@@ -186,6 +186,10 @@ PostgreSQL, Redis, PHP-FPM et Vite restent sur le réseau privé `riskpilot`. Ng
 
 Le service `scheduler` exécute les maintenances périodiques, notamment l’expiration des acceptations de risques. Une expiration replace automatiquement le risque en revue et notifie son propriétaire. Le module `risk-governance` conserve les politiques par tenant, les décisions signées par leur auteur, les campagnes et les instantanés de scores ; aucun statut `ACCEPTED` ne peut être saisi sans acceptation approuvée encore valide.
 
+## Identité, API et intégrations
+
+`PlatformIntegration` isole chaque configuration par organisation et couvre OIDC, SAML, SCIM, clés de service et webhooks. Les clés sont préfixées pour une recherche indexable puis vérifiées par comparaison d’empreinte SHA-256 ; le secret en clair n’est retourné qu’une fois. Les webhooks utilisent une signature HMAC `sha256=HMAC_SHA256(timestamp.payload, SHA256(secret))`. L’API d’administration est versionnée sous `/api/v1/integrations`, applique le rôle administrateur et masque les identifiants appartenant à un autre tenant par une réponse 404. L’endpoint de service `/api/v1/service/status` valide la clé et expose seulement l’organisation et les portées associées.
+
 ## Variables et secrets structurants
 
 | Variable | Usage |

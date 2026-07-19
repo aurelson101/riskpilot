@@ -45,6 +45,7 @@ security:
         - { path: ^/api/public/documents/, roles: PUBLIC_ACCESS }
         - { path: ^/api/public/supplier-assessments/, roles: PUBLIC_ACCESS }
         - { path: ^/api/calendar/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/service/status$, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: ROLE_VIEWER }
 

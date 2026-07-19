@@ -124,6 +124,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 - tests E2E, IDOR, fuzz, ZAP, charge, accessibilité WCAG 2.2 AA et i18n ;
 - CI/CD, migrations à blanc, SBOM, signature d’images et déploiement progressif.
 
+**Réalisé :** catalogue administrable OIDC/SAML (Google Workspace, Microsoft Entra et fournisseur générique), mappings groupes/rôles, préparation SCIM avec validation à blanc, API `/api/v1`, clés de service à portées dont le secret n’est affiché qu’une fois et webhooks HTTPS signés. La CI reconstruit les images, valide les migrations à blanc, exécute tests/analyse statique/lint, produit un SBOM et analyse dépôt et conteneurs. La signature d’images et le déploiement progressif restent des contrôles d’exploitation à brancher sur le registre et l’orchestrateur de la cible.
+
 ## Critères de sortie
 
 Une version destinée à une production critique exige : aucune vulnérabilité critique/haute connue, restauration testée, migrations validées avec retour arrière, matrice RBAC/tenant automatisée, preuves et secrets protégés, audit probant, supervision active et documentation d’exploitation approuvée.

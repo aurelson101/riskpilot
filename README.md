@@ -134,6 +134,8 @@ Le registre réglementaire regroupe traitements RGPD, AIPD, violations de donné
 
 Le pilotage direction structure objectifs SMSI, KPI/KRI et seuils, revues de direction, scénarios financiers par fréquence/fourchette de pertes et dossiers d’investissement avec coût, charge, réduction et ROI. La Vision 360° du rapport exécutif agrège les registres opérationnels sans dupliquer leurs données.
 
+Les intégrations d’entreprise se configurent dans **Paramètres → Identité et intégrations** : fournisseurs OIDC/SAML Google Workspace, Microsoft Entra ou génériques, préparation SCIM, clés API à portées et webhooks HTTPS. Les secrets techniques ne sont affichés qu’à leur création et ne sont conservés que sous forme d’empreinte.
+
 ## Tests
 
 Après démarrage :

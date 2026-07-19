@@ -11,6 +11,24 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker compose build
+      - run: docker compose run --rm backend composer validate --strict
+      - run: docker compose run --rm backend php bin/console doctrine:migrations:migrate --dry-run --no-interaction
+      - run: docker compose run --rm -e APP_ENV=test backend php bin/phpunit
+      - run: docker compose run --rm backend vendor/bin/phpstan analyse src tests --memory-limit=512M
+      - run: docker compose run --rm backend vendor/bin/php-cs-fixer check --diff
+      - run: docker compose run --rm frontend npm run lint
+      - run: docker compose run --rm frontend npm run test
+      - run: docker compose run --rm frontend npm run build
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: riskpilot-sbom.spdx.json
   repository-scan:
     runs-on: ubuntu-latest
     steps:
@@ -20,6 +38,18 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+  container-scan:
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build backend frontend
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: riskpilot-backend
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'

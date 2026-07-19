@@ -162,6 +162,11 @@ const RegulatoryPage = lazy(() =>
     default: module.RegulatoryPage,
   })),
 );
+const IntegrationSettingsPage = lazy(() =>
+  import("./pages/IntegrationSettingsPage").then((module) => ({
+    default: module.IntegrationSettingsPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -244,6 +249,7 @@ function Layout() {
     "/administration/organizations": "Organisations",
     "/administration/audit-logs": "Journal d’audit",
     "/administration/email-settings": "Paramètres email",
+    "/administration/integrations": "Identité et intégrations",
   };
 
   function NavItem({
@@ -502,6 +508,14 @@ function Layout() {
               {isAdmin && (
                 <NavItem
                   nested
+                  path="/administration/integrations"
+                  label="Identité et intégrations"
+                  icon={<AccountTreeOutlined fontSize="small" />}
+                />
+              )}
+              {isAdmin && (
+                <NavItem
+                  nested
                   path="/administration/email-settings"
                   label="Messagerie"
                   icon={<SettingsOutlined fontSize="small" />}
@@ -731,6 +745,10 @@ export default function App() {
             <Route
               path="administration/email-settings"
               element={<EmailSettingsPage />}
+            />
+            <Route
+              path="administration/integrations"
+              element={<IntegrationSettingsPage />}
             />
             <Route path="reports/executive" element={<ExecutiveReportPage />} />
             <Route path="isms-documents" element={<IsmsDocumentsPage />} />
