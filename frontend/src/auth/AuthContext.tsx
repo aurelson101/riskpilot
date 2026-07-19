@@ -22,6 +22,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     retry: false,
   });
   const logout = useCallback(() => {
+    void api.post("/auth/logout").catch(() => undefined);
     sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     queryClient.clear();

@@ -40,6 +40,7 @@ describe("App", () => {
   it("revient à la connexion quand le JWT stocké est expiré", async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "expired-token");
     vi.spyOn(api, "get").mockRejectedValueOnce(new Error("Unauthorized"));
+    vi.spyOn(api, "post").mockRejectedValueOnce(new Error("Unauthorized"));
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/"]}>
@@ -69,28 +70,30 @@ describe("App", () => {
                 category: "Politique interne",
               },
             ]
-          : {
-              id: 1,
-              email: "admin@example.test",
-              firstName: "Alice",
-              lastName: "Admin",
-              roles: ["ROLE_ADMIN"],
-              status: "ACTIVE",
-              mfaEnabled: false,
-              lastLoginAt: null,
-              organization: {
+          : url === "/me/sessions"
+            ? []
+            : {
                 id: 1,
-                name: "Demo",
-                description: null,
+                email: "admin@example.test",
+                firstName: "Alice",
+                lastName: "Admin",
+                roles: ["ROLE_ADMIN"],
                 status: "ACTIVE",
-                riskThresholds: {
-                  lowMax: 4,
-                  moderateMax: 9,
-                  highMax: 16,
-                  criticalMax: 25,
+                mfaEnabled: false,
+                lastLoginAt: null,
+                organization: {
+                  id: 1,
+                  name: "Demo",
+                  description: null,
+                  status: "ACTIVE",
+                  riskThresholds: {
+                    lowMax: 4,
+                    moderateMax: 9,
+                    highMax: 16,
+                    criticalMax: 25,
+                  },
                 },
               },
-            },
     }));
     render(
       <QueryClientProvider client={new QueryClient()}>

@@ -9,6 +9,7 @@ use App\Api\Dto\CreateUserInput;
 use App\Api\Dto\UpdateUserInput;
 use App\Api\JsonInputMapper;
 use App\Entity\User;
+use App\Repository\AuthSessionRepository;
 use App\Repository\OrganizationRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ final readonly class UserController
         private Security $security,
         private JsonInputMapper $inputMapper,
         private ApiResponseFactory $responses,
+        private AuthSessionRepository $sessions,
     ) {
     }
 
@@ -102,6 +104,9 @@ final readonly class UserController
         }
 
         $user->setEmail($input->email)->setFirstName($input->firstName)->setLastName($input->lastName)->setRoles($input->roles)->setStatus($input->status);
+        if (User::STATUS_ACTIVE !== $input->status) {
+            $this->sessions->revokeAll($user);
+        }
         $this->entityManager->flush();
 
         return new JsonResponse($this->responses->user($user));
@@ -122,6 +127,7 @@ final readonly class UserController
 
         // Les comptes sont désactivés afin de conserver leurs responsabilités et l’historique métier.
         $user->setStatus(User::STATUS_INACTIVE);
+        $this->sessions->revokeAll($user);
         $this->entityManager->flush();
 
         return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);

@@ -51,10 +51,13 @@ export function LoginPage() {
       navigate("/");
     } catch (reason) {
       setError(
-        axios.isAxiosError(reason) && reason.response?.status === 401
-          ? mfaRequired
-            ? "Code MFA ou code de secours invalide."
-            : "Email ou mot de passe incorrect."
+        axios.isAxiosError<{ message?: string }>(reason)
+          ? reason.response?.status === 401
+            ? mfaRequired
+              ? "Code MFA ou code de secours invalide."
+              : "Email ou mot de passe incorrect."
+            : (reason.response?.data?.message ??
+              "Le service est momentanément indisponible.")
           : "Le service est momentanément indisponible.",
       );
     }
@@ -127,6 +130,9 @@ export function LoginPage() {
               disabled={isSubmitting}
             >
               {isSubmitting ? "Connexion…" : "Se connecter"}
+            </Button>
+            <Button type="button" onClick={() => navigate("/reset-password")}>
+              Mot de passe oublié ?
             </Button>
           </Stack>
         </CardContent>

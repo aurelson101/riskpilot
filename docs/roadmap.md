@@ -21,6 +21,8 @@ Chaque étape doit inclure : migrations réversibles, isolation par organisation
 
 ## Étape 1 — identité, sessions et récupération
 
+**État : réalisé.** Les codes de secours MFA à usage unique assurent la récupération du second facteur sans politique MFA obligatoire.
+
 - refresh tokens rotatifs stockés sous forme d’empreinte ;
 - registre des sessions/appareils, révocation unitaire et déconnexion globale ;
 - déconnexion serveur et invalidation lors d’une désactivation de compte ;

@@ -71,6 +71,11 @@ import {
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
 );
+const ResetPasswordPage = lazy(() =>
+  import("./pages/ResetPasswordPage").then((module) => ({
+    default: module.ResetPasswordPage,
+  })),
+);
 const InventoryPage = lazy(() =>
   import("./pages/InventoryPage").then((module) => ({
     default: module.InventoryPage,
@@ -653,6 +658,7 @@ export default function App() {
     >
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/shared/documents/:token"
           element={<PublicDocumentPage />}

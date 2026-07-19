@@ -91,6 +91,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $calendarTokenCreatedAt = null;
 
+    #[ORM\Column]
+    private int $failedLoginAttempts = 0;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lockedUntil = null;
+
     /** @param list<string> $roles */
     public function __construct(string $email, string $firstName, string $lastName, Organization $organization, array $roles = [])
     {
@@ -223,6 +229,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function markLogin(): void
     {
         $this->lastLoginAt = new \DateTimeImmutable();
+        $this->failedLoginAttempts = 0;
+        $this->lockedUntil = null;
+    }
+
+    public function isTemporarilyLocked(): bool
+    {
+        return null !== $this->lockedUntil && $this->lockedUntil > new \DateTimeImmutable();
+    }
+
+    public function registerFailedLogin(): void
+    {
+        ++$this->failedLoginAttempts;
+        if ($this->failedLoginAttempts >= 10) {
+            $this->lockedUntil = new \DateTimeImmutable('+15 minutes');
+        } elseif ($this->failedLoginAttempts >= 5) {
+            $this->lockedUntil = new \DateTimeImmutable('+1 minute');
+        }
     }
 
     public function isMfaEnabled(): bool

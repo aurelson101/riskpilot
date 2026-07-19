@@ -32,6 +32,7 @@ services:
     App\Controller\AuthController:
         arguments:
             $loginLimiter: '@limiter.login'
+            $appUrl: '%app.url%'
 
     App\Controller\EmailSettingsController:
         arguments:
@@ -42,6 +43,10 @@ services:
             $appUrl: '%app.url%'
 
     App\Controller\CalendarController:
+        arguments:
+            $appUrl: '%app.url%'
+
+    App\Controller\SessionController:
         arguments:
             $appUrl: '%app.url%'
 

@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
+  Chip,
   Stack,
   TextField,
   Typography,
@@ -16,7 +18,7 @@ import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -33,6 +35,27 @@ export function ProfilePage() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [mfaQrCode, setMfaQrCode] = useState("");
   const [mfaMessage, setMfaMessage] = useState("");
+  const sessions = useQuery({
+    queryKey: ["sessions"],
+    queryFn: async () =>
+      (
+        await api.get<
+          Array<{
+            id: number;
+            userAgent: string;
+            ipAddress: string;
+            lastUsedAt: string;
+            expiresAt: string;
+            active: boolean;
+            current: boolean;
+          }>
+        >("/me/sessions")
+      ).data,
+  });
+  const revokeSession = useMutation({
+    mutationFn: (id: number) => api.delete(`/me/sessions/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -182,6 +205,76 @@ export function ProfilePage() {
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? "Enregistrement…" : "Enregistrer les modifications"}
             </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              gap={1}
+            >
+              <Box>
+                <Typography variant="h6">Sessions et appareils</Typography>
+                <Typography color="text.secondary">
+                  Consultez et révoquez les connexions associées à votre compte.
+                </Typography>
+              </Box>
+              <Button
+                color="error"
+                variant="outlined"
+                onClick={async () => {
+                  await api.delete("/me/sessions");
+                  logout();
+                }}
+              >
+                Tout déconnecter
+              </Button>
+            </Stack>
+            {(sessions.data ?? []).map((session) => (
+              <Stack
+                key={session.id}
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                gap={1}
+                sx={{
+                  p: 1.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                <Stack minWidth={0}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography fontWeight={700} noWrap>
+                      {session.userAgent}
+                    </Typography>
+                    {session.current && (
+                      <Chip
+                        size="small"
+                        color="success"
+                        label="Cette session"
+                      />
+                    )}
+                    {!session.active && <Chip size="small" label="Révoquée" />}
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    IP {session.ipAddress} · dernière activité{" "}
+                    {new Date(session.lastUsedAt).toLocaleString("fr-FR")}
+                  </Typography>
+                </Stack>
+                {session.active && (
+                  <Button
+                    color="error"
+                    onClick={() => revokeSession.mutate(session.id)}
+                  >
+                    Révoquer
+                  </Button>
+                )}
+              </Stack>
+            ))}
           </Stack>
         </CardContent>
       </Card>
