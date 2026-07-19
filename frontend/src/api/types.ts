@@ -216,6 +216,45 @@ export interface ComplianceResult {
   remediationAction: { id: number; title: string } | null;
 }
 
+export interface StatementOfApplicability {
+  id: number;
+  title: string;
+  version: number;
+  status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "SUPERSEDED";
+  framework: { id: number; name: string; version: string };
+  scope: { id: number; name: string };
+  owner: { id: number; name: string };
+  approvedBy: { id: number; name: string } | null;
+  approvedAt: string | null;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface SecurityControlTest {
+  id: number;
+  control: { id: number; name: string };
+  tester: { id: number; name: string };
+  type: "DESIGN" | "OPERATING_EFFECTIVENESS";
+  frequency: string;
+  result: "EFFECTIVE" | "PARTIALLY_EFFECTIVE" | "INEFFECTIVE" | "NOT_TESTED";
+  procedure: string;
+  sampleDescription: string | null;
+  sampleSize: number | null;
+  conclusion: string | null;
+  evidence: string[];
+  performedAt: string;
+  nextReviewAt: string;
+}
+
+export interface RequirementMapping {
+  id: number;
+  source: { id: number; reference: string; framework: string };
+  target: { id: number; reference: string; framework: string };
+  coveragePercent: number;
+  inheritEvidence: boolean;
+  rationale: string | null;
+}
+
 export interface Dashboard {
   summary: {
     totalRisks: number;

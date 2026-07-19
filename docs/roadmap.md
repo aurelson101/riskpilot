@@ -53,12 +53,16 @@ Chaque étape doit inclure : migrations réversibles, isolation par organisation
 
 ## Étape 4 — SoA, contrôles et conformité continue
 
+**État : réalisé.** La SoA ISO 27001 dispose désormais d’un cycle versionné et approuvé, les contrôles ont des tests probants et planifiés, et les correspondances multinormes réutilisent les preuves avec leur taux de couverture et leur provenance.
+
 - déclaration d’applicabilité ISO 27001 versionnée et exportable ;
 - liens exigences ↔ mesures ↔ risques ↔ actions ↔ preuves ;
 - tests de conception et d’efficacité opérationnelle des contrôles ;
 - propriétaire, fréquence, échantillon, résultat, preuve et prochaine revue ;
 - bibliothèques réutilisables d’exigences, mesures, menaces et actifs ;
 - conformité multinorme avec héritage et réutilisation des preuves.
+
+Les bibliothèques existantes de référentiels/exigences, mesures, menaces et actifs sont réutilisables dans les périmètres autorisés. Les relations et l’héritage n’effectuent jamais de copie opaque : la source, l’évaluation et le pourcentage de couverture restent exposés.
 
 ## Étape 5 — audits, non-conformités et CAPA
 

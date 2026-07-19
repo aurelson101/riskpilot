@@ -38,6 +38,7 @@ import type {
   User,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { ComplianceGovernancePanel } from "../components/compliance/ComplianceGovernancePanel";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
   COMPLIANT: "Conforme",
@@ -190,7 +191,9 @@ export function CompliancePage() {
       <Tabs value={tab} onChange={(_, value) => setTab(value)}>
         <Tab label="Évaluations" />
         <Tab label="Référentiels" />
+        <Tab label="SoA & contrôles" />
       </Tabs>
+      {tab === 2 && <ComplianceGovernancePanel />}
       {tab === 1 && (
         <Card variant="outlined">
           <CardContent>

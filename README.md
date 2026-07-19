@@ -92,6 +92,8 @@ Les API principales sont `GET|POST /api/actions`, `GET|PUT /api/actions/{id}`, `
 
 ## Référentiels et conformité
 
+Le module conformité inclut les déclarations d’applicabilité ISO 27001 versionnées. Une version approuvée est immuable et sa révision crée une nouvelle version en conservant les liens exigences–contrôles–risques–actions–preuves. L’approbateur administrateur doit être distinct du responsable. Chaque SoA est exportable en CSV UTF-8. Les tests de contrôles consignent conception ou efficacité opérationnelle, procédure, fréquence, testeur, échantillon, résultat, preuves et prochaine revue. Les correspondances entre exigences permettent de réutiliser une preuve multinorme tout en affichant sa provenance et son taux de couverture.
+
 L’écran `/compliance` regroupe les référentiels et les évaluations. Une évaluation porte sur un périmètre et génère un résultat pour chaque exigence active. Les évaluateurs saisissent un niveau de maturité de 0 à 5, un statut conforme, partiel, non conforme, non applicable ou non évalué, ainsi que des preuves et une action corrective facultative. Le score global exclut les exigences non applicables ou non évaluées.
 
 Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.

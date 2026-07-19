@@ -75,6 +75,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `ROLE_SUPER_ADMIN` administre plusieurs organisations. `ROLE_ADMIN` administre son tenant. Les rôles spécialisés limitent les écritures sur les risques, actions, audits ou ressources de conformité.
 
+### Conformité continue
+
+`StatementOfApplicability` représente une version de SoA liée à une organisation, un référentiel et un périmètre. Ses lignes relient chaque exigence aux contrôles, risques, actions et références de preuve. Une approbation fige la version ; `revise` duplique les lignes dans une version suivante et marque l’ancienne comme remplacée. `SecurityControlTest` apporte la preuve de conception ou d’efficacité opérationnelle avec planification de la prochaine revue. `RequirementMapping` relie deux exigences et autorise, explicitement, la résolution de preuves héritées dans le tenant courant avec provenance et couverture.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |
