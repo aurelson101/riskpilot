@@ -18,6 +18,8 @@ Centraliser les politiques, procédures, preuves et modèles du SMSI avec une tr
 - liens de partage externes révocables et expirables, avec protection renforcée selon la classification ;
 - journalisation automatique des opérations sensibles par le système d'audit existant ;
 - interface responsive intégrée au menu principal.
+- catégories libres générant automatiquement des sous-menus après filtrage tenant/ACL ;
+- vue d’ensemble présentant les 10 documents accessibles les plus récents avec résumé.
 
 ## Règles de sécurité
 
@@ -32,11 +34,25 @@ Centraliser les politiques, procédures, preuves et modèles du SMSI avec une tr
 - seuls les comptes actifs de la même organisation peuvent être propriétaires ou recevoir une ACL ;
 - un document confidentiel ou restreint impose un mot de passe de partage ; un document restreint impose une expiration de 30 jours maximum.
 
-## Lots suivants
+## P0 — stockage et conservation
 
-1. Migration des fichiers Word locaux vers un stockage chiffré S3/MinIO avec antivirus.
-2. Signature électronique et rappels automatiques des revues périodiques.
-3. Modèles ISO 27001, NIS2 et DORA avec génération guidée.
-4. Liens entre documents, exigences, contrôles, risques et preuves d'audit.
-5. Export PDF signé, filigrane, conservation légale et corbeille restaurable.
-6. Recherche plein texte PostgreSQL et indexation du contenu des pièces jointes.
+1. Migrer les fichiers locaux vers un stockage objet chiffré S3/MinIO avec antivirus, quotas et journal de téléchargement.
+2. Ajouter une corbeille restaurable, une politique de rétention, le gel légal et une purge contrôlée à double validation.
+3. Préserver le fichier binaire de chaque version, et pas uniquement ses métadonnées et son empreinte.
+4. Sauvegarder et restaurer conjointement métadonnées, ACL, partages et objets documentaires.
+
+## P1 — gouvernance documentaire
+
+1. Ajouter signature électronique, commentaires de revue, délégation et rappels automatiques des échéances.
+2. Gérer les catégories comme ressources administrables : description, icône, ordre, responsable, archivage et déplacement contrôlé des documents.
+3. Relier documents, exigences, contrôles, risques, actions, audits et preuves avec indicateurs de couverture.
+4. Fournir des modèles ISO 27001, NIS2 et DORA avec génération guidée et licence clairement identifiée.
+5. Ajouter accusé de lecture, campagnes d’attestation et statistiques de diffusion par population.
+
+## P2 — recherche et diffusion
+
+1. Ajouter recherche plein texte PostgreSQL, filtres serveur, pagination et indexation du contenu des pièces jointes.
+2. Produire des exports PDF signés avec filigrane, numéro de version, classification et empreinte vérifiable.
+3. Proposer prévisualisation Markdown/Word sécurisée, comparaison visuelle entre versions et restauration des métadonnées.
+4. Ajouter des liens publics à usage unique, limitation du nombre de consultations et liste d’adresses autorisées.
+5. Tester automatiquement la matrice ACL complète, les expirations, les accès concurrents et les volumes élevés.
