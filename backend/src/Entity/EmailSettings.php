@@ -31,6 +31,15 @@ class EmailSettings
     #[ORM\Column(length: 180, nullable: true)] private ?string $replyTo = null;
     #[ORM\Column] private bool $enabled = false;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
+    #[ORM\Column(length: 255, nullable: true)] private ?string $oauthClientId = null;
+    #[ORM\Column(type: 'text', nullable: true)] private ?string $encryptedOauthClientSecret = null;
+    #[ORM\Column(type: 'text', nullable: true)] private ?string $encryptedAccessToken = null;
+    #[ORM\Column(type: 'text', nullable: true)] private ?string $encryptedRefreshToken = null;
+    #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $accessTokenExpiresAt = null;
+    #[ORM\Column(length: 180, nullable: true)] private ?string $connectedEmail = null;
+    #[ORM\Column(length: 100, nullable: true)] private ?string $oauthTenant = null;
+    #[ORM\Column(length: 64, nullable: true)] private ?string $oauthStateHash = null;
+    #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $oauthStateExpiresAt = null;
     public function __construct(Organization $organization)
     {
         $this->organization = $organization;
@@ -95,6 +104,92 @@ class EmailSettings
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getOauthClientId(): ?string
+    {
+        return $this->oauthClientId;
+    }
+
+    public function getEncryptedOauthClientSecret(): ?string
+    {
+        return $this->encryptedOauthClientSecret;
+    }
+
+    public function getEncryptedAccessToken(): ?string
+    {
+        return $this->encryptedAccessToken;
+    }
+
+    public function getEncryptedRefreshToken(): ?string
+    {
+        return $this->encryptedRefreshToken;
+    }
+
+    public function getAccessTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->accessTokenExpiresAt;
+    }
+
+    public function getConnectedEmail(): ?string
+    {
+        return $this->connectedEmail;
+    }
+
+    public function getOauthTenant(): ?string
+    {
+        return $this->oauthTenant;
+    }
+
+    public function configureOauth(string $provider, string $clientId, ?string $encryptedClientSecret, ?string $tenant, string $senderName, ?string $replyTo): void
+    {
+        $this->provider = $provider;
+        $this->oauthClientId = $clientId;
+        if (null !== $encryptedClientSecret) {
+            $this->encryptedOauthClientSecret = $encryptedClientSecret;
+        }
+        $this->oauthTenant = null === $tenant || '' === trim($tenant) ? 'common' : trim($tenant);
+        $this->senderName = $senderName;
+        $this->replyTo = null === $replyTo || '' === trim($replyTo) ? null : mb_strtolower(trim($replyTo));
+        $this->enabled = false;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function beginOauth(string $state, \DateTimeImmutable $expiresAt): void
+    {
+        $this->oauthStateHash = hash('sha256', $state);
+        $this->oauthStateExpiresAt = $expiresAt;
+    }
+
+    public function consumeOauthState(string $state): bool
+    {
+        $valid = null !== $this->oauthStateHash && null !== $this->oauthStateExpiresAt && $this->oauthStateExpiresAt > new \DateTimeImmutable() && hash_equals($this->oauthStateHash, hash('sha256', $state));
+        $this->oauthStateHash = null;
+        $this->oauthStateExpiresAt = null;
+
+        return $valid;
+    }
+
+    public function connectOauth(string $encryptedAccessToken, ?string $encryptedRefreshToken, \DateTimeImmutable $expiresAt, string $email): void
+    {
+        $this->encryptedAccessToken = $encryptedAccessToken;
+        if (null !== $encryptedRefreshToken) {
+            $this->encryptedRefreshToken = $encryptedRefreshToken;
+        }
+        $this->accessTokenExpiresAt = $expiresAt;
+        $this->connectedEmail = mb_strtolower($email);
+        $this->senderEmail = mb_strtolower($email);
+        $this->enabled = true;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function disconnectOauth(): void
+    {
+        $this->encryptedAccessToken = null;
+        $this->encryptedRefreshToken = null;
+        $this->accessTokenExpiresAt = null;
+        $this->connectedEmail = null;
+        $this->enabled = false;
     }
 
     public function configure(string $provider, string $host, int $port, string $encryption, string $username, string $senderEmail, string $senderName, ?string $replyTo, bool $enabled): void

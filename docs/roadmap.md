@@ -55,11 +55,11 @@ L’analyse du code a mis en évidence une authentification JWT à facteur uniqu
 |---|---|---|---|
 | P0 | MFA TOTP individuel | Confirmation du mot de passe, Google/Microsoft Authenticator et codes de secours à usage unique | Réalisé |
 | P0 | Secrets protégés | Secrets TOTP et mots de passe SMTP chiffrés avec libsodium, jamais exposés par l’API | Réalisé |
-| P0 | SMTP par organisation | SMTP2GO, Google Workspace, Microsoft 365 et SMTP personnalisé, expéditeur, reply-to et test | Réalisé |
+| P0 | SMTP par organisation | SMTP2GO et SMTP personnalisé, expéditeur, reply-to et test | Réalisé |
 | P1 | Politique MFA | MFA obligatoire par rôle/organisation, délai d’enrôlement et vue de conformité | Prochaine étape |
 | P1 | Récupération encadrée | Régénération des codes, désactivation par un second administrateur et audit dédié | Prochaine étape |
-| P1 | OAuth Google/Microsoft | Consentement tenant, rotation des jetons et Microsoft Graph/Gmail API, sans mot de passe d’application | Prochaine étape |
+| P0 | OAuth Google/Microsoft | Authorization Code, consentement tenant, renouvellement des jetons et envoi Microsoft Graph/Gmail API | Réalisé |
 | P1 | Délivrabilité | Modèles HTML, SPF/DKIM/DMARC, suivi des rebonds et file d’échec administrable | Prochaine étape |
 | P2 | SSO d’entreprise | OpenID Connect Google/Microsoft, liaison de comptes et provisioning SCIM | À planifier |
 
-Cette première livraison utilise les points SMTP officiels. Google Workspace et Microsoft 365 pouvant imposer des politiques tenant spécifiques, l’interface explique les prérequis et conserve un mode SMTP personnalisé. L’OAuth natif reste une phase séparée car il exige des applications clientes et un consentement administrateur propres à chaque organisation.
+Google Workspace et Microsoft 365 utilisent désormais OAuth 2.0 et leurs API d’envoi, sans mot de passe SMTP. Chaque organisation fournit son client OAuth et réalise son propre consentement administrateur ; SMTP2GO et le SMTP personnalisé restent disponibles pour les autres infrastructures.

@@ -269,6 +269,26 @@ final class TenantIsolationTest extends WebTestCase
         self::assertSame([], $reloadedUser->getMfaRecoveryCodes());
     }
 
+    public function testGoogleOauthConfigurationNeverExposesSecretAndCreatesConsentUrl(): void
+    {
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'provider' => 'GOOGLE_WORKSPACE', 'oauthClientId' => 'google-client-id.apps.googleusercontent.com',
+            'oauthClientSecret' => 'google-client-secret', 'senderName' => 'RiskPilot',
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertTrue($payload['oauthClientSecretConfigured']);
+        self::assertArrayNotHasKey('oauthClientSecret', $payload);
+
+        $this->authenticate($this->adminA);
+        $this->client->request('POST', '/api/settings/email/oauth/google_workspace/authorize');
+        self::assertResponseIsSuccessful();
+        $authorization = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertStringStartsWith('https://accounts.google.com/o/oauth2/v2/auth?', $authorization['authorizationUrl']);
+        self::assertStringContainsString('gmail.send', urldecode($authorization['authorizationUrl']));
+        self::assertStringContainsString('/api/settings/email/oauth/google_workspace/callback', $authorization['redirectUri']);
+    }
+
     #[DataProvider('inventoryResources')]
     public function testInventoryListsNeverExposeAnotherTenant(string $resource): void
     {

@@ -15,7 +15,7 @@ use Symfony\Component\Mime\Email;
 
 final readonly class OrganizationMailer
 {
-    public function __construct(private EmailSettingsRepository $settings, private SecretCipher $cipher, private MailerInterface $fallbackMailer)
+    public function __construct(private EmailSettingsRepository $settings, private SecretCipher $cipher, private MailerInterface $fallbackMailer, private OauthMailProvider $oauthMailer)
     {
     }
 
@@ -32,6 +32,11 @@ final readonly class OrganizationMailer
 
     public function sendWithSettings(EmailSettings $settings, string $recipient, string $subject, string $message): void
     {
+        if (in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
+            $this->oauthMailer->send($settings, $recipient, $subject, $message);
+
+            return;
+        }
         $password = $settings->getEncryptedPassword();
         if (null === $password) {
             throw new \RuntimeException('Le mot de passe SMTP est manquant.');

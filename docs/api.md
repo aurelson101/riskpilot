@@ -19,6 +19,9 @@ Le point `GET /api/health` permet de vérifier le service sans authentification.
 - `GET /api/audit-logs` : 500 dernières mutations visibles par l’administrateur.
 - `GET|PUT /api/settings/email` : configuration SMTP isolée par organisation.
 - `POST /api/settings/email/test` : test immédiat vers le destinataire choisi.
+- `POST /api/settings/email/oauth/{provider}/authorize` : génère l’URL de consentement Google ou Microsoft avec état anti-CSRF.
+- `GET /api/settings/email/oauth/{provider}/callback` : échange le code OAuth, chiffre les jetons et reconnecte l’interface.
+- `POST /api/settings/email/oauth/disconnect` : retire les jetons OAuth de l’organisation.
 
 Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié au niveau du repository. Une ressource d’une autre organisation est renvoyée comme inexistante.
 
