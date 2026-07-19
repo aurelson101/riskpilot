@@ -93,7 +93,7 @@ export function DashboardPage() {
             Vue consolidée des risques, actions et conformité
           </Typography>
         </Stack>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             component={Link}
             to="/reports/executive"

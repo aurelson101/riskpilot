@@ -20,6 +20,23 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.MuiTableContainer-root {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 599px) {
+  .MuiDialog-paper {
+    margin: 12px !important;
+    max-height: calc(100% - 24px) !important;
+  }
+
+  .MuiCardContent-root {
+    padding: 16px;
+  }
 }
 
 @media print {

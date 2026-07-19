@@ -123,15 +123,20 @@ export function ExecutiveReportPage() {
   return (
     <Stack className="executive-report" spacing={3}>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="flex-start"
+        alignItems={{ xs: "stretch", sm: "flex-start" }}
+        gap={2}
       >
         <Stack>
           <Typography variant="overline" color="primary" fontWeight={800}>
             RISKpilot · Rapport exécutif
           </Typography>
-          <Typography variant="h3" fontWeight={800}>
+          <Typography
+            variant="h3"
+            fontWeight={800}
+            sx={{ fontSize: { xs: "2rem", sm: "3rem" } }}
+          >
             {user?.organization.name}
           </Typography>
           <Typography color="text.secondary">

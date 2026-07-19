@@ -94,10 +94,11 @@ export function RiskMatrixPage() {
         alignItems="stretch"
       >
         <Card variant="outlined" sx={{ flex: 1 }}>
-          <CardContent>
+          <CardContent sx={{ overflowX: "auto" }}>
             <Box
               sx={{
                 display: "grid",
+                minWidth: 400,
                 gridTemplateColumns: "36px repeat(5, minmax(64px, 1fr))",
                 gap: 1,
                 alignItems: "stretch",

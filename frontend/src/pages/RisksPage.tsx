@@ -216,7 +216,12 @@ export function RisksPage() {
     );
   return (
     <Stack spacing={3}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        gap={2}
+      >
         <Stack>
           <Typography variant="h4" fontWeight={750}>
             Registre des risques

@@ -104,7 +104,11 @@ export function OrganizationsPage() {
   }
   return (
     <Stack spacing={3}>
-      <Stack direction="row" justifyContent="space-between">
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        gap={2}
+      >
         <Stack>
           <Typography variant="h4" fontWeight={750}>
             Organisations
