@@ -128,6 +128,8 @@ Le même menu donne accès au pilotage des audits métier : programme annuel, mi
 
 Le registre des tiers centralise services, données confiées, criticité, dépendances, contrat/SLA, échéances, plan de sortie et cyberscore. Une campagne fournisseur fige la version et les pondérations du questionnaire, expose un formulaire limité par jeton opaque et expiration, collecte réponses et références de preuves, puis exige une revue interne avant de mettre à jour le score.
 
+Le module résilience gère les incidents de la détection à la clôture avec chronologie, impacts, preuves, obligations de notification, retour d’expérience et liens vers actifs, tiers, risques et actions. La BIA documente les processus, dépendances et impacts, impose un RTO cohérent avec le MTPD, suit le RPO, les procédures PCA/PRA et les exercices avec écarts et améliorations.
+
 ## Tests
 
 Après démarrage :

@@ -87,6 +87,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `ThirdParty` est isolé par organisation et porte le contexte contractuel, les dépendances, la criticité, le plan de sortie et le score courant. `SupplierAssessment` conserve un instantané versionné des questions et pondérations. Le portail public ne donne accès qu’au questionnaire désigné par un jeton aléatoire de 256 bits jusqu’à son expiration ; aucune API du tenant n’y est exposée. La soumission est ensuite revue par un utilisateur autorisé avant consolidation du cyberscore.
 
+### Résilience
+
+`SecurityIncident` porte le cycle opérationnel, les impacts structurés, la chronologie, les preuves et les relations vers actifs, tiers, risques et actions du même tenant. Une clôture soumise à notification réglementaire est refusée tant que la date d’envoi manque. `ContinuityProcess` porte la BIA, contrôle `RTO <= MTPD`, documente RPO, dépendances, PCA/PRA et conserve les exercices, participants, écarts et améliorations sous forme d’instantanés.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |

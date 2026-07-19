@@ -86,6 +86,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 7 — incidents et continuité
 
+**État : réalisé.** Le registre d’incidents trace qualification, chronologie, impacts, preuves, notification et retour d’expérience avec liens aux actifs, tiers, risques et actions. Le module BIA contrôle la cohérence MTPD/RTO/RPO et conserve PCA, PRA et exercices d’amélioration.
+
 - incidents : qualification, chronologie, impacts, preuves, notifications et retour d’expérience ;
 - processus métier, dépendances et analyse d’impact BIA ;
 - MTPD, RTO, RPO, PCA, PRA et procédures de crise ;
