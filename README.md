@@ -132,6 +132,8 @@ Le module résilience gère les incidents de la détection à la clôture avec c
 
 Le registre réglementaire regroupe traitements RGPD, AIPD, violations de données, obligations légales/contractuelles et dérogations. Chaque type impose ses informations probantes (finalité, base légale, conservation, risques, mesures, source ou décision de notification). Une dérogation doit documenter le risque et la compensation, expirer et être approuvée par une personne distincte du responsable.
 
+Le pilotage direction structure objectifs SMSI, KPI/KRI et seuils, revues de direction, scénarios financiers par fréquence/fourchette de pertes et dossiers d’investissement avec coût, charge, réduction et ROI. La Vision 360° du rapport exécutif agrège les registres opérationnels sans dupliquer leurs données.
+
 ## Tests
 
 Après démarrage :

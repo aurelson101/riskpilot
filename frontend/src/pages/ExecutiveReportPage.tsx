@@ -104,6 +104,20 @@ export function ExecutiveReportPage() {
     queryKey: ["dashboard"],
     queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
   });
+  const vision = useQuery({
+    queryKey: ["vision-360"],
+    queryFn: async () =>
+      (
+        await api.get<{
+          controls: { total: number; implemented: number };
+          thirdParties: { total: number; critical: number };
+          financialScenarios: Array<{
+            lossMostLikely?: number;
+            currency?: string;
+          }>;
+        }>("/executive-governance/vision-360")
+      ).data,
+  });
   if (!query.data) return <Typography>Préparation du rapport…</Typography>;
   const data = query.data;
   const riskData = (
@@ -173,6 +187,27 @@ export function ExecutiveReportPage() {
           </Card>
         ))}
       </Box>
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="h6" fontWeight={750} gutterBottom>
+            Vision 360°
+          </Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
+            <Typography>
+              Contrôles : {vision.data?.controls.implemented ?? 0}/
+              {vision.data?.controls.total ?? 0} déployés
+            </Typography>
+            <Typography>
+              Tiers critiques : {vision.data?.thirdParties.critical ?? 0}/
+              {vision.data?.thirdParties.total ?? 0}
+            </Typography>
+            <Typography>
+              Scénarios financiers :{" "}
+              {vision.data?.financialScenarios.length ?? 0}
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
       <Box
         sx={{
           display: "grid",

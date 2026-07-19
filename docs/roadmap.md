@@ -106,6 +106,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 9 — pilotage direction et quantification
 
+**État : réalisé.** Objectifs, KPI/KRI, revues de direction, fourchettes de pertes et dossiers d’investissement sont structurés et validés. La Vision 360° agrège en temps réel risques, contrôles, conformité, tiers, actions et scénarios financiers.
+
 - objectifs SMSI, indicateurs KPI/KRI, seuils, tendances et alertes ;
 - revues de direction, décisions, participants, entrées, sorties et suivi ;
 - quantification financière : fréquence, pertes, fourchettes et simulations ;

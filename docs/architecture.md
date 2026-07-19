@@ -95,6 +95,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `RegulatoryRecord` utilise un type fermé et des schémas de validation métier pour les traitements, AIPD, violations, obligations et exceptions. Les détails restent structurés en JSON afin d’accepter les évolutions réglementaires sans mélanger les tenants. Les exceptions sont temporaires et appliquent une séparation demandeur/approbateur.
 
+### Pilotage exécutif
+
+`ExecutiveGovernanceRecord` applique un schéma par objectif, indicateur, revue de direction, scénario financier ou investissement. Les fourchettes financières sont contrôlées et les dossiers conservent coût, charge, réduction attendue et ROI. L’endpoint Vision 360° agrège directement les repositories tenant-scoped afin que le rapport ne repose pas sur une copie désynchronisée.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |
