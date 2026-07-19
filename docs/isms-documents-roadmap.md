@@ -28,6 +28,8 @@ Centraliser les politiques, procédures, preuves et modèles du SMSI avec une tr
 - les jetons de partage et mots de passe ne sont conservés que sous forme d'empreinte ;
 - un partage expiré ou révoqué répond comme une ressource inexistante.
 - une modification de contenu, métadonnées ou pièce jointe invalide l’approbation en cours ;
+- cette invalidation révoque définitivement les partages publics existants ;
+- seuls les comptes actifs de la même organisation peuvent être propriétaires ou recevoir une ACL ;
 - un document confidentiel ou restreint impose un mot de passe de partage ; un document restreint impose une expiration de 30 jours maximum.
 
 ## Lots suivants

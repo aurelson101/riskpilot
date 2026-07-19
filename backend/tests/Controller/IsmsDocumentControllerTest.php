@@ -129,6 +129,85 @@ final class IsmsDocumentControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
+    public function testAclMatrixAndPublicShareRevocationAreEnforced(): void
+    {
+        $this->authenticate($this->admin);
+        $this->json('POST', '/api/isms-documents', ['title' => 'Procédure ACL', 'category' => 'Procédure', 'classification' => 'INTERNAL', 'visibility' => 'RESTRICTED', 'content' => 'Version 1']);
+        self::assertResponseStatusCodeSame(201);
+        $documentId = $this->payload()['id'];
+
+        $this->authenticate($this->viewer);
+        $this->client->request('GET', '/api/isms-documents/'.$documentId);
+        self::assertResponseStatusCodeSame(404);
+
+        $this->authenticate($this->admin);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => $this->foreignUser->getId(), 'permission' => 'READ']);
+        self::assertResponseStatusCodeSame(422);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => $this->viewer->getId(), 'permission' => 'READ']);
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($this->viewer);
+        $this->client->request('GET', '/api/isms-documents/'.$documentId);
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->payload()['permissions']['read']);
+        self::assertFalse($this->payload()['permissions']['edit']);
+        self::assertFalse($this->payload()['permissions']['manage']);
+        $this->json('PUT', '/api/isms-documents/'.$documentId, ['title' => 'Interdit', 'category' => 'Procédure', 'content' => 'Version 2']);
+        self::assertResponseStatusCodeSame(404);
+
+        $this->authenticate($this->admin);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => $this->viewer->getId(), 'permission' => 'EDIT']);
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($this->viewer);
+        $this->json('PUT', '/api/isms-documents/'.$documentId, ['title' => 'Procédure ACL', 'category' => 'Procédure', 'status' => 'IN_REVIEW', 'content' => 'Version 2']);
+        self::assertResponseIsSuccessful();
+        self::assertSame($this->admin->getId(), $this->payload()['owner']['id']);
+        self::assertTrue($this->payload()['permissions']['edit']);
+        self::assertFalse($this->payload()['permissions']['manage']);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/shares', []);
+        self::assertResponseStatusCodeSame(404);
+
+        $this->authenticate($this->admin);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => $this->viewer->getId(), 'permission' => 'MANAGE']);
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($this->viewer);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/shares', []);
+        self::assertResponseStatusCodeSame(422);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/approve', ['nextReviewAt' => (new \DateTimeImmutable('+1 year'))->format('Y-m-d')]);
+        self::assertResponseIsSuccessful();
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/shares', []);
+        self::assertResponseStatusCodeSame(201);
+        $share = $this->payload();
+        $token = basename((string) parse_url($share['url'], PHP_URL_PATH));
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->request('GET', '/api/public/documents/'.$token);
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($this->viewer);
+        $this->json('PUT', '/api/isms-documents/'.$documentId, ['title' => 'Procédure ACL', 'category' => 'Procédure', 'status' => 'APPROVED', 'content' => 'Version 3']);
+        self::assertResponseIsSuccessful();
+        self::assertSame('DRAFT', $this->payload()['status']);
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->request('GET', '/api/public/documents/'.$token);
+        self::assertResponseStatusCodeSame(404);
+
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $inactiveViewer = $manager->find(User::class, $this->viewer->getId());
+        self::assertInstanceOf(User::class, $inactiveViewer);
+        $inactiveViewer->setStatus(User::STATUS_INACTIVE);
+        $manager->flush();
+        $token = $this->tokens->create($inactiveViewer);
+        $manager->clear();
+        $this->client->restart();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$token);
+        $this->client->request('GET', '/api/isms-documents/'.$documentId);
+        self::assertResponseStatusCodeSame(401);
+    }
+
     private function authenticate(User $user): void
     {
         $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$this->tokens->create($user));

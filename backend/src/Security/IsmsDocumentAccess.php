@@ -11,7 +11,7 @@ final class IsmsDocumentAccess
 {
     public function canRead(IsmsDocument $document, User $user): bool
     {
-        if ($document->getOrganization() !== $user->getOrganization()) {
+        if (User::STATUS_ACTIVE !== $user->getStatus() || $document->getOrganization() !== $user->getOrganization()) {
             return false;
         }
         if ($this->isAdmin($user) || $document->getOwner() === $user || IsmsDocument::VISIBILITY_ORGANIZATION === $document->getVisibility()) {
@@ -23,12 +23,12 @@ final class IsmsDocumentAccess
 
     public function canEdit(IsmsDocument $document, User $user): bool
     {
-        return $document->getOrganization() === $user->getOrganization() && ($this->isAdmin($user) || $document->getOwner() === $user || in_array($this->permission($document, $user), ['EDIT', 'MANAGE'], true));
+        return User::STATUS_ACTIVE === $user->getStatus() && $document->getOrganization() === $user->getOrganization() && ($this->isAdmin($user) || $document->getOwner() === $user || in_array($this->permission($document, $user), ['EDIT', 'MANAGE'], true));
     }
 
     public function canManage(IsmsDocument $document, User $user): bool
     {
-        return $document->getOrganization() === $user->getOrganization() && ($this->isAdmin($user) || $document->getOwner() === $user || 'MANAGE' === $this->permission($document, $user));
+        return User::STATUS_ACTIVE === $user->getStatus() && $document->getOrganization() === $user->getOrganization() && ($this->isAdmin($user) || $document->getOwner() === $user || 'MANAGE' === $this->permission($document, $user));
     }
 
     private function permission(IsmsDocument $document, User $user): ?string

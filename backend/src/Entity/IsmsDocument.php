@@ -284,6 +284,9 @@ class IsmsDocument
         $this->approvedBy = null;
         $this->approvedAt = null;
         $this->nextReviewAt = null;
+        foreach ($this->shares as $share) {
+            $share->revoke();
+        }
     }
 
     private function touch(): void

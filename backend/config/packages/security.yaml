@@ -27,6 +27,7 @@ security:
             pattern: ^/api
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\ActiveUserChecker
             jwt: ~
 
             # Activate different ways to authenticate:

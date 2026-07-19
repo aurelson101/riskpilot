@@ -89,7 +89,9 @@ final readonly class IsmsDocumentController
         if (null !== $error) {
             return $error;
         }
-        $owner = $this->access->canManage($document, $user) ? $this->owner($input, $user) : $document->getOwner();
+        $ownerInput = $input;
+        $ownerInput['ownerId'] ??= $document->getOwner()->getId();
+        $owner = $this->access->canManage($document, $user) ? $this->owner($ownerInput, $user) : $document->getOwner();
         if (null === $owner) {
             return $this->invalid('Propriétaire invalide.');
         }
@@ -257,7 +259,7 @@ final readonly class IsmsDocumentController
         $input = $this->input($request);
         $userId = filter_var($input['userId'] ?? null, FILTER_VALIDATE_INT);
         $permission = strtoupper((string) ($input['permission'] ?? ''));
-        $user = false === $userId ? null : $this->users->findOneBy(['id' => $userId, 'organization' => $actor->getOrganization()]);
+        $user = false === $userId ? null : $this->users->findOneBy(['id' => $userId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
         if (!$user instanceof User || !in_array($permission, IsmsDocumentAcl::PERMISSIONS, true) || $user === $document->getOwner()) {
             return $this->invalid('Utilisateur ou permission ACL invalide.');
         }
@@ -298,6 +300,9 @@ final readonly class IsmsDocumentController
         $document = $this->find($id, $actor);
         if (null === $document || !$this->access->canManage($document, $actor)) {
             return $this->notFound();
+        }
+        if ('APPROVED' !== $document->getStatus()) {
+            return $this->invalid('Seul un document approuvé peut être partagé publiquement.');
         }
         $input = $this->input($request);
         $password = trim((string) ($input['password'] ?? ''));
@@ -367,7 +372,7 @@ final readonly class IsmsDocumentController
     {
         $ownerId = filter_var($input['ownerId'] ?? $actor->getId(), FILTER_VALIDATE_INT);
 
-        return false === $ownerId ? null : $this->users->findOneBy(['id' => $ownerId, 'organization' => $actor->getOrganization()]);
+        return false === $ownerId ? null : $this->users->findOneBy(['id' => $ownerId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
     }
 
     /** @param array<string, mixed> $input */
@@ -400,7 +405,7 @@ final readonly class IsmsDocumentController
     /** @return array<string, mixed> */
     private function share(IsmsDocumentShare $share): array
     {
-        return ['id' => $share->getId(), 'enabled' => $share->isEnabled(), 'available' => $share->isAvailable(), 'hasPassword' => $share->hasPassword(), 'expiresAt' => $share->getExpiresAt()?->format(DATE_ATOM), 'accessCount' => $share->getAccessCount(), 'createdAt' => $share->getCreatedAt()->format(DATE_ATOM)];
+        return ['id' => $share->getId(), 'enabled' => $share->isEnabled(), 'available' => $share->isAvailable(), 'expired' => $share->isExpired(), 'hasPassword' => $share->hasPassword(), 'expiresAt' => $share->getExpiresAt()?->format(DATE_ATOM), 'accessCount' => $share->getAccessCount(), 'createdAt' => $share->getCreatedAt()->format(DATE_ATOM)];
     }
 
     /** @return array<string, mixed> */

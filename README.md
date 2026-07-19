@@ -98,6 +98,8 @@ Un document naît en brouillon, peut être soumis à revue puis approuvé par un
 
 Un gestionnaire peut créer un lien externe révocable et expirable. Les documents confidentiels ou restreints exigent un mot de passe ; un partage restreint expire obligatoirement sous 30 jours. RiskPilot ne stocke que les empreintes du jeton et du mot de passe ; le lien complet n’est affiché qu’à sa création.
 
+Les ACL nominatives appliquent strictement `READ`, `EDIT` et `MANAGE`. Seuls les comptes actifs de l’organisation peuvent être propriétaires ou recevoir une ACL. Un partage public n’est possible que sur une version approuvée ; toute modification révoque définitivement les liens existants afin qu’une approbation ultérieure ne les réactive pas.
+
 Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo, protégés contre les archives décompressées excessives et conservés dans un volume Docker privé. Chaque changement crée une version et enregistre l’empreinte SHA-256 de la pièce jointe. Le stockage chiffré S3/MinIO et l’antivirus restent planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
 
 ## Tableau de bord, exports et démonstration

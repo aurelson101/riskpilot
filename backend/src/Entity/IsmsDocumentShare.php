@@ -68,7 +68,12 @@ class IsmsDocumentShare
 
     public function isAvailable(): bool
     {
-        return $this->enabled && (null === $this->expiresAt || $this->expiresAt > new \DateTimeImmutable());
+        return $this->enabled && !$this->isExpired() && 'APPROVED' === $this->document->getStatus();
+    }
+
+    public function isExpired(): bool
+    {
+        return null !== $this->expiresAt && $this->expiresAt <= new \DateTimeImmutable();
     }
 
     public function verifiesPassword(?string $password): bool

@@ -240,6 +240,7 @@ export interface IsmsDocumentShare {
   id: number;
   enabled: boolean;
   available: boolean;
+  expired: boolean;
   hasPassword: boolean;
   expiresAt: string | null;
   accessCount: number;

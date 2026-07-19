@@ -722,9 +722,11 @@ export function IsmsDocumentsPage() {
                         label={
                           share.available
                             ? "Actif"
-                            : share.enabled
+                            : share.expired
                               ? "Expiré"
-                              : "Révoqué"
+                              : share.enabled
+                                ? "Document non approuvé"
+                                : "Révoqué"
                         }
                       />
                       {share.hasPassword && (
