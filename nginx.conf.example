@@ -1,12 +1,34 @@
 # Configuration Nginx autonome à installer sur l'hôte ou un reverse proxy.
-# Elle ne doit pas être montée dans les conteneurs RiskPilot.
+# Elle ne doit pas être montée dans les conteneurs RiskPilot ni remplacer
+# docker/nginx/production-http.conf.
 #
 # Prérequis : RiskPilot reste exposé en HTTP sur 127.0.0.1:8080.
-# Remplacer riskpilot.example.com et les chemins des certificats.
+# Remplacer riskpilot.example.com et les chemins des certificats, puis définir :
+# APP_URL=https://riskpilot.example.com
+#
+# Ce fichier est prévu pour /etc/nginx/conf.d/riskpilot.conf (contexte http).
+
+server_tokens off;
 
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
+}
+
+# Limites par adresse IP. Les rafales absorbent les chargements légitimes de la SPA.
+limit_req_zone $binary_remote_addr zone=riskpilot_login:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=riskpilot_public:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=riskpilot_api:10m rate=20r/s;
+
+log_format riskpilot_json escape=json
+    '{"time":"$time_iso8601","remote_addr":"$remote_addr",'
+    '"request_id":"$request_id","request":"$request",'
+    '"status":$status,"bytes":$body_bytes_sent,"duration":$request_time, '
+    '"upstream":"$upstream_addr","upstream_duration":"$upstream_response_time"}';
+
+upstream riskpilot_http {
+    server 127.0.0.1:8080;
+    keepalive 32;
 }
 
 server {
@@ -29,31 +51,72 @@ server {
     http2 on;
     server_name riskpilot.example.com;
 
+    access_log /var/log/nginx/riskpilot.access.log riskpilot_json;
+    error_log /var/log/nginx/riskpilot.error.log warn;
+
     ssl_certificate /etc/letsencrypt/live/riskpilot.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/riskpilot.example.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
     ssl_session_tickets off;
+    ssl_prefer_server_ciphers off;
 
+    # Les documents ISMS sont limités à 10 Mio côté application.
     client_max_body_size 12m;
+    client_body_timeout 30s;
+    client_header_timeout 15s;
+    keepalive_timeout 65s;
+    send_timeout 60s;
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options nosniff always;
     add_header X-Frame-Options DENY always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Cross-Origin-Opener-Policy same-origin always;
+
+    # Tous les en-têtes sont définis au niveau du serveur afin d'être hérités par
+    # les callbacks OAuth, les routes OIDC/SAML/SCIM et les partages publics.
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Request-ID $request_id;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    proxy_buffering on;
+    proxy_buffers 16 16k;
+    proxy_busy_buffers_size 32k;
+
+    # Protection renforcée de l'authentification locale. Le MFA reste facultatif.
+    location = /api/auth/login {
+        limit_req zone=riskpilot_login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://riskpilot_http;
+    }
+
+    # Liens documentaires, questionnaires fournisseurs et calendriers partagés.
+    location ~ ^/api/(public|calendar)/ {
+        limit_req zone=riskpilot_public burst=20 nodelay;
+        limit_req_status 429;
+        proxy_pass http://riskpilot_http;
+    }
+
+    # API versionnée : clés de service, SCIM et intégrations SIEM/ticketing.
+    location ^~ /api/v1/ {
+        limit_req zone=riskpilot_api burst=40 nodelay;
+        limit_req_status 429;
+        proxy_pass http://riskpilot_http;
+    }
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-Port 443;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
+        proxy_pass http://riskpilot_http;
     }
 }
