@@ -69,6 +69,11 @@ describe("App", () => {
                 title: "Politique de sécurité",
                 category: "Politique interne",
               },
+              {
+                id: 11,
+                title: "Document au nom réservé",
+                category: "Publications récentes",
+              },
             ]
           : url === "/me/sessions"
             ? []
@@ -109,6 +114,7 @@ describe("App", () => {
     expect(screen.getByText("Messagerie")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Documents ISMS"));
     expect(await screen.findByText("Politique interne")).toBeInTheDocument();
+    expect(screen.getAllByText("Publications récentes")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /Réduire/ }));
     await waitFor(() =>
       expect(screen.queryByText("Mon profil et MFA")).not.toBeInTheDocument(),

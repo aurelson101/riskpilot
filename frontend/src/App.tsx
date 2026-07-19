@@ -198,7 +198,12 @@ function Layout() {
   const ismsCategories = useMemo(
     () =>
       [...new Set((ismsDocuments.data ?? []).map((item) => item.category))]
-        .filter(Boolean)
+        .filter(
+          (category) =>
+            Boolean(category) &&
+            category.trim().toLocaleLowerCase("fr") !==
+              "publications récentes".toLocaleLowerCase("fr"),
+        )
         .sort((left, right) => left.localeCompare(right, "fr")),
     [ismsDocuments.data],
   );
