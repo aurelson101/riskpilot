@@ -4,7 +4,7 @@ Le fichier `compose.yaml` cible le développement. `compose.prod.yaml` supprime 
 
 Avant un déploiement, fournir des secrets uniques via le gestionnaire de secrets de la plateforme, générer la paire de clés JWT hors image, terminer TLS, sauvegarder PostgreSQL et Redis, puis exécuter les migrations en tâche contrôlée. `APP_URL` doit être l’origine HTTPS publique exacte : RiskPilot l’utilise pour générer les callbacks OAuth Google Workspace et Microsoft 365.
 
-Docker et les fichiers Compose restent exclusivement en HTTP. `docker/nginx/production-http.conf` sert l’application sur le port publié `8080`. Pour HTTPS, installer un Nginx séparé sur l’hôte ou un reverse proxy et adapter `nginx.conf.example` ; ce fichier relaie vers `127.0.0.1:8080` avec les en-têtes OAuth nécessaires.
+Docker et les fichiers Compose restent exclusivement en HTTP. `docker/nginx/production-http.conf` sert l’application sur le port publié `8080`. Pour HTTPS, installer un Nginx séparé sur l’hôte ou un reverse proxy et adapter `nginx.conf.example` ; ce fichier relaie vers `127.0.0.1:8080` avec les en-têtes OAuth nécessaires. Le service ponctuel `jwt-init` génère au premier démarrage la paire JWT dans le volume persistant `jwt_keys` ; backend, worker et scheduler la montent ensuite en lecture seule.
 
 ```bash
 docker compose -f compose.yaml -f compose.prod.yaml up -d --build

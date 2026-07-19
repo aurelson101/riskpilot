@@ -1,4 +1,19 @@
 services:
+  jwt-init:
+    build:
+      context: ./backend
+      target: production
+    user: root
+    env_file: .env
+    command: >-
+      sh -c 'php bin/console lexik:jwt:generate-keypair --skip-if-exists
+      && chown -R www-data:www-data /app/config/jwt'
+    volumes:
+      - jwt_keys:/app/config/jwt
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: 0
+
   nginx:
     volumes:
       - ./docker/nginx/production-http.conf:/etc/nginx/conf.d/default.conf:ro
@@ -7,6 +22,10 @@ services:
       target: production
     volumes: !override
       - isms_document_files:/app/var/isms-documents
+      - jwt_keys:/app/config/jwt:ro
+    depends_on:
+      jwt-init:
+        condition: service_completed_successfully
     environment:
       APP_ENV: prod
       APP_DEBUG: 0
@@ -15,6 +34,22 @@ services:
       target: production
     volumes: !override
       - isms_document_files:/app/var/isms-documents
+      - jwt_keys:/app/config/jwt:ro
+    depends_on:
+      jwt-init:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: 0
+  scheduler:
+    build:
+      target: production
+    volumes: !override
+      - isms_document_files:/app/var/isms-documents
+      - jwt_keys:/app/config/jwt:ro
+    depends_on:
+      jwt-init:
+        condition: service_completed_successfully
     environment:
       APP_ENV: prod
       APP_DEBUG: 0
@@ -26,3 +61,6 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
   mailpit:
     profiles: [development]
+
+volumes:
+  jwt_keys:
