@@ -62,6 +62,19 @@ final readonly class ActionPlanController
         return null === $item ? $this->notFound() : $this->save($item, $request);
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function cancel(int $id): JsonResponse
+    {
+        $item = $this->actions->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $item) {
+            return $this->notFound();
+        }
+        $item->setStatus('CANCELLED');
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
+    }
+
     #[Route('/{id<\d+>}/comments', methods: ['GET'])]
     public function comments(int $id): JsonResponse
     {

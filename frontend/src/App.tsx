@@ -14,6 +14,8 @@ import {
   NotificationsOutlined,
   FactCheckOutlined,
   AccountCircleOutlined,
+  BusinessOutlined,
+  HistoryOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -50,6 +52,8 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { CompliancePage } from "./pages/CompliancePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { OrganizationsPage } from "./pages/OrganizationsPage";
+import { AuditLogsPage } from "./pages/AuditLogsPage";
 
 const drawerWidth = 250;
 
@@ -213,6 +217,28 @@ function Layout() {
           </ListItemButton>
           {isAdmin && (
             <ListItemButton
+              selected={location.pathname === "/administration/organizations"}
+              onClick={() => navigate("/administration/organizations")}
+            >
+              <ListItemIcon>
+                <BusinessOutlined sx={{ color: "inherit" }} />
+              </ListItemIcon>
+              <ListItemText primary="Organisations" />
+            </ListItemButton>
+          )}
+          {isAdmin && (
+            <ListItemButton
+              selected={location.pathname === "/administration/audit-logs"}
+              onClick={() => navigate("/administration/audit-logs")}
+            >
+              <ListItemIcon>
+                <HistoryOutlined sx={{ color: "inherit" }} />
+              </ListItemIcon>
+              <ListItemText primary="Journal d’audit" />
+            </ListItemButton>
+          )}
+          {isAdmin && (
+            <ListItemButton
               selected={location.pathname === "/administration/users"}
               onClick={() => navigate("/administration/users")}
             >
@@ -285,6 +311,11 @@ export default function App() {
             element={<InventoryPage kind="security-controls" />}
           />
           <Route path="administration/users" element={<UsersPage />} />
+          <Route
+            path="administration/organizations"
+            element={<OrganizationsPage />}
+          />
+          <Route path="administration/audit-logs" element={<AuditLogsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>

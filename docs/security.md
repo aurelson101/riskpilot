@@ -4,6 +4,8 @@ Le socle prévoit JWT, Symfony Security, le rate limiting, une validation serveu
 
 L’isolation multi-tenant et le RBAC sont appliqués à tous les modules. Les tableaux de bord et exports sont calculés uniquement depuis les données de l’organisation authentifiée. Les valeurs CSV commençant par un marqueur de formule sont neutralisées avant téléchargement.
 
+Les mutations réussies sont inscrites dans un journal tenant-aware avec l’auteur, la ressource, la date, l’adresse IP et les données d’entrée. Les champs contenant un mot de passe ou un jeton sont remplacés par `[REDACTED]`. Les suppressions d’utilisateurs, organisations, risques et actions sont logiques afin de préserver les responsabilités et l’historique.
+
 ## Contrôles implémentés à l’étape 2
 
 - mots de passe Argon2id via Sodium ;

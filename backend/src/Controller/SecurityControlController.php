@@ -53,6 +53,23 @@ final readonly class SecurityControlController
         return null === $item ? $this->notFound() : $this->save($item, $request);
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function delete(int $id): JsonResponse
+    {
+        $item = $this->controls->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $item) {
+            return $this->notFound();
+        }
+        $this->entityManager->remove($item);
+        try {
+            $this->entityManager->flush();
+        } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException) {
+            return new JsonResponse(['code' => 'RESOURCE_IN_USE', 'message' => 'Cette mesure est utilisée et ne peut pas être supprimée.'], 409);
+        }
+
+        return new JsonResponse(null, 204);
+    }
+
     private function save(?SecurityControl $item, Request $request): JsonResponse
     {
         [$input, $violations] = $this->mapper->map($request, SecurityControlInput::class);

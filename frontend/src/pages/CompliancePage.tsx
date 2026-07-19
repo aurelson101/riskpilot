@@ -19,14 +19,25 @@ import {
   TableRow,
   Tabs,
   Typography,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  InputLabel,
+  TextField,
 } from "@mui/material";
-import { useState } from "react";
+import { Add } from "@mui/icons-material";
+import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type {
   ComplianceAssessment,
   ComplianceResult,
   Framework,
+  Scope,
+  User,
 } from "../api/types";
+import { useAuth } from "../auth/useAuth";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
   COMPLIANT: "Conforme",
@@ -44,11 +55,28 @@ const statusColors: Record<ComplianceResult["complianceStatus"], string> = {
 };
 
 export function CompliancePage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState(0);
   const [selectedAssessment, setSelectedAssessment] = useState<number | null>(
     null,
   );
   const client = useQueryClient();
+  const [assessmentDialog, setAssessmentDialog] = useState(false);
+  const [assessmentForm, setAssessmentForm] = useState({
+    frameworkId: "",
+    scopeId: "",
+    assessorId: "",
+    assessmentDate: new Date().toISOString().slice(0, 10),
+    status: "DRAFT",
+  });
+  const canAssess = user?.roles.some((role) =>
+    [
+      "ROLE_SUPER_ADMIN",
+      "ROLE_ADMIN",
+      "ROLE_RISK_MANAGER",
+      "ROLE_AUDITOR",
+    ].includes(role),
+  );
   const frameworks = useQuery({
     queryKey: ["frameworks"],
     queryFn: async () => (await api.get<Framework[]>("/frameworks")).data,
@@ -57,6 +85,34 @@ export function CompliancePage() {
     queryKey: ["compliance-assessments"],
     queryFn: async () =>
       (await api.get<ComplianceAssessment[]>("/compliance-assessments")).data,
+  });
+  const scopes = useQuery({
+    queryKey: ["scopes"],
+    queryFn: async () => (await api.get<Scope[]>("/scopes")).data,
+    enabled: Boolean(canAssess),
+  });
+  const users = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => (await api.get<User[]>("/users")).data,
+    enabled: Boolean(
+      canAssess &&
+      user?.roles.some((role) =>
+        ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
+      ),
+    ),
+  });
+  const createAssessment = useMutation({
+    mutationFn: () =>
+      api.post("/compliance-assessments", {
+        ...assessmentForm,
+        frameworkId: Number(assessmentForm.frameworkId),
+        scopeId: Number(assessmentForm.scopeId),
+        assessorId: Number(assessmentForm.assessorId),
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["compliance-assessments"] });
+      setAssessmentDialog(false);
+    },
   });
   const results = useQuery({
     queryKey: ["compliance-results", selectedAssessment],
@@ -101,13 +157,30 @@ export function CompliancePage() {
 
   return (
     <Stack spacing={3}>
-      <Stack>
-        <Typography variant="h4" fontWeight={750}>
-          Conformité
-        </Typography>
-        <Typography color="text.secondary">
-          Référentiels, évaluations et plans de remédiation
-        </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack>
+          <Typography variant="h4" fontWeight={750}>
+            Conformité
+          </Typography>
+          <Typography color="text.secondary">
+            Référentiels, évaluations et plans de remédiation
+          </Typography>
+        </Stack>
+        {canAssess && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => {
+              setAssessmentForm((current) => ({
+                ...current,
+                assessorId: String(user?.id ?? ""),
+              }));
+              setAssessmentDialog(true);
+            }}
+          >
+            Lancer une évaluation
+          </Button>
+        )}
       </Stack>
       <Tabs value={tab} onChange={(_, value) => setTab(value)}>
         <Tab label="Évaluations" />
@@ -161,7 +234,7 @@ export function CompliancePage() {
           <Stack spacing={1.5} sx={{ width: { xs: "100%", lg: 380 } }}>
             {assessments.data?.length === 0 && (
               <Alert severity="info">
-                Aucune évaluation. Lancez-en une via l’API.
+                Aucune évaluation. Lancez-en une avec le bouton ci-dessus.
               </Alert>
             )}
             {assessments.data?.map((assessment) => (
@@ -308,6 +381,117 @@ export function CompliancePage() {
           </Card>
         </Stack>
       )}
+      <Dialog
+        open={assessmentDialog}
+        onClose={() => setAssessmentDialog(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Stack
+          component="form"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            createAssessment.mutate();
+          }}
+        >
+          <DialogTitle>Lancer une évaluation</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              {createAssessment.isError && (
+                <Alert severity="error">
+                  Impossible de créer l’évaluation.
+                </Alert>
+              )}
+              <FormControl required>
+                <InputLabel>Référentiel</InputLabel>
+                <Select
+                  label="Référentiel"
+                  value={assessmentForm.frameworkId}
+                  onChange={(e) =>
+                    setAssessmentForm({
+                      ...assessmentForm,
+                      frameworkId: String(e.target.value),
+                    })
+                  }
+                >
+                  {frameworks.data
+                    ?.filter((item) => item.status === "ACTIVE")
+                    .map((item) => (
+                      <MenuItem key={item.id} value={item.id}>
+                        {item.name} · {item.version}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              <FormControl required>
+                <InputLabel>Périmètre</InputLabel>
+                <Select
+                  label="Périmètre"
+                  value={assessmentForm.scopeId}
+                  onChange={(e) =>
+                    setAssessmentForm({
+                      ...assessmentForm,
+                      scopeId: String(e.target.value),
+                    })
+                  }
+                >
+                  {scopes.data?.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl required>
+                <InputLabel>Évaluateur</InputLabel>
+                <Select
+                  label="Évaluateur"
+                  value={assessmentForm.assessorId}
+                  onChange={(e) =>
+                    setAssessmentForm({
+                      ...assessmentForm,
+                      assessorId: String(e.target.value),
+                    })
+                  }
+                >
+                  {users.data?.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.firstName} {item.lastName}
+                    </MenuItem>
+                  )) ?? (
+                    <MenuItem value={user?.id}>
+                      {user?.firstName} {user?.lastName}
+                    </MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+              <TextField
+                required
+                type="date"
+                label="Date"
+                InputLabelProps={{ shrink: true }}
+                value={assessmentForm.assessmentDate}
+                onChange={(e) =>
+                  setAssessmentForm({
+                    ...assessmentForm,
+                    assessmentDate: e.target.value,
+                  })
+                }
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAssessmentDialog(false)}>Annuler</Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={createAssessment.isPending}
+            >
+              Créer
+            </Button>
+          </DialogActions>
+        </Stack>
+      </Dialog>
     </Stack>
   );
 }

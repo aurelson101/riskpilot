@@ -54,6 +54,23 @@ final readonly class AssetController
         return null === $asset ? $this->notFound() : $this->save($asset, $request);
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function delete(int $id): JsonResponse
+    {
+        $asset = $this->assets->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $asset) {
+            return $this->notFound();
+        }
+        $this->entityManager->remove($asset);
+        try {
+            $this->entityManager->flush();
+        } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException) {
+            return new JsonResponse(['code' => 'RESOURCE_IN_USE', 'message' => 'Cet actif est utilisé par un risque et ne peut pas être supprimé.'], 409);
+        }
+
+        return new JsonResponse(null, 204);
+    }
+
     private function save(?Asset $asset, Request $request): JsonResponse
     {
         [$input, $violations] = $this->mapper->map($request, AssetInput::class);

@@ -92,6 +92,23 @@ final readonly class OrganizationController
         return new JsonResponse($this->responses->organization($organization));
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])]
+    #[IsGranted(User::ROLE_SUPER_ADMIN)]
+    public function deactivate(int $id): JsonResponse
+    {
+        $organization = $this->organizations->find($id);
+        if (null === $organization) {
+            return $this->notFound();
+        }
+        if ($organization === $this->actor()->getOrganization()) {
+            return new JsonResponse(['code' => 'CURRENT_ORGANIZATION_DELETE_FORBIDDEN', 'message' => 'Vous ne pouvez pas désactiver votre organisation courante.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        $organization->setStatus(Organization::STATUS_INACTIVE);
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
+    }
+
     private function actor(): User
     {
         $actor = $this->security->getUser();

@@ -2,7 +2,7 @@
 
 Les agrégats prévus sont Organization, User, Scope, Asset, Threat, Vulnerability, RiskScenario, SecurityControl, ActionPlan, Framework, Requirement, ComplianceAssessment, ComplianceResult et AuditLog.
 
-Toutes les ressources tenant-aware porteront une organisation explicite. Les associations et index seront ajoutés avec leurs migrations au fil des modules afin de conserver des changements révisables.
+Toutes les ressources tenant-aware portent une organisation explicite. Les associations et index sont versionnés par des migrations afin de conserver des changements révisables.
 
 ## Étape 3
 
@@ -21,3 +21,5 @@ Ces quatre agrégats portent une organisation obligatoire. Les repositories ajou
 ## Étape 7
 
 Le tableau de bord et les exports ne créent pas de nouvel agrégat : ils constituent des projections des risques, actions et résultats de conformité existants. Les fixtures assemblent un graphe cohérent de ces entités pour le développement et les démonstrations.
+
+`AuditLog` conserve les mutations HTTP réussies, leur auteur, le tenant, la ressource, l’adresse IP et les valeurs d’entrée expurgées de leurs secrets.

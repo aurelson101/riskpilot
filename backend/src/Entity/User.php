@@ -150,6 +150,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return array_values(array_unique([...$this->roles, self::ROLE_VIEWER]));
     }
 
+    /** @return list<string> */
+    public function getAssignedRoles(): array
+    {
+        return $this->roles;
+    }
+
     /** @param list<string> $roles */
     public function setRoles(array $roles): self
     {

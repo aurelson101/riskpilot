@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   Box,
@@ -16,15 +16,36 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
 } from "@mui/material";
 import {
+  Add,
   CalendarMonthOutlined,
+  DeleteOutline,
+  EditOutlined,
   TableRowsOutlined,
   ViewKanbanOutlined,
 } from "@mui/icons-material";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
-import type { ActionPlan } from "../api/types";
+import type {
+  ActionPlan,
+  RiskScenario,
+  SecurityControl,
+  User,
+} from "../api/types";
+import { useAuth } from "../auth/useAuth";
+import axios from "axios";
 
 const statuses = [
   "OPEN",
@@ -47,6 +68,46 @@ const priorityColors: Record<
   ActionPlan["priority"],
   "default" | "info" | "warning" | "error"
 > = { LOW: "default", MEDIUM: "info", HIGH: "warning", CRITICAL: "error" };
+
+type ActionForm = {
+  title: string;
+  description: string;
+  relatedRiskId: number | "";
+  relatedControlId: number | null;
+  ownerId: number | "";
+  priority: ActionPlan["priority"];
+  status: ActionPlan["status"];
+  startDate: string | null;
+  dueDate: string;
+  completionDate: string | null;
+  progress: number;
+  estimatedCost: number | null;
+  actualCost: number | null;
+  expectedRiskReduction: number | null;
+  evidence: string[];
+};
+const emptyForm: ActionForm = {
+  title: "",
+  description: "",
+  relatedRiskId: "",
+  relatedControlId: null,
+  ownerId: "",
+  priority: "MEDIUM",
+  status: "OPEN",
+  startDate: null,
+  dueDate: "",
+  completionDate: null,
+  progress: 0,
+  estimatedCost: null,
+  actualCost: null,
+  expectedRiskReduction: null,
+  evidence: [],
+};
+function apiMessage(error: unknown) {
+  return axios.isAxiosError<{ message?: string }>(error)
+    ? (error.response?.data?.message ?? "L’opération a échoué.")
+    : "L’opération a échoué.";
+}
 
 function ActionCard({ action }: { action: ActionPlan }) {
   return (
@@ -76,11 +137,87 @@ function ActionCard({ action }: { action: ActionPlan }) {
 }
 
 export function ActionsPage() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ActionPlan | null>(null);
+  const [form, setForm] = useState<ActionForm>(emptyForm);
+  const [error, setError] = useState("");
+  const canManage = user?.roles.some((role) =>
+    ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
+  );
   const query = useQuery({
     queryKey: ["actions"],
     queryFn: async () => (await api.get<ActionPlan[]>("/actions")).data,
   });
+  const risks = useQuery({
+    queryKey: ["risks"],
+    queryFn: async () => (await api.get<RiskScenario[]>("/risks")).data,
+  });
+  const controls = useQuery({
+    queryKey: ["security-controls"],
+    queryFn: async () =>
+      (await api.get<SecurityControl[]>("/security-controls")).data,
+  });
+  const users = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => (await api.get<User[]>("/users")).data,
+    enabled: Boolean(canManage),
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      editing
+        ? api.put(`/actions/${editing.id}`, form)
+        : api.post("/actions", form),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["actions"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setDialogOpen(false);
+    },
+    onError: (caught) => setError(apiMessage(caught)),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api.delete(`/actions/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["actions"] }),
+    onError: (caught) => setError(apiMessage(caught)),
+  });
+  const update = <K extends keyof ActionForm>(key: K, value: ActionForm[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  function openCreate() {
+    setEditing(null);
+    setForm(emptyForm);
+    setError("");
+    setDialogOpen(true);
+  }
+  function openEdit(action: ActionPlan) {
+    setEditing(action);
+    setForm({
+      title: action.title,
+      description: action.description ?? "",
+      relatedRiskId: action.relatedRisk.id,
+      relatedControlId: action.relatedControl?.id ?? null,
+      ownerId: action.owner.id,
+      priority: action.priority,
+      status: action.status,
+      startDate: action.startDate,
+      dueDate: action.dueDate,
+      completionDate: action.completionDate,
+      progress: action.progress,
+      estimatedCost:
+        action.estimatedCost === null ? null : Number(action.estimatedCost),
+      actualCost: action.actualCost === null ? null : Number(action.actualCost),
+      expectedRiskReduction: action.expectedRiskReduction,
+      evidence: action.evidence,
+    });
+    setError("");
+    setDialogOpen(true);
+  }
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    save.mutate();
+  }
   if (query.isLoading) return <CircularProgress />;
   if (query.isError)
     return (
@@ -122,7 +259,13 @@ export function ActionsPage() {
             Calendrier
           </ToggleButton>
         </ToggleButtonGroup>
+        {canManage && (
+          <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
+            Créer une action
+          </Button>
+        )}
       </Stack>
+      {error && !dialogOpen && <Alert severity="error">{error}</Alert>}
       {view === "table" && (
         <Card variant="outlined">
           <CardContent>
@@ -136,6 +279,7 @@ export function ActionsPage() {
                   <TableCell>Progression</TableCell>
                   <TableCell>Échéance</TableCell>
                   <TableCell>Statut</TableCell>
+                  {canManage && <TableCell align="right">Actions</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -182,6 +326,27 @@ export function ActionsPage() {
                         }
                       />
                     </TableCell>
+                    {canManage && (
+                      <TableCell align="right">
+                        <IconButton
+                          aria-label="Modifier"
+                          onClick={() => openEdit(action)}
+                        >
+                          <EditOutlined />
+                        </IconButton>
+                        <IconButton
+                          aria-label="Annuler"
+                          color="error"
+                          disabled={action.status === "CANCELLED"}
+                          onClick={() =>
+                            window.confirm(`Annuler « ${action.title} » ?`) &&
+                            remove.mutate(action.id)
+                          }
+                        >
+                          <DeleteOutline />
+                        </IconButton>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -280,6 +445,215 @@ export function ActionsPage() {
           </CardContent>
         </Card>
       )}
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <Stack component="form" onSubmit={submit}>
+          <DialogTitle>
+            {editing ? "Modifier l’action" : "Créer une action"}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              {error && <Alert severity="error">{error}</Alert>}
+              <TextField
+                required
+                label="Titre"
+                value={form.title}
+                onChange={(e) => update("title", e.target.value)}
+              />
+              <TextField
+                multiline
+                minRows={2}
+                label="Description"
+                value={form.description}
+                onChange={(e) => update("description", e.target.value)}
+              />
+              <FormControl required>
+                <InputLabel>Risque lié</InputLabel>
+                <Select
+                  label="Risque lié"
+                  value={form.relatedRiskId}
+                  onChange={(e) =>
+                    update("relatedRiskId", Number(e.target.value))
+                  }
+                >
+                  {risks.data
+                    ?.filter((risk) => risk.status !== "ARCHIVED")
+                    .map((risk) => (
+                      <MenuItem key={risk.id} value={risk.id}>
+                        {risk.title}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              <FormControl>
+                <InputLabel>Mesure liée</InputLabel>
+                <Select
+                  label="Mesure liée"
+                  value={form.relatedControlId ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "relatedControlId",
+                      String(e.target.value) === ""
+                        ? null
+                        : Number(e.target.value),
+                    )
+                  }
+                >
+                  <MenuItem value="">Aucune</MenuItem>
+                  {controls.data?.map((control) => (
+                    <MenuItem key={control.id} value={control.id}>
+                      {control.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl required>
+                <InputLabel>Responsable</InputLabel>
+                <Select
+                  label="Responsable"
+                  value={form.ownerId}
+                  onChange={(e) => update("ownerId", Number(e.target.value))}
+                >
+                  {users.data?.map((owner) => (
+                    <MenuItem key={owner.id} value={owner.id}>
+                      {owner.firstName} {owner.lastName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Priorité</InputLabel>
+                  <Select
+                    label="Priorité"
+                    value={form.priority}
+                    onChange={(e) =>
+                      update(
+                        "priority",
+                        e.target.value as ActionPlan["priority"],
+                      )
+                    }
+                  >
+                    {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>Statut</InputLabel>
+                  <Select
+                    label="Statut"
+                    value={form.status}
+                    onChange={(e) =>
+                      update("status", e.target.value as ActionPlan["status"])
+                    }
+                  >
+                    {[
+                      "OPEN",
+                      "PLANNED",
+                      "IN_PROGRESS",
+                      "BLOCKED",
+                      "COMPLETED",
+                      "CANCELLED",
+                    ].map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Début"
+                  InputLabelProps={{ shrink: true }}
+                  value={form.startDate ?? ""}
+                  onChange={(e) => update("startDate", e.target.value || null)}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  type="date"
+                  label="Échéance"
+                  InputLabelProps={{ shrink: true }}
+                  value={form.dueDate}
+                  onChange={(e) => update("dueDate", e.target.value)}
+                />
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Achèvement"
+                  InputLabelProps={{ shrink: true }}
+                  value={form.completionDate ?? ""}
+                  onChange={(e) =>
+                    update("completionDate", e.target.value || null)
+                  }
+                />
+              </Stack>
+              <TextField
+                type="number"
+                label="Progression (%)"
+                inputProps={{ min: 0, max: 100 }}
+                value={form.progress}
+                onChange={(e) => update("progress", Number(e.target.value))}
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Coût estimé"
+                  value={form.estimatedCost ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "estimatedCost",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Coût réel"
+                  value={form.actualCost ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "actualCost",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Réduction attendue"
+                  inputProps={{ min: 0, max: 25 }}
+                  value={form.expectedRiskReduction ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "expectedRiskReduction",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+              </Stack>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button type="submit" variant="contained" disabled={save.isPending}>
+              Enregistrer
+            </Button>
+          </DialogActions>
+        </Stack>
+      </Dialog>
     </Stack>
   );
 }

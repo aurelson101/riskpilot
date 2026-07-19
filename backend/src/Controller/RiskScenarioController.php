@@ -66,6 +66,19 @@ final readonly class RiskScenarioController
         return null === $risk ? $this->notFound() : $this->save($risk, $request);
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function archive(int $id): JsonResponse
+    {
+        $risk = $this->risks->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $risk) {
+            return $this->notFound();
+        }
+        $risk->setStatus('ARCHIVED');
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
+    }
+
     private function save(?RiskScenario $risk, Request $request): JsonResponse
     {
         [$input, $violations] = $this->mapper->map($request, RiskScenarioInput::class);

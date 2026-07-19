@@ -15,6 +15,7 @@ Le point `GET /api/health` permet de vérifier le service sans authentification.
 
 - `GET|POST /api/users` et `GET|PUT /api/users/{id}`.
 - `GET|POST /api/organizations` et `GET|PUT /api/organizations/{id}`.
+- `GET /api/audit-logs` : 500 dernières mutations visibles par l’administrateur.
 
 Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié au niveau du repository. Une ressource d’une autre organisation est renvoyée comme inexistante.
 

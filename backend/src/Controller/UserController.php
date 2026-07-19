@@ -20,7 +20,6 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/users')]
-#[IsGranted(User::ROLE_ADMIN)]
 final readonly class UserController
 {
     public function __construct(
@@ -35,12 +34,14 @@ final readonly class UserController
     }
 
     #[Route('', methods: ['GET'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
     public function index(): JsonResponse
     {
         return new JsonResponse(array_map($this->responses->user(...), $this->users->findVisibleTo($this->actor())));
     }
 
     #[Route('/{id<\d+>}', methods: ['GET'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
     public function show(int $id): JsonResponse
     {
         $user = $this->users->findOneVisibleTo($id, $this->actor());
@@ -49,6 +50,7 @@ final readonly class UserController
     }
 
     #[Route('', methods: ['POST'])]
+    #[IsGranted(User::ROLE_ADMIN)]
     public function create(Request $request): JsonResponse
     {
         [$input, $violations] = $this->inputMapper->map($request, CreateUserInput::class);
@@ -79,6 +81,7 @@ final readonly class UserController
     }
 
     #[Route('/{id<\d+>}', methods: ['PUT'])]
+    #[IsGranted(User::ROLE_ADMIN)]
     public function update(int $id, Request $request): JsonResponse
     {
         $user = $this->users->findOneVisibleTo($id, $this->actor());
@@ -93,11 +96,35 @@ final readonly class UserController
         if (!$this->rolesAreAllowed($input->roles)) {
             return $this->invalidRoles();
         }
+        $existingUser = $this->users->findOneBy(['email' => mb_strtolower($input->email)]);
+        if (null !== $existingUser && $existingUser !== $user) {
+            return new JsonResponse(['code' => 'EMAIL_ALREADY_USED', 'message' => 'Cette adresse email est déjà utilisée.'], JsonResponse::HTTP_CONFLICT);
+        }
 
-        $user->setFirstName($input->firstName)->setLastName($input->lastName)->setRoles($input->roles)->setStatus($input->status);
+        $user->setEmail($input->email)->setFirstName($input->firstName)->setLastName($input->lastName)->setRoles($input->roles)->setStatus($input->status);
         $this->entityManager->flush();
 
         return new JsonResponse($this->responses->user($user));
+    }
+
+    #[Route('/{id<\d+>}', methods: ['DELETE'])]
+    #[IsGranted(User::ROLE_ADMIN)]
+    public function delete(int $id): JsonResponse
+    {
+        $actor = $this->actor();
+        $user = $this->users->findOneVisibleTo($id, $actor);
+        if (null === $user) {
+            return $this->notFound();
+        }
+        if ($user === $actor) {
+            return new JsonResponse(['code' => 'SELF_DELETE_FORBIDDEN', 'message' => 'Vous ne pouvez pas supprimer votre propre compte.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Les comptes sont désactivés afin de conserver leurs responsabilités et l’historique métier.
+        $user->setStatus(User::STATUS_INACTIVE);
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
     }
 
     /** @param list<string> $roles */

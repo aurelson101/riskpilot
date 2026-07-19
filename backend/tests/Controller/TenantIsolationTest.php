@@ -20,6 +20,7 @@ use App\Entity\User;
 use App\Entity\Vulnerability;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -28,6 +29,7 @@ final class TenantIsolationTest extends WebTestCase
 {
     private KernelBrowser $client;
     private EntityManagerInterface $entityManager;
+    private JWTTokenManagerInterface $tokenManager;
     private User $adminA;
     private User $userA;
     private User $userB;
@@ -38,9 +40,15 @@ final class TenantIsolationTest extends WebTestCase
     private int $foreignNotificationId;
     private int $foreignComplianceResultId;
 
+    private function authenticate(User $user): void
+    {
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$this->tokenManager->create($user));
+    }
+
     protected function setUp(): void
     {
         $this->client = self::createClient();
+        $this->client->disableReboot();
         $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schemaTool = new SchemaTool($this->entityManager);
@@ -95,7 +103,8 @@ final class TenantIsolationTest extends WebTestCase
         $this->foreignNotificationId = (int) $notificationB->getId();
         $this->foreignComplianceResultId = (int) $resultB->getId();
         $this->localScopeId = (int) $scopeA->getId();
-        $this->client->loginUser($this->adminA, 'api');
+        $this->tokenManager = self::getContainer()->get(JWTTokenManagerInterface::class);
+        $this->authenticate($this->adminA);
     }
 
     public function testUserListOnlyContainsCurrentOrganization(): void
@@ -109,6 +118,58 @@ final class TenantIsolationTest extends WebTestCase
             ['admin-a@example.test', 'user-a@example.test'],
             array_column($payload, 'email'),
         );
+    }
+
+    public function testApiOnlyExposesAssignedRoles(): void
+    {
+        $this->client->request('GET', '/api/me');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([User::ROLE_ADMIN], $payload['roles']);
+    }
+
+    public function testAdministratorCanCreateUpdateAndDeactivateUser(): void
+    {
+        $this->client->request('POST', '/api/users', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'email' => 'new-user@example.test', 'firstName' => 'Nouvel', 'lastName' => 'Utilisateur',
+            'password' => 'StrongPassword123!', 'roles' => [User::ROLE_RISK_MANAGER],
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+        $created = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->authenticate($this->adminA);
+        $this->client->request('PUT', '/api/users/'.$created['id'], server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'email' => 'updated-user@example.test', 'firstName' => 'Mis', 'lastName' => 'À jour',
+            'roles' => [User::ROLE_ADMIN], 'status' => User::STATUS_ACTIVE,
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+        $updatedPayload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('updated-user@example.test', $updatedPayload['email']);
+
+        $this->authenticate($this->adminA);
+        $this->client->request('DELETE', '/api/users/'.$created['id']);
+        self::assertResponseStatusCodeSame(204);
+        $updated = $this->entityManager->getRepository(User::class)->find($created['id']);
+        self::assertInstanceOf(User::class, $updated);
+        self::assertSame(User::STATUS_INACTIVE, $updated->getStatus());
+    }
+
+    public function testAuditLogRedactsPasswords(): void
+    {
+        $this->client->request('POST', '/api/users', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'email' => 'audited@example.test', 'firstName' => 'Audit', 'lastName' => 'Test',
+            'password' => 'StrongPassword123!', 'roles' => [User::ROLE_VIEWER],
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+
+        $this->authenticate($this->adminA);
+        $this->client->request('GET', '/api/audit-logs');
+        self::assertResponseIsSuccessful();
+        $logs = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('POST', $logs[0]['action']);
+        self::assertSame('users', $logs[0]['entityType']);
+        self::assertSame('[REDACTED]', $logs[0]['newValues']['password']);
     }
 
     public function testAuthenticatedUserCanUpdateOwnProfile(): void
@@ -155,7 +216,7 @@ final class TenantIsolationTest extends WebTestCase
 
     public function testViewerCannotAccessAdministration(): void
     {
-        $this->client->loginUser($this->userA, 'api');
+        $this->authenticate($this->userA);
         $this->client->request('GET', '/api/users');
 
         self::assertResponseStatusCodeSame(403);

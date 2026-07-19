@@ -84,6 +84,8 @@ Les fixtures créent une organisation, trois utilisateurs, plusieurs périmètre
 - `risk.manager@riskpilot.local` / `ChangeMe123!` ;
 - `action.owner@riskpilot.local` / `ChangeMe123!`.
 
+Le compte administrateur est super-administrateur. Depuis l’interface, il peut créer et modifier les utilisateurs et organisations, gérer les inventaires, risques, actions et évaluations, archiver ou désactiver les ressources importantes, et consulter le journal d’audit. Le rôle « Lecteur » hérité pour l’autorisation interne n’est pas présenté comme rôle assigné.
+
 ## Tests
 
 Après démarrage :

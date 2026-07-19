@@ -53,6 +53,26 @@ final readonly class ScopeController
         return null === $scope ? $this->notFound() : $this->save($scope, $request, false);
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function delete(int $id): JsonResponse
+    {
+        $scope = $this->scopes->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $scope) {
+            return $this->notFound();
+        }
+        if ($scope->getChildren()->count() > 0) {
+            return new JsonResponse(['code' => 'RESOURCE_IN_USE', 'message' => 'Ce périmètre contient des sous-périmètres.'], 409);
+        }
+        $this->entityManager->remove($scope);
+        try {
+            $this->entityManager->flush();
+        } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException) {
+            return new JsonResponse(['code' => 'RESOURCE_IN_USE', 'message' => 'Ce périmètre est utilisé par un actif, un risque ou une évaluation.'], 409);
+        }
+
+        return new JsonResponse(null, 204);
+    }
+
     private function save(Scope $scope, Request $request, bool $created): JsonResponse
     {
         [$input, $violations] = $this->mapper->map($request, ScopeInput::class);
