@@ -76,6 +76,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 6 — tiers et collaboration
 
+**État : réalisé.** Le registre tiers couvre criticité, services, données, dépendances, contrat/SLA, réévaluation et sortie. Les questionnaires sont versionnés, expirables, accessibles par un portail public à jeton opaque, revus en interne et consolidés en cyberscore.
+
 - registre des tiers, services, données, criticité, dépendances, contrats, SLA et plans de sortie ;
 - questionnaires/formulaires versionnés, campagnes, relances et pièces justificatives ;
 - préqualification, cyberscore, attestations, certifications et réévaluations ;

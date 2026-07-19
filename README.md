@@ -126,6 +126,8 @@ Le compte administrateur est super-administrateur. Depuis l’interface, il peut
 
 Le même menu donne accès au pilotage des audits métier : programme annuel, missions et périmètres, équipe et déclaration d’indépendance, rapport final, observations et non-conformités majeures/mineures. Chaque constat porte un responsable, une échéance et des preuves. Son cycle CAPA impose l’analyse de cause, la correction et l’action corrective avant une revue d’efficacité ; la clôture doit être validée par une personne distincte du responsable.
 
+Le registre des tiers centralise services, données confiées, criticité, dépendances, contrat/SLA, échéances, plan de sortie et cyberscore. Une campagne fournisseur fige la version et les pondérations du questionnaire, expose un formulaire limité par jeton opaque et expiration, collecte réponses et références de preuves, puis exige une revue interne avant de mettre à jour le score.
+
 ## Tests
 
 Après démarrage :

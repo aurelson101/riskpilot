@@ -83,6 +83,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `AuditProgram` porte le plan annuel d’une organisation. Il agrège des `AuditEngagement` rattachés à un périmètre, un auditeur principal, une équipe, des dates et une déclaration d’indépendance. Les `AuditFinding` séparent observation, opportunité et non-conformité mineure/majeure. Le workflow CAPA documente cause racine, correction, actions corrective/préventive et preuve ; la revue d’efficacité interdit l’auto-validation et rouvre automatiquement l’action si elle est jugée inefficace. Ces objets sont audités par le subscriber général mais restent distincts d’`AuditLog`, qui est le journal technique append-only.
 
+### Tiers et évaluations externes
+
+`ThirdParty` est isolé par organisation et porte le contexte contractuel, les dépendances, la criticité, le plan de sortie et le score courant. `SupplierAssessment` conserve un instantané versionné des questions et pondérations. Le portail public ne donne accès qu’au questionnaire désigné par un jeton aléatoire de 256 bits jusqu’à son expiration ; aucune API du tenant n’y est exposée. La soumission est ensuite revue par un utilisateur autorisé avant consolidation du cyberscore.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |
