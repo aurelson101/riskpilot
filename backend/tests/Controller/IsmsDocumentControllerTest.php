@@ -134,7 +134,12 @@ final class IsmsDocumentControllerTest extends WebTestCase
         $this->authenticate($this->admin);
         $this->json('POST', '/api/isms-documents', ['title' => 'Procédure ACL', 'category' => 'Procédure', 'classification' => 'INTERNAL', 'visibility' => 'RESTRICTED', 'content' => 'Version 1']);
         self::assertResponseStatusCodeSame(201);
-        $documentId = $this->payload()['id'];
+        $createdDocument = $this->payload();
+        $documentId = $createdDocument['id'];
+        self::assertSame('Version 1', $createdDocument['excerpt']);
+
+        $this->json('POST', '/api/isms-documents', ['title' => 'Catégorie invalide', 'category' => str_repeat('x', 81), 'content' => 'test']);
+        self::assertResponseStatusCodeSame(422);
 
         $this->authenticate($this->viewer);
         $this->client->request('GET', '/api/isms-documents/'.$documentId);

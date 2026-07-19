@@ -14,6 +14,7 @@ import {
 } from "@mui/icons-material";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Card,
@@ -41,6 +42,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { IsmsDocument, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
@@ -87,6 +89,8 @@ function date(value: string | null) {
 export function IsmsDocumentsPage() {
   const { user } = useAuth();
   const client = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const selectedCategory = searchParams.get("category")?.trim() || null;
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -118,15 +122,27 @@ export function IsmsDocumentsPage() {
     queryFn: async () =>
       (await api.get<User[]>("/isms-documents/collaborators")).data,
   });
-  const documents = useMemo(
+  const availableCategories = useMemo(
     () =>
-      (list.data ?? []).filter((item) =>
+      [
+        ...new Set([
+          ...categories,
+          ...(list.data ?? []).map((item) => item.category),
+        ]),
+      ].sort((left, right) => left.localeCompare(right, "fr")),
+    [list.data],
+  );
+  const documents = useMemo(() => {
+    const filtered = (list.data ?? []).filter(
+      (item) =>
+        (!selectedCategory || item.category === selectedCategory) &&
         `${item.title} ${item.category} ${person(item.owner)}`
           .toLowerCase()
           .includes(search.toLowerCase()),
-      ),
-    [list.data, search],
-  );
+    );
+
+    return selectedCategory ? filtered : filtered.slice(0, 10);
+  }, [list.data, search, selectedCategory]);
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ["isms-documents"] });
   };
@@ -272,10 +288,12 @@ export function IsmsDocumentsPage() {
       >
         <Box>
           <Typography variant="h4" fontWeight={750}>
-            Documents ISMS
+            {selectedCategory ?? "Publications ISMS récentes"}
           </Typography>
           <Typography color="text.secondary">
-            Politiques, procédures, preuves, versions et partages sécurisés
+            {selectedCategory
+              ? `Documents accessibles de la catégorie ${selectedCategory}`
+              : "Les 10 derniers documents accessibles, toutes catégories confondues"}
           </Typography>
         </Box>
         <Button
@@ -333,6 +351,9 @@ export function IsmsDocumentsPage() {
                     label={document.classification}
                   />
                 </Stack>
+                <Typography variant="body2" color="text.secondary" mt={2}>
+                  {document.excerpt || "Aucun résumé disponible."}
+                </Typography>
                 <Typography variant="body2" color="text.secondary" mt={2}>
                   Propriétaire : {person(document.owner)}
                 </Typography>
@@ -800,22 +821,22 @@ export function IsmsDocumentsPage() {
               />
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Catégorie</InputLabel>
-                    <Select
-                      label="Catégorie"
-                      value={form.category}
-                      onChange={(event) =>
-                        setForm({ ...form, category: event.target.value })
-                      }
-                    >
-                      {categories.map((item) => (
-                        <MenuItem key={item} value={item}>
-                          {item}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <Autocomplete
+                    freeSolo
+                    options={availableCategories}
+                    value={form.category}
+                    onInputChange={(_, value) =>
+                      setForm({ ...form, category: value })
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        required
+                        label="Catégorie"
+                        helperText="Choisissez une catégorie ou créez-en une nouvelle"
+                      />
+                    )}
+                  />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <FormControl fullWidth>

@@ -59,30 +59,39 @@ describe("App", () => {
 
   it("regroupe le profil dans les paramètres et permet de réduire le menu", async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "valid-token");
-    vi.spyOn(api, "get").mockResolvedValueOnce({
-      data: {
-        id: 1,
-        email: "admin@example.test",
-        firstName: "Alice",
-        lastName: "Admin",
-        roles: ["ROLE_ADMIN"],
-        status: "ACTIVE",
-        mfaEnabled: false,
-        lastLoginAt: null,
-        organization: {
-          id: 1,
-          name: "Demo",
-          description: null,
-          status: "ACTIVE",
-          riskThresholds: {
-            lowMax: 4,
-            moderateMax: 9,
-            highMax: 16,
-            criticalMax: 25,
-          },
-        },
-      },
-    });
+    vi.spyOn(api, "get").mockImplementation(async (url) => ({
+      data:
+        url === "/isms-documents"
+          ? [
+              {
+                id: 10,
+                title: "Politique de sécurité",
+                category: "Politique interne",
+              },
+            ]
+          : {
+              id: 1,
+              email: "admin@example.test",
+              firstName: "Alice",
+              lastName: "Admin",
+              roles: ["ROLE_ADMIN"],
+              status: "ACTIVE",
+              mfaEnabled: false,
+              lastLoginAt: null,
+              organization: {
+                id: 1,
+                name: "Demo",
+                description: null,
+                status: "ACTIVE",
+                riskThresholds: {
+                  lowMax: 4,
+                  moderateMax: 9,
+                  highMax: 16,
+                  criticalMax: 25,
+                },
+              },
+            },
+    }));
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/profile"]}>
@@ -95,6 +104,8 @@ describe("App", () => {
 
     expect(await screen.findByText("Mon profil et MFA")).toBeInTheDocument();
     expect(screen.getByText("Messagerie")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Documents ISMS"));
+    expect(await screen.findByText("Politique interne")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Réduire/ }));
     await waitFor(() =>
       expect(screen.queryByText("Mon profil et MFA")).not.toBeInTheDocument(),

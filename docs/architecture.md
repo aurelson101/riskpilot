@@ -114,6 +114,8 @@ IsmsDocument
 
 Le cycle est `DRAFT` → `IN_REVIEW` → `APPROVED` → `ARCHIVED`. L’approbation mémorise le valideur et la prochaine revue. Toute modification invalide l’approbation et révoque les liens publics existants. Seule une version approuvée peut être partagée.
 
+La navigation documentaire dérive ses catégories de `GET /api/isms-documents`, qui ne retourne que les documents lisibles par l’utilisateur courant. Les sous-menus respectent donc naturellement le tenant et les ACL. La racine du module affiche les 10 éléments accessibles les plus récents ; un sous-menu applique ensuite son filtre de catégorie.
+
 Les fichiers `.doc` et `.docx` sont validés, limités à 10 Mo, renommés aléatoirement et conservés dans le volume privé `isms_document_files`. L’API contrôle les ACL avant tout téléchargement. Le jeton public et le mot de passe ne sont conservés que sous forme d’empreinte.
 
 ### Messagerie et notifications

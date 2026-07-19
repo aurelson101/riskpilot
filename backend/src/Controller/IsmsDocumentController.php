@@ -378,7 +378,7 @@ final readonly class IsmsDocumentController
     /** @param array<string, mixed> $input */
     private function validate(array $input): ?JsonResponse
     {
-        if ('' === trim((string) ($input['title'] ?? '')) || mb_strlen((string) $input['title']) > 200 || '' === trim((string) ($input['category'] ?? ''))) {
+        if ('' === trim((string) ($input['title'] ?? '')) || mb_strlen((string) $input['title']) > 200 || '' === trim((string) ($input['category'] ?? '')) || mb_strlen((string) $input['category']) > 80) {
             return $this->invalid('Un titre et une catégorie valides sont requis.');
         }
         if (!in_array((string) ($input['status'] ?? 'DRAFT'), IsmsDocument::STATUSES, true) || !in_array((string) ($input['classification'] ?? 'INTERNAL'), IsmsDocument::CLASSIFICATIONS, true) || !in_array((string) ($input['visibility'] ?? IsmsDocument::VISIBILITY_ORGANIZATION), IsmsDocument::VISIBILITIES, true)) {
@@ -391,7 +391,7 @@ final readonly class IsmsDocumentController
     /** @return array<string, mixed> */
     private function serialize(IsmsDocument $document, User $user, bool $detail): array
     {
-        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'owner' => $this->user($document->getOwner()), 'approval' => ['approvedBy' => null === $document->getApprovedBy() ? null : $this->user($document->getApprovedBy()), 'approvedAt' => $document->getApprovedAt()?->format(DATE_ATOM), 'nextReviewAt' => $document->getNextReviewAt()?->format(DATE_ATOM), 'reviewOverdue' => $document->isReviewOverdue()], 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize(), 'checksum' => $document->getFileChecksum()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
+        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'excerpt' => $this->excerpt($document), 'owner' => $this->user($document->getOwner()), 'approval' => ['approvedBy' => null === $document->getApprovedBy() ? null : $this->user($document->getApprovedBy()), 'approvedAt' => $document->getApprovedAt()?->format(DATE_ATOM), 'nextReviewAt' => $document->getNextReviewAt()?->format(DATE_ATOM), 'reviewOverdue' => $document->isReviewOverdue()], 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize(), 'checksum' => $document->getFileChecksum()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
         if ($detail) {
             $data['content'] = $document->getContent();
             $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'fileName' => $version->getFileName(), 'fileChecksum' => $version->getFileChecksum(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());
@@ -412,6 +412,14 @@ final readonly class IsmsDocumentController
     private function user(User $user): array
     {
         return ['id' => $user->getId(), 'email' => $user->getEmail(), 'firstName' => $user->getFirstName(), 'lastName' => $user->getLastName()];
+    }
+
+    private function excerpt(IsmsDocument $document): string
+    {
+        $plainText = preg_replace('/[#*_>`\[\]()!-]+/u', ' ', $document->getContent());
+        $plainText = preg_replace('/\s+/u', ' ', trim($plainText ?? $document->getContent()));
+
+        return mb_substr($plainText ?? '', 0, 240);
     }
 
     private function notFound(): JsonResponse

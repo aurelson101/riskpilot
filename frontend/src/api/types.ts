@@ -255,6 +255,7 @@ export interface IsmsDocument {
   classification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
   visibility: "ORGANIZATION" | "RESTRICTED";
   content?: string;
+  excerpt: string;
   owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
   approval: {
     approvedBy: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;

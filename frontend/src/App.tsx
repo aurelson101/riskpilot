@@ -55,8 +55,18 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth/useAuth";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { api } from "./api/client";
+import type { IsmsDocument } from "./api/types";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
@@ -152,6 +162,21 @@ function Layout() {
     location.pathname === "/profile" ||
     location.pathname.startsWith("/administration");
   const [settingsOpen, setSettingsOpen] = useState(settingsActive);
+  const ismsActive = location.pathname === "/isms-documents";
+  const [ismsOpen, setIsmsOpen] = useState(ismsActive);
+  const ismsDocuments = useQuery({
+    queryKey: ["isms-documents"],
+    queryFn: async () =>
+      (await api.get<IsmsDocument[]>("/isms-documents")).data,
+    enabled: Boolean(user),
+  });
+  const ismsCategories = useMemo(
+    () =>
+      [...new Set((ismsDocuments.data ?? []).map((item) => item.category))]
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right, "fr")),
+    [ismsDocuments.data],
+  );
   const isAdmin = user?.roles.some((role) =>
     ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
   );
@@ -160,6 +185,10 @@ function Layout() {
   useEffect(() => {
     if (settingsActive) setSettingsOpen(true);
   }, [settingsActive]);
+
+  useEffect(() => {
+    if (ismsActive) setIsmsOpen(true);
+  }, [ismsActive]);
 
   if (!user) {
     return (
@@ -205,9 +234,15 @@ function Layout() {
     icon: ReactNode;
     nested?: boolean;
   }) {
+    const [targetPath, targetSearch = ""] = path.split("?");
+    const selected =
+      location.pathname === targetPath &&
+      (targetSearch
+        ? location.search === `?${targetSearch}`
+        : location.pathname !== "/isms-documents" || !location.search);
     const button = (
       <ListItemButton
-        selected={location.pathname === path}
+        selected={selected}
         onClick={() => go(path)}
         sx={{
           minHeight: 44,
@@ -308,11 +343,66 @@ function Layout() {
           label="Conformité"
           icon={<FactCheckOutlined />}
         />
-        <NavItem
-          path="/isms-documents"
-          label="Documents ISMS"
-          icon={<FolderCopyOutlined />}
-        />
+        <Tooltip
+          title={collapsed && !mobile ? "Documents ISMS" : ""}
+          placement="right"
+        >
+          <ListItemButton
+            selected={ismsActive}
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                setIsmsOpen(true);
+              } else setIsmsOpen((open) => !open);
+            }}
+            sx={{
+              minHeight: 44,
+              borderRadius: 1.5,
+              mb: 0.25,
+              justifyContent: collapsed ? "center" : "initial",
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: collapsed ? 0 : 42,
+                color: "inherit",
+                justifyContent: "center",
+              }}
+            >
+              <FolderCopyOutlined />
+            </ListItemIcon>
+            {!collapsed && (
+              <>
+                <ListItemText
+                  primary="Documents ISMS"
+                  primaryTypographyProps={{ fontSize: 14 }}
+                />
+                {ismsOpen ? <ExpandLess /> : <ExpandMore />}
+              </>
+            )}
+          </ListItemButton>
+        </Tooltip>
+        {!collapsed && (
+          <Collapse in={ismsOpen} timeout="auto" unmountOnExit>
+            <List disablePadding>
+              <NavItem
+                nested
+                path="/isms-documents"
+                label="Publications récentes"
+                icon={<DescriptionOutlined fontSize="small" />}
+              />
+              {ismsCategories.map((category) => (
+                <NavItem
+                  key={category}
+                  nested
+                  path={`/isms-documents?category=${encodeURIComponent(category)}`}
+                  label={category}
+                  icon={<FolderCopyOutlined fontSize="small" />}
+                />
+              ))}
+            </List>
+          </Collapse>
+        )}
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavItem
           path="/notifications"
@@ -494,7 +584,9 @@ function Layout() {
             noWrap
             sx={{ flexGrow: 1, fontSize: { xs: "1rem", sm: "1.25rem" } }}
           >
-            {titleByPath[location.pathname] ?? "RiskPilot"}
+            {location.pathname === "/isms-documents" && location.search
+              ? `Documents ISMS — ${new URLSearchParams(location.search).get("category") ?? "Vue d’ensemble"}`
+              : (titleByPath[location.pathname] ?? "RiskPilot")}
           </Typography>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
