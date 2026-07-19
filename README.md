@@ -20,6 +20,13 @@ make start
 
 L’application est disponible sur <http://localhost:8080>, l’API sur <http://localhost:8080/api> et Mailpit sur <http://localhost:8025>.
 
+Après l’installation, créez le premier administrateur :
+
+```bash
+docker compose exec backend php bin/console app:user:create-admin \
+  "Mon organisation" admin@example.com "un-mot-de-passe-robuste"
+```
+
 ## Commandes
 
 `make start`, `make stop`, `make restart`, `make logs`, `make migrate`, `make fixtures`, `make test`, `make lint`, `make shell-backend`, `make shell-frontend` et `make reset` couvrent le cycle de développement courant.
@@ -31,9 +38,11 @@ L’application est disponible sur <http://localhost:8080>, l’API sur <http://
 - `docker/` : configuration Nginx et infrastructure locale.
 - `docs/` : architecture, sécurité, données, API, déploiement et développement.
 
-## Comptes de démonstration
+## Authentification et administration
 
-Les fixtures et le compte `admin@riskpilot.local` / `ChangeMe123!` seront ajoutés à l’étape dédiée. Aucun compte par défaut n’est créé dans ce socle.
+La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes. `GET /api/me` retourne le profil courant. Les administrateurs gèrent les utilisateurs de leur propre organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
+
+Le compte de développement `admin@riskpilot.local` / `ChangeMe123!` n’est créé que dans la base locale utilisée pendant le développement. Les fixtures reproductibles seront ajoutées à l’étape 7.
 
 ## Tests
 
@@ -47,6 +56,6 @@ curl http://localhost:8080/api/health
 
 ## Limitations connues
 
-Cette première étape fournit l’environnement exécutable et les dépendances structurantes. L’authentification, les entités, migrations, fixtures et écrans métier sont planifiés dans les étapes 2 à 7 du cahier des charges.
+Les étapes 1 et 2 fournissent l’environnement, l’authentification JWT, les organisations, les utilisateurs, le RBAC et l’isolation multi-tenant. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les notifications et les données de démonstration.
 
 Licence : AGPL-3.0-or-later.

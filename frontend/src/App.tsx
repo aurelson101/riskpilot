@@ -1,75 +1,173 @@
-import { ShieldOutlined } from "@mui/icons-material";
 import {
+  AdminPanelSettingsOutlined,
+  DashboardOutlined,
+  Logout,
+  ShieldOutlined,
+} from "@mui/icons-material";
+import {
+  AppBar,
+  Avatar,
   Box,
-  Card,
-  CardContent,
-  Chip,
+  Button,
+  CircularProgress,
   Container,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Stack,
+  Toolbar,
   Typography,
 } from "@mui/material";
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { useAuth } from "./auth/useAuth";
+import { LoginPage } from "./pages/LoginPage";
+import { UsersPage } from "./pages/UsersPage";
 
-const modules = [
-  "Organisations et périmètres",
-  "Actifs et scénarios de risque",
-  "Plans d'action",
-  "Conformité et référentiels",
-];
+const drawerWidth = 250;
 
-export default function App() {
+function ProtectedRoute() {
+  return useAuth().token ? <Outlet /> : <Navigate to="/login" replace />;
+}
+
+function Layout() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAdmin = user?.roles.some((role) =>
+    ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
+  );
+
+  if (!user) {
+    return (
+      <Stack minHeight="100vh" alignItems="center" justifyContent="center">
+        <CircularProgress aria-label="Chargement du profil" />
+      </Stack>
+    );
+  }
+
   return (
-    <Box
-      component="main"
-      sx={{ minHeight: "100vh", bgcolor: "#f4f7fb", py: 8 }}
-    >
-      <Container maxWidth="md">
-        <Stack spacing={4}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <ShieldOutlined sx={{ fontSize: 54, color: "#1769e0" }} />
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f4f7fb" }}>
+      <AppBar
+        position="fixed"
+        color="inherit"
+        elevation={0}
+        sx={{ ml: `${drawerWidth}px`, width: `calc(100% - ${drawerWidth}px)` }}
+      >
+        <Toolbar sx={{ borderBottom: "1px solid #e5eaf1" }}>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            {location.pathname.startsWith("/administration")
+              ? "Administration"
+              : "Tableau de bord"}
+          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
+              {user.firstName[0]}
+              {user.lastName[0]}
+            </Avatar>
             <Box>
-              <Typography
-                variant="h3"
-                component="h1"
-                fontWeight={750}
-                color="#09203f"
-              >
-                RiskPilot
+              <Typography variant="body2" fontWeight={700}>
+                {user.firstName} {user.lastName}
               </Typography>
-              <Typography color="text.secondary">
-                Pilotage des risques cyber, de la conformité et des plans
-                d’action
+              <Typography variant="caption" color="text.secondary">
+                {user.organization.name}
               </Typography>
             </Box>
           </Stack>
-
-          <Card variant="outlined" sx={{ borderRadius: 3 }}>
-            <CardContent sx={{ p: 4 }}>
-              <Chip
-                label="Socle technique opérationnel"
-                color="success"
-                sx={{ mb: 2 }}
-              />
-              <Typography variant="h5" gutterBottom>
-                Bienvenue dans RiskPilot
-              </Typography>
-              <Typography color="text.secondary" paragraph>
-                L’étape 1 initialise l’architecture Symfony, React et
-                PostgreSQL. Les modules métier seront activés progressivement
-                dans les prochaines étapes.
-              </Typography>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                gap={1}
-                flexWrap="wrap"
-              >
-                {modules.map((module) => (
-                  <Chip key={module} label={module} variant="outlined" />
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
-      </Container>
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            bgcolor: "#062b4b",
+            color: "white",
+          },
+        }}
+      >
+        <Toolbar>
+          <ShieldOutlined sx={{ mr: 1.5, color: "#54a3ff" }} />
+          <Typography variant="h5" fontWeight={750}>
+            RiskPilot
+          </Typography>
+        </Toolbar>
+        <List sx={{ px: 1 }}>
+          <ListItemButton
+            selected={location.pathname === "/"}
+            onClick={() => navigate("/")}
+          >
+            <ListItemIcon>
+              <DashboardOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Tableau de bord" />
+          </ListItemButton>
+          {isAdmin && (
+            <ListItemButton
+              selected={location.pathname === "/administration/users"}
+              onClick={() => navigate("/administration/users")}
+            >
+              <ListItemIcon>
+                <AdminPanelSettingsOutlined sx={{ color: "inherit" }} />
+              </ListItemIcon>
+              <ListItemText primary="Utilisateurs" />
+            </ListItemButton>
+          )}
+        </List>
+        <Box sx={{ mt: "auto", p: 2 }}>
+          <Button
+            color="inherit"
+            fullWidth
+            startIcon={<Logout />}
+            onClick={logout}
+          >
+            Déconnexion
+          </Button>
+        </Box>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, pt: 11, pb: 5 }}>
+        <Container maxWidth="xl">
+          <Outlet />
+        </Container>
+      </Box>
     </Box>
+  );
+}
+
+function DashboardPage() {
+  const { user } = useAuth();
+  return (
+    <Stack spacing={1}>
+      <Typography variant="h4" fontWeight={750}>
+        Bonjour {user?.firstName}
+      </Typography>
+      <Typography color="text.secondary">
+        Votre espace sécurisé {user?.organization.name} est prêt.
+      </Typography>
+    </Stack>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<Layout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="administration/users" element={<UsersPage />} />
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

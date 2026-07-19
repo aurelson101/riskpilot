@@ -1,0 +1,40 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState, type PropsWithChildren } from "react";
+import { api, TOKEN_STORAGE_KEY } from "../api/client";
+import type { User } from "../api/types";
+import { AuthContext } from "./auth-context";
+
+export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
+  const [token, setToken] = useState(() =>
+    sessionStorage.getItem(TOKEN_STORAGE_KEY),
+  );
+  const profile = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => (await api.get<User>("/me")).data,
+    enabled: Boolean(token),
+    retry: false,
+  });
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    setToken(null);
+    queryClient.clear();
+  }, [queryClient]);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const { data } = await api.post<{ token: string }>("/auth/login", {
+        email,
+        password,
+      });
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      setToken(data.token);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+    [queryClient],
+  );
+  const value = useMemo(
+    () => ({ token, user: profile.data, login, logout }),
+    [token, profile.data, login, logout],
+  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
