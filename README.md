@@ -96,7 +96,7 @@ Le menu **Documents ISMS** centralise les politiques, procédures, instructions,
 
 Un gestionnaire peut créer un lien externe révocable, avec mot de passe facultatif d’au moins huit caractères et date d’expiration. RiskPilot ne stocke que les empreintes du jeton et du mot de passe ; le lien complet n’est affiché qu’à sa création. Les partages expirés ou révoqués ne révèlent plus le document.
 
-Le premier lot utilise un contenu textuel Markdown. Le stockage de pièces jointes chiffrées S3/MinIO, l’antivirus et les circuits d’approbation sont planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
+Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo et conservés dans un volume Docker privé ; ils ne sont accessibles qu’au travers des ACL ou d’un lien de partage valide. Le stockage chiffré S3/MinIO, l’antivirus et les circuits d’approbation restent planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
 
 ## Tableau de bord, exports et démonstration
 

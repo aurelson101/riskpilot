@@ -8,6 +8,8 @@ import {
   PersonAddOutlined,
   RestoreOutlined,
   ShareOutlined,
+  AttachFileOutlined,
+  DownloadOutlined,
 } from "@mui/icons-material";
 import {
   Alert,
@@ -96,6 +98,7 @@ export function IsmsDocumentsPage() {
   const [sharePassword, setSharePassword] = useState("");
   const [shareExpiry, setShareExpiry] = useState("");
   const [createdUrl, setCreatedUrl] = useState("");
+  const [wordFile, setWordFile] = useState<File | null>(null);
 
   const list = useQuery({
     queryKey: ["isms-documents"],
@@ -126,15 +129,30 @@ export function IsmsDocumentsPage() {
     await client.invalidateQueries({ queryKey: ["isms-documents"] });
   };
   const save = useMutation({
-    mutationFn: () =>
-      editing
-        ? api.put(`/isms-documents/${editing.id}`, form)
-        : api.post("/isms-documents", form),
+    mutationFn: async () => {
+      const response = editing
+        ? await api.put<IsmsDocument>(`/isms-documents/${editing.id}`, form)
+        : await api.post<IsmsDocument>("/isms-documents", form);
+      if (wordFile) {
+        const body = new FormData();
+        body.append("file", wordFile);
+        await api.post(`/isms-documents/${response.data.id}/file`, body, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+      return response;
+    },
     onSuccess: async (response) => {
       await refresh();
+      setWordFile(null);
       setEditorOpen(false);
       setSelectedId(response.data.id);
     },
+    onError: (caught) => setError(message(caught)),
+  });
+  const deleteFile = useMutation({
+    mutationFn: (id: number) => api.delete(`/isms-documents/${id}/file`),
+    onSuccess: refresh,
     onError: (caught) => setError(message(caught)),
   });
   const remove = useMutation({
@@ -192,12 +210,14 @@ export function IsmsDocumentsPage() {
 
   const openCreate = () => {
     setEditing(null);
+    setWordFile(null);
     setForm({ ...emptyForm, ownerId: user?.id ?? 0 });
     setError("");
     setEditorOpen(true);
   };
   const openEdit = (document: IsmsDocument) => {
     setEditing(document);
+    setWordFile(null);
     setForm({
       title: document.title,
       category: document.category,
@@ -210,6 +230,21 @@ export function IsmsDocumentsPage() {
     });
     setError("");
     setEditorOpen(true);
+  };
+  const downloadWord = async (document: IsmsDocument) => {
+    try {
+      const response = await api.get(`/isms-documents/${document.id}/file`, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(response.data);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = document.file?.name ?? "document.docx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(message(caught));
+    }
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -409,6 +444,32 @@ export function IsmsDocumentsPage() {
                   <Typography color="text.secondary">Document vide</Typography>
                 )}
               </Box>
+              {current.file && (
+                <Alert
+                  severity="info"
+                  icon={<AttachFileOutlined />}
+                  action={
+                    <Stack direction="row">
+                      <Button
+                        startIcon={<DownloadOutlined />}
+                        onClick={() => downloadWord(current)}
+                      >
+                        Télécharger
+                      </Button>
+                      {current.permissions.edit && (
+                        <Button
+                          color="error"
+                          onClick={() => deleteFile.mutate(current.id)}
+                        >
+                          Retirer
+                        </Button>
+                      )}
+                    </Stack>
+                  }
+                >
+                  {current.file.name} — {Math.ceil(current.file.size / 1024)} Ko
+                </Alert>
+              )}
             </Stack>
           )}
           {current && tab === 1 && (
@@ -768,6 +829,29 @@ export function IsmsDocumentsPage() {
                 multiline
                 minRows={12}
               />
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<AttachFileOutlined />}
+              >
+                {wordFile
+                  ? wordFile.name
+                  : editing?.file
+                    ? "Remplacer le fichier Word"
+                    : "Joindre un document Word"}
+                <input
+                  hidden
+                  type="file"
+                  accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(event) =>
+                    setWordFile(event.target.files?.[0] ?? null)
+                  }
+                />
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Markdown et fichier Word peuvent être utilisés ensemble. Taille
+                maximale : 10 Mo.
+              </Typography>
               <TextField
                 label="Commentaire de version"
                 value={form.versionComment}

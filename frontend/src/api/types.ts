@@ -253,6 +253,7 @@ export interface IsmsDocument {
   content?: string;
   owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
   currentVersion: number;
+  file: { name: string; mimeType: string; size: number } | null;
   createdAt: string;
   updatedAt: string;
   permissions: { read: boolean; edit: boolean; manage: boolean };

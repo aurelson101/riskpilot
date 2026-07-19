@@ -21,7 +21,7 @@ final class IsmsDocumentRepository extends ServiceEntityRepository
     /** @return list<IsmsDocument> */
     public function findVisibleTo(User $user): array
     {
-        $qb = $this->createQueryBuilder('d')->leftJoin('d.aclEntries', 'acl')->addSelect('acl')->leftJoin('acl.user', 'aclUser')->addSelect('aclUser')->leftJoin('d.owner', 'owner')->addSelect('owner')->andWhere('d.organization = :organization')->setParameter('organization', $user->getOrganization())->orderBy('d.updatedAt', 'DESC')->distinct();
+        $qb = $this->createQueryBuilder('d')->leftJoin('d.aclEntries', 'acl')->addSelect('acl')->leftJoin('acl.user', 'aclUser')->addSelect('aclUser')->leftJoin('d.owner', 'owner')->addSelect('owner')->andWhere('d.organization = :organization')->setParameter('organization', $user->getOrganization())->orderBy('d.updatedAt', 'DESC');
         if (!$this->isAdmin($user)) {
             $qb->andWhere('d.visibility = :organizationVisibility OR d.owner = :user OR acl.user = :user')->setParameter('organizationVisibility', IsmsDocument::VISIBILITY_ORGANIZATION)->setParameter('user', $user);
         }

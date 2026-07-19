@@ -16,14 +16,16 @@ COPY composer.json composer.lock symfony.lock* ./
 FROM base AS development
 ENV APP_ENV=dev
 COPY . .
-RUN composer install --prefer-dist --no-interaction --no-progress
+RUN composer install --prefer-dist --no-interaction --no-progress \
+    && mkdir -p var/isms-documents \
+    && chown -R www-data:www-data var
 CMD ["php-fpm", "-F"]
 
 FROM base AS production
 ENV APP_ENV=prod APP_DEBUG=0
 COPY . .
 RUN composer install --no-dev --classmap-authoritative --no-interaction --no-progress \
-    && mkdir -p var/cache var/log \
+    && mkdir -p var/cache var/log var/isms-documents \
     && chown -R www-data:www-data var
 USER www-data
 CMD ["php-fpm", "-F"]

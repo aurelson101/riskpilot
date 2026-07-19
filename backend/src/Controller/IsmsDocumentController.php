@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\IsmsDocumentStorage;
 use App\Entity\IsmsDocument;
 use App\Entity\IsmsDocumentAcl;
 use App\Entity\IsmsDocumentShare;
@@ -14,14 +15,16 @@ use App\Repository\IsmsDocumentRepository;
 use App\Repository\UserRepository;
 use App\Security\IsmsDocumentAccess;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/isms-documents')]
 final readonly class IsmsDocumentController
 {
-    public function __construct(private IsmsDocumentRepository $documents, private UserRepository $users, private CurrentUser $currentUser, private IsmsDocumentAccess $access, private EntityManagerInterface $entityManager, private string $appUrl)
+    public function __construct(private IsmsDocumentRepository $documents, private UserRepository $users, private CurrentUser $currentUser, private IsmsDocumentAccess $access, private IsmsDocumentStorage $storage, private EntityManagerInterface $entityManager, private string $appUrl)
     {
     }
 
@@ -113,8 +116,69 @@ final readonly class IsmsDocumentController
         if (null === $document || !$this->access->canManage($document, $user)) {
             return $this->notFound();
         }
+        $this->storage->delete($document->getFileStorageName());
         $this->entityManager->remove($document);
         $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
+    }
+
+    #[Route('/{id<\d+>}/file', methods: ['POST'])]
+    public function uploadFile(int $id, Request $request): JsonResponse
+    {
+        $user = $this->currentUser->get();
+        $document = $this->find($id, $user);
+        if (null === $document || !$this->access->canEdit($document, $user)) {
+            return $this->notFound();
+        }
+        $file = $request->files->get('file');
+        if (!$file instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+            return $this->invalid('Sélectionnez un fichier Word.');
+        }
+        try {
+            $stored = $this->storage->store($file);
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            return $this->invalid($exception->getMessage());
+        }
+        $previous = $document->getFileStorageName();
+        $document->attachFile($file->getClientOriginalName(), $stored['storageName'], $stored['mimeType'], $stored['size']);
+        $this->entityManager->flush();
+        $this->storage->delete($previous);
+
+        return new JsonResponse($this->serialize($document, $user, true));
+    }
+
+    #[Route('/{id<\d+>}/file', methods: ['GET'])]
+    public function downloadFile(int $id): JsonResponse|BinaryFileResponse
+    {
+        $user = $this->currentUser->get();
+        $document = $this->find($id, $user);
+        if (null === $document || !$this->access->canRead($document, $user) || !$document->hasFile()) {
+            return $this->notFound();
+        }
+        $path = $this->storage->path((string) $document->getFileStorageName());
+        if (!is_file($path)) {
+            return $this->notFound();
+        }
+        $response = new BinaryFileResponse($path);
+        $response->headers->set('Content-Type', (string) $document->getFileMimeType());
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, (string) $document->getFileName());
+
+        return $response;
+    }
+
+    #[Route('/{id<\d+>}/file', methods: ['DELETE'])]
+    public function deleteFile(int $id): JsonResponse
+    {
+        $user = $this->currentUser->get();
+        $document = $this->find($id, $user);
+        if (null === $document || !$this->access->canEdit($document, $user)) {
+            return $this->notFound();
+        }
+        $storageName = $document->getFileStorageName();
+        $document->detachFile();
+        $this->entityManager->flush();
+        $this->storage->delete($storageName);
 
         return new JsonResponse(null, 204);
     }
@@ -268,7 +332,7 @@ final readonly class IsmsDocumentController
     /** @return array<string, mixed> */
     private function serialize(IsmsDocument $document, User $user, bool $detail): array
     {
-        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'owner' => $this->user($document->getOwner()), 'currentVersion' => $document->getCurrentVersion(), 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
+        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'owner' => $this->user($document->getOwner()), 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
         if ($detail) {
             $data['content'] = $document->getContent();
             $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());

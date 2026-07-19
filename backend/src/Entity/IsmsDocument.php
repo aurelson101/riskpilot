@@ -32,6 +32,10 @@ class IsmsDocument
     #[ORM\Column(length: 20)] private string $classification = 'INTERNAL';
     #[ORM\Column(length: 20)] private string $visibility = self::VISIBILITY_ORGANIZATION;
     #[ORM\Column(type: 'text')] private string $content = '';
+    #[ORM\Column(length: 255, nullable: true)] private ?string $fileName = null;
+    #[ORM\Column(length: 255, nullable: true)] private ?string $fileStorageName = null;
+    #[ORM\Column(length: 150, nullable: true)] private ?string $fileMimeType = null;
+    #[ORM\Column(nullable: true)] private ?int $fileSize = null;
     #[ORM\Column] private int $currentVersion = 1;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
@@ -112,6 +116,31 @@ class IsmsDocument
         return $this->content;
     }
 
+    public function getFileName(): ?string
+    {
+        return $this->fileName;
+    }
+
+    public function getFileStorageName(): ?string
+    {
+        return $this->fileStorageName;
+    }
+
+    public function getFileMimeType(): ?string
+    {
+        return $this->fileMimeType;
+    }
+
+    public function getFileSize(): ?int
+    {
+        return $this->fileSize;
+    }
+
+    public function hasFile(): bool
+    {
+        return null !== $this->fileStorageName;
+    }
+
     public function getCurrentVersion(): int
     {
         return $this->currentVersion;
@@ -172,6 +201,22 @@ class IsmsDocument
         if ($this->versions->isEmpty()) {
             $this->versions->add(new IsmsDocumentVersion($this, $author, 1, $this->content, $comment));
         }
+    }
+
+    public function attachFile(string $fileName, string $storageName, string $mimeType, int $size): void
+    {
+        $this->fileName = $fileName;
+        $this->fileStorageName = $storageName;
+        $this->fileMimeType = $mimeType;
+        $this->fileSize = $size;
+        $this->touch();
+    }
+
+    public function detachFile(): void
+    {
+        $this->fileName = $this->fileStorageName = $this->fileMimeType = null;
+        $this->fileSize = null;
+        $this->touch();
     }
 
     private function touch(): void

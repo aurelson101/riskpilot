@@ -1,4 +1,8 @@
-import { LockOutlined, ShieldOutlined } from "@mui/icons-material";
+import {
+  DownloadOutlined,
+  LockOutlined,
+  ShieldOutlined,
+} from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -23,6 +27,7 @@ interface SharedDocument {
   status: string;
   content: string;
   version: number;
+  file: { name: string; size: number } | null;
   updatedAt: string;
 }
 
@@ -56,6 +61,28 @@ export function PublicDocumentPage() {
           ? "Mot de passe incorrect."
           : "Impossible d’ouvrir ce document.",
       );
+    }
+  };
+  const downloadWord = async () => {
+    if (!document?.file) return;
+    try {
+      const response = password
+        ? await api.post(
+            `/public/documents/${token}/file`,
+            { password },
+            { responseType: "blob" },
+          )
+        : await api.get(`/public/documents/${token}/file`, {
+            responseType: "blob",
+          });
+      const url = URL.createObjectURL(response.data);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = document.file.name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Impossible de télécharger le fichier Word.");
     }
   };
   return (
@@ -117,6 +144,23 @@ export function PublicDocumentPage() {
                 Mis à jour le{" "}
                 {new Date(document.updatedAt).toLocaleString("fr-FR")}
               </Typography>
+              {document.file && (
+                <Alert
+                  severity="info"
+                  sx={{ mt: 3 }}
+                  action={
+                    <Button
+                      startIcon={<DownloadOutlined />}
+                      onClick={downloadWord}
+                    >
+                      Télécharger
+                    </Button>
+                  }
+                >
+                  {document.file.name} — {Math.ceil(document.file.size / 1024)}{" "}
+                  Ko
+                </Alert>
+              )}
               <Box
                 sx={{
                   mt: 4,

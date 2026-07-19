@@ -25,6 +25,10 @@ services:
         arguments:
             $appSecret: '%app.secret%'
 
+    App\Application\IsmsDocumentStorage:
+        arguments:
+            $directory: '%kernel.project_dir%/var/isms-documents'
+
     App\Controller\AuthController:
         arguments:
             $loginLimiter: '@limiter.login'

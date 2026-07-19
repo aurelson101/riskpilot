@@ -9,6 +9,7 @@ Centraliser les politiques, procédures, preuves et modèles du SMSI avec une tr
 - registre documentaire par organisation avec recherche, catégorie, statut et classification ;
 - création, consultation, modification, archivage et suppression ;
 - contenu Markdown éditable depuis l'interface ;
+- fichier Word `.doc`/`.docx` facultatif, contrôlé, limité à 10 Mo et stocké hors exposition publique ;
 - historique de versions immuables avec auteur et commentaire de version ;
 - propriétaire et ACL nominatives `READ`, `EDIT` et `MANAGE` ;
 - visibilité interne à l'organisation ou restreinte aux personnes autorisées ;
@@ -27,7 +28,7 @@ Centraliser les politiques, procédures, preuves et modèles du SMSI avec une tr
 
 ## Lots suivants
 
-1. Ajout de pièces jointes chiffrées avec stockage S3/MinIO et antivirus.
+1. Migration des fichiers Word locaux vers un stockage chiffré S3/MinIO avec antivirus.
 2. Circuit de revue/approbation, signatures et rappels périodiques.
 3. Modèles ISO 27001, NIS2 et DORA avec génération guidée.
 4. Liens entre documents, exigences, contrôles, risques et preuves d'audit.

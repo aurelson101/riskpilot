@@ -11,6 +11,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class IsmsDocumentControllerTest extends WebTestCase
 {
@@ -50,6 +51,29 @@ final class IsmsDocumentControllerTest extends WebTestCase
         self::assertSame(1, $document['currentVersion']);
 
         $this->authenticate($this->admin);
+        $this->client->request('GET', '/api/isms-documents');
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $this->payload());
+
+        $wordPath = tempnam(sys_get_temp_dir(), 'riskpilot-docx-');
+        self::assertIsString($wordPath);
+        $archive = new \ZipArchive();
+        self::assertTrue($archive->open($wordPath, \ZipArchive::OVERWRITE));
+        $archive->addFromString('[Content_Types].xml', '<Types/>');
+        $archive->addFromString('word/document.xml', '<document>Politique</document>');
+        $archive->close();
+        $uploaded = new UploadedFile($wordPath, 'politique.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', null, true);
+        $this->authenticate($this->admin);
+        $this->client->request('POST', '/api/isms-documents/'.$document['id'].'/file', files: ['file' => $uploaded]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('politique.docx', $this->payload()['file']['name']);
+
+        $this->authenticate($this->admin);
+        $this->client->request('GET', '/api/isms-documents/'.$document['id'].'/file');
+        self::assertResponseIsSuccessful();
+        self::assertSame('attachment; filename=politique.docx', $this->client->getResponse()->headers->get('content-disposition'));
+
+        $this->authenticate($this->admin);
         $this->json('POST', '/api/isms-documents/'.$document['id'].'/acl', ['userId' => $this->viewer->getId(), 'permission' => 'EDIT']);
         self::assertResponseIsSuccessful();
 
@@ -73,6 +97,10 @@ final class IsmsDocumentControllerTest extends WebTestCase
         $this->json('POST', '/api/public/documents/'.$token, ['password' => 'Secret123!']);
         self::assertResponseIsSuccessful();
         self::assertSame('# Version approuvée', $this->payload()['document']['content']);
+
+        $this->json('POST', '/api/public/documents/'.$token.'/file', ['password' => 'Secret123!']);
+        self::assertResponseIsSuccessful();
+        self::assertSame('attachment; filename=politique.docx', $this->client->getResponse()->headers->get('content-disposition'));
     }
 
     public function testTenantAndRestrictedDocumentIsolation(): void

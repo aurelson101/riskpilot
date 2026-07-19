@@ -8,6 +8,7 @@ x-backend: &backend
   volumes:
     - ./backend:/app
     - backend_vendor:/app/vendor
+    - isms_document_files:/app/var/isms-documents
   depends_on:
     postgres:
       condition: service_healthy
@@ -99,6 +100,7 @@ volumes:
   redis_data:
   backend_vendor:
   frontend_node_modules:
+  isms_document_files:
 
 networks:
   riskpilot:
