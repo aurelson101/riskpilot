@@ -61,6 +61,42 @@ export interface RiskMatrix {
   thresholds: Organization["riskThresholds"];
   cells: RiskMatrixCell[];
 }
+
+export interface ActionPlan {
+  id: number;
+  title: string;
+  description: string | null;
+  relatedRisk: { id: number; title: string };
+  relatedControl: { id: number; name: string } | null;
+  owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status:
+    | "OPEN"
+    | "PLANNED"
+    | "IN_PROGRESS"
+    | "BLOCKED"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "OVERDUE";
+  startDate: string | null;
+  dueDate: string;
+  completionDate: string | null;
+  progress: number;
+  estimatedCost: string | null;
+  actualCost: string | null;
+  expectedRiskReduction: number | null;
+  evidence: string[];
+}
+
+export interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
 export interface User {
   id: number;
   email: string;

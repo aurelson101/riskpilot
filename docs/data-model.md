@@ -9,3 +9,7 @@ Toutes les ressources tenant-aware porteront une organisation explicite. Les ass
 `Scope` forme une arborescence auto-référencée et possède un responsable optionnel. `Asset` appartient obligatoirement à un périmètre et porte les niveaux de criticité, confidentialité, intégrité et disponibilité de 1 à 5. `Threat` constitue le catalogue de menaces propre à l’organisation. `Vulnerability` référence plusieurs actifs affectés via une table de jointure.
 
 Ces quatre agrégats portent une organisation obligatoire. Les repositories ajoutent cette organisation à chaque lecture et les contrôleurs refusent toute relation pointant vers un autre tenant.
+
+## Étape 5
+
+`ActionPlan` relie un traitement à un `RiskScenario`, une mesure facultative et un responsable. `ActionComment` conserve les échanges horodatés. `Notification` appartient à un destinataire et à son organisation ; l’email correspondant est distribué de façon asynchrone par Messenger.

@@ -8,6 +8,7 @@ use App\Api\ApiResponseFactory;
 use App\Api\Dto\RiskScenarioInput;
 use App\Api\JsonInputMapper;
 use App\Application\CurrentUser;
+use App\Application\NotificationService;
 use App\Domain\Risk\RiskCalculation;
 use App\Entity\RiskScenario;
 use App\Entity\User;
@@ -33,6 +34,7 @@ final readonly class RiskScenarioController
         private SecurityControlRepository $controls, private UserRepository $users, private CurrentUser $currentUser,
         private RiskCalculation $calculation, private EntityManagerInterface $entityManager,
         private JsonInputMapper $mapper, private ApiResponseFactory $responses,
+        private NotificationService $notifications,
     ) {
     }
 
@@ -88,6 +90,12 @@ final readonly class RiskScenarioController
             ->setEvaluations($input->likelihood, $input->impact, $this->calculation->score($input->likelihood, $input->impact), $input->currentLikelihood, $input->currentImpact, $this->calculation->score($input->currentLikelihood, $input->currentImpact), $input->residualLikelihood, $input->residualImpact, $this->calculation->score($input->residualLikelihood, $input->residualImpact))
             ->setTreatmentDecision($input->treatmentDecision)->setStatus($input->status)->setReviewDate(null === $input->reviewDate ? null : new \DateTimeImmutable($input->reviewDate));
         $this->entityManager->persist($risk);
+        if ($created && $risk->getGrossRiskScore() > $actor->getOrganization()->getRiskThresholds()['highMax']) {
+            $this->notifications->notify($owner, 'CRITICAL_RISK_CREATED', 'Risque critique créé', sprintf('Le scénario « %s » a un score brut de %d.', $risk->getTitle(), $risk->getGrossRiskScore()), '/risks');
+        }
+        if ($created && 'IN_REVIEW' === $risk->getStatus()) {
+            $this->notifications->notify($owner, 'RISK_REVIEW_REQUIRED', 'Risque à valider', sprintf('Le scénario « %s » est en attente de validation.', $risk->getTitle()), '/risks');
+        }
         $this->entityManager->flush();
 
         return new JsonResponse($this->responses->riskScenario($risk), $created ? 201 : 200);

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Api;
 
+use App\Entity\ActionComment;
+use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\Notification;
 use App\Entity\Organization;
 use App\Entity\RiskScenario;
 use App\Entity\Scope;
@@ -17,6 +20,33 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 final class ApiResponseFactory
 {
+    /** @return array<string, mixed> */
+    public function actionPlan(ActionPlan $action): array
+    {
+        return [
+            'id' => $action->getId(), 'title' => $action->getTitle(), 'description' => $action->getDescription(),
+            'relatedRisk' => ['id' => $action->getRelatedRisk()->getId(), 'title' => $action->getRelatedRisk()->getTitle()],
+            'relatedControl' => null === $action->getRelatedControl() ? null : ['id' => $action->getRelatedControl()->getId(), 'name' => $action->getRelatedControl()->getName()],
+            'owner' => $this->userSummary($action->getOwner()), 'priority' => $action->getPriority(), 'status' => $action->getStatus(),
+            'startDate' => $action->getStartDate()?->format('Y-m-d'), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'completionDate' => $action->getCompletionDate()?->format('Y-m-d'),
+            'progress' => $action->getProgress(), 'estimatedCost' => $action->getEstimatedCost(), 'actualCost' => $action->getActualCost(),
+            'expectedRiskReduction' => $action->getExpectedRiskReduction(), 'evidence' => $action->getEvidence(),
+            'createdAt' => $action->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $action->getUpdatedAt()->format(DATE_ATOM),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function actionComment(ActionComment $comment): array
+    {
+        return ['id' => $comment->getId(), 'author' => $this->userSummary($comment->getAuthor()), 'message' => $comment->getMessage(), 'createdAt' => $comment->getCreatedAt()->format(DATE_ATOM)];
+    }
+
+    /** @return array<string, mixed> */
+    public function notification(Notification $notification): array
+    {
+        return ['id' => $notification->getId(), 'type' => $notification->getType(), 'title' => $notification->getTitle(), 'message' => $notification->getMessage(), 'link' => $notification->getLink(), 'isRead' => $notification->isRead(), 'createdAt' => $notification->getCreatedAt()->format(DATE_ATOM)];
+    }
+
     public function validationError(ConstraintViolationListInterface $violations): JsonResponse
     {
         $errors = [];

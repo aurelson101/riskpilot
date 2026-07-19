@@ -10,6 +10,8 @@ import {
   AssessmentOutlined,
   GridViewOutlined,
   VerifiedUserOutlined,
+  TaskAltOutlined,
+  NotificationsOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -41,6 +43,8 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { UsersPage } from "./pages/UsersPage";
 import { RisksPage } from "./pages/RisksPage";
 import { RiskMatrixPage } from "./pages/RiskMatrixPage";
+import { ActionsPage } from "./pages/ActionsPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 
 const drawerWidth = 250;
 
@@ -131,6 +135,15 @@ function Layout() {
             <ListItemText primary="Risques" />
           </ListItemButton>
           <ListItemButton
+            selected={location.pathname === "/actions"}
+            onClick={() => navigate("/actions")}
+          >
+            <ListItemIcon>
+              <TaskAltOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Plans d’action" />
+          </ListItemButton>
+          <ListItemButton
             selected={location.pathname === "/risk-matrix"}
             onClick={() => navigate("/risk-matrix")}
           >
@@ -195,6 +208,15 @@ function Layout() {
               <ListItemText primary="Utilisateurs" />
             </ListItemButton>
           )}
+          <ListItemButton
+            selected={location.pathname === "/notifications"}
+            onClick={() => navigate("/notifications")}
+          >
+            <ListItemIcon>
+              <NotificationsOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Notifications" />
+          </ListItemButton>
         </List>
         <Box sx={{ mt: "auto", p: 2 }}>
           <Button
@@ -238,6 +260,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
           <Route path="risks" element={<RisksPage />} />
+          <Route path="actions" element={<ActionsPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="risk-matrix" element={<RiskMatrixPage />} />
           <Route path="scopes" element={<InventoryPage kind="scopes" />} />
           <Route path="assets" element={<InventoryPage kind="assets" />} />

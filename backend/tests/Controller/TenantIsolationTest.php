@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\Notification;
 use App\Entity\Organization;
 use App\Entity\RiskScenario;
 use App\Entity\Scope;
@@ -29,6 +31,7 @@ final class TenantIsolationTest extends WebTestCase
     /** @var array<string, int> */
     private array $foreignResourceIds = [];
     private int $localScopeId;
+    private int $foreignNotificationId;
 
     protected function setUp(): void
     {
@@ -57,8 +60,12 @@ final class TenantIsolationTest extends WebTestCase
         $controlB = new SecurityControl('MFA B', 'ACCESS', $this->organizationB);
         $riskA = (new RiskScenario('Risque A', $organizationA, $scopeA, $assetA, $threatA, $this->adminA))->setEvaluations(5, 5, 25, 4, 4, 16, 2, 2, 4);
         $riskB = (new RiskScenario('Risque B', $this->organizationB, $scopeB, $assetB, $threatB, $this->userB))->setEvaluations(4, 5, 20, 3, 4, 12, 2, 3, 6);
+        $actionA = new ActionPlan('Action A', $organizationA, $riskA, $this->adminA, new \DateTimeImmutable('+30 days'));
+        $actionB = new ActionPlan('Action B', $this->organizationB, $riskB, $this->userB, new \DateTimeImmutable('+20 days'));
+        $notificationA = new Notification($this->adminA, 'ACTION_ASSIGNED', 'Action A', 'Une action vous est affectée.');
+        $notificationB = new Notification($this->userB, 'ACTION_ASSIGNED', 'Action B', 'Une action vous est affectée.');
 
-        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB, $controlA, $controlB, $riskA, $riskB] as $entity) {
+        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB, $controlA, $controlB, $riskA, $riskB, $actionA, $actionB, $notificationA, $notificationB] as $entity) {
             $this->entityManager->persist($entity);
         }
         $this->entityManager->flush();
@@ -69,7 +76,9 @@ final class TenantIsolationTest extends WebTestCase
             'vulnerabilities' => (int) $vulnerabilityB->getId(),
             'security-controls' => (int) $controlB->getId(),
             'risks' => (int) $riskB->getId(),
+            'actions' => (int) $actionB->getId(),
         ];
+        $this->foreignNotificationId = (int) $notificationB->getId();
         $this->localScopeId = (int) $scopeA->getId();
         $this->client->loginUser($this->adminA, 'api');
     }
@@ -185,5 +194,35 @@ final class TenantIsolationTest extends WebTestCase
     {
         yield 'controls' => ['security-controls'];
         yield 'risks' => ['risks'];
+    }
+
+    public function testActionPlansAreTenantScoped(): void
+    {
+        $this->client->request('GET', '/api/actions');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertCount(1, $payload);
+        self::assertSame('Action A', $payload[0]['title']);
+    }
+
+    public function testForeignActionPlanIsNotAddressable(): void
+    {
+        $this->client->request('GET', '/api/actions/'.$this->foreignResourceIds['actions']);
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testNotificationsBelongOnlyToRecipient(): void
+    {
+        $this->client->request('GET', '/api/notifications');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertCount(1, $payload);
+        self::assertSame('Action A', $payload[0]['title']);
+    }
+
+    public function testForeignNotificationCannotBeMarkedRead(): void
+    {
+        $this->client->request('PUT', '/api/notifications/'.$this->foreignNotificationId.'/read');
+        self::assertResponseStatusCodeSame(404);
     }
 }

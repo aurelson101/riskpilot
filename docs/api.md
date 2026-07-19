@@ -2,7 +2,7 @@
 
 L’API REST est servie sous `/api` et sa documentation OpenAPI sous `/docs`. Les réponses d’erreur métier utiliseront un code stable, un message lisible et un objet `errors` pour les violations de validation.
 
-Le point `GET /api/health` permet de vérifier le service sans authentification. Les ressources métier, filtres, pagination et permissions seront ajoutés dans les étapes suivantes.
+Le point `GET /api/health` permet de vérifier le service sans authentification. Les ressources métier sont protégées par JWT et isolées par organisation.
 
 ## Authentification
 
@@ -25,3 +25,11 @@ Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié 
 - `GET|POST /api/vulnerabilities` et `GET|PUT /api/vulnerabilities/{id}`.
 
 La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le rôle Risk Manager ou un rôle supérieur. Les relations vers un parent, un responsable, un périmètre ou un actif sont résolues exclusivement dans l’organisation courante.
+
+## Plans d’action et notifications
+
+- `GET|POST /api/actions` et `GET|PUT /api/actions/{id}` ;
+- `GET|POST /api/actions/{id}/comments` ;
+- `GET /api/notifications` et `PUT /api/notifications/{id}/read`.
+
+Les actions et toutes leurs relations sont limitées au tenant courant. Les notifications ne sont visibles que par leur destinataire.
