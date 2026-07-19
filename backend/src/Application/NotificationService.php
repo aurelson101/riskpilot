@@ -19,6 +19,6 @@ final readonly class NotificationService
     public function notify(User $recipient, string $type, string $title, string $message, ?string $link = null): void
     {
         $this->entityManager->persist(new Notification($recipient, $type, $title, $message, $link));
-        $this->bus->dispatch(new SendNotificationEmail($recipient->getEmail(), $title, $message));
+        $this->bus->dispatch(new SendNotificationEmail((int) $recipient->getOrganization()->getId(), $recipient->getEmail(), $title, $message));
     }
 }

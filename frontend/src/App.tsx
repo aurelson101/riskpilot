@@ -17,6 +17,7 @@ import {
   BusinessOutlined,
   HistoryOutlined,
   DescriptionOutlined,
+  SettingsOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -102,6 +103,11 @@ const AuditLogsPage = lazy(() =>
 const ExecutiveReportPage = lazy(() =>
   import("./pages/ExecutiveReportPage").then((module) => ({
     default: module.ExecutiveReportPage,
+  })),
+);
+const EmailSettingsPage = lazy(() =>
+  import("./pages/EmailSettingsPage").then((module) => ({
+    default: module.EmailSettingsPage,
   })),
 );
 
@@ -267,6 +273,17 @@ function Layout() {
           </ListItemButton>
           {isAdmin && (
             <ListItemButton
+              selected={location.pathname === "/administration/email-settings"}
+              onClick={() => navigate("/administration/email-settings")}
+            >
+              <ListItemIcon>
+                <SettingsOutlined sx={{ color: "inherit" }} />
+              </ListItemIcon>
+              <ListItemText primary="Paramètres email" />
+            </ListItemButton>
+          )}
+          {isAdmin && (
+            <ListItemButton
               selected={location.pathname === "/administration/organizations"}
               onClick={() => navigate("/administration/organizations")}
             >
@@ -386,6 +403,10 @@ export default function App() {
               element={<AuditLogsPage />}
             />
             <Route path="profile" element={<ProfilePage />} />
+            <Route
+              path="administration/email-settings"
+              element={<EmailSettingsPage />}
+            />
             <Route path="reports/executive" element={<ExecutiveReportPage />} />
           </Route>
         </Route>

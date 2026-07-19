@@ -46,3 +46,20 @@ Le MVP couvre l’authentification JWT, le RBAC et l’isolation multi-tenant, l
 5. Couvrir les parcours critiques avec Playwright, puis optimiser le bundle frontend.
 
 Chaque élément doit inclure tests automatisés, contrôle RBAC et multi-tenant, documentation, migration si nécessaire, rebuild Docker et smoke test.
+
+## Roadmap MFA et messagerie
+
+L’analyse du code a mis en évidence une authentification JWT à facteur unique et un transport email global, sans paramétrage par organisation. L’ordre retenu limite les risques de verrouillage de compte et de fuite de secrets.
+
+| Priorité | Capacité | Mise en œuvre | État |
+|---|---|---|---|
+| P0 | MFA TOTP individuel | Confirmation du mot de passe, Google/Microsoft Authenticator et codes de secours à usage unique | Réalisé |
+| P0 | Secrets protégés | Secrets TOTP et mots de passe SMTP chiffrés avec libsodium, jamais exposés par l’API | Réalisé |
+| P0 | SMTP par organisation | SMTP2GO, Google Workspace, Microsoft 365 et SMTP personnalisé, expéditeur, reply-to et test | Réalisé |
+| P1 | Politique MFA | MFA obligatoire par rôle/organisation, délai d’enrôlement et vue de conformité | Prochaine étape |
+| P1 | Récupération encadrée | Régénération des codes, désactivation par un second administrateur et audit dédié | Prochaine étape |
+| P1 | OAuth Google/Microsoft | Consentement tenant, rotation des jetons et Microsoft Graph/Gmail API, sans mot de passe d’application | Prochaine étape |
+| P1 | Délivrabilité | Modèles HTML, SPF/DKIM/DMARC, suivi des rebonds et file d’échec administrable | Prochaine étape |
+| P2 | SSO d’entreprise | OpenID Connect Google/Microsoft, liaison de comptes et provisioning SCIM | À planifier |
+
+Cette première livraison utilise les points SMTP officiels. Google Workspace et Microsoft 365 pouvant imposer des politiques tenant spécifiques, l’interface explique les prérequis et conserve un mode SMTP personnalisé. L’OAuth natif reste une phase séparée car il exige des applications clientes et un consentement administrateur propres à chaque organisation.

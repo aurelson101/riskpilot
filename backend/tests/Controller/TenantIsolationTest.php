@@ -8,6 +8,7 @@ use App\Entity\ActionPlan;
 use App\Entity\Asset;
 use App\Entity\ComplianceAssessment;
 use App\Entity\ComplianceResult;
+use App\Entity\EmailSettings;
 use App\Entity\Framework;
 use App\Entity\Notification;
 use App\Entity\Organization;
@@ -18,12 +19,14 @@ use App\Entity\SecurityControl;
 use App\Entity\Threat;
 use App\Entity\User;
 use App\Entity\Vulnerability;
+use App\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class TenantIsolationTest extends WebTestCase
 {
@@ -60,6 +63,8 @@ final class TenantIsolationTest extends WebTestCase
         $this->adminA = new User('admin-a@example.test', 'Alice', 'Admin', $organizationA, [User::ROLE_ADMIN]);
         $this->userA = new User('user-a@example.test', 'Alain', 'A', $organizationA, [User::ROLE_VIEWER]);
         $this->userB = new User('user-b@example.test', 'Brice', 'B', $this->organizationB, [User::ROLE_VIEWER]);
+        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $this->adminA->setPassword($hasher->hashPassword($this->adminA, 'StrongPassword123!'));
 
         $scopeA = new Scope('Périmètre A', 'DEPARTMENT', $organizationA);
         $scopeB = new Scope('Périmètre B', 'SITE', $this->organizationB);
@@ -220,6 +225,48 @@ final class TenantIsolationTest extends WebTestCase
         $this->client->request('GET', '/api/users');
 
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testAdministratorCanConfigureTenantEmailWithoutExposingPassword(): void
+    {
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'provider' => 'SMTP2GO', 'username' => 'smtp-user', 'password' => 'smtp-secret',
+            'senderEmail' => 'grc@example.test', 'senderName' => 'GRC', 'replyTo' => 'support@example.test', 'enabled' => true,
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertTrue($payload['passwordConfigured']);
+        self::assertArrayNotHasKey('password', $payload);
+        $settings = $this->entityManager->getRepository(EmailSettings::class)->findOneBy(['organization' => $this->adminA->getOrganization()]);
+        self::assertInstanceOf(EmailSettings::class, $settings);
+        self::assertNotSame('smtp-secret', $settings->getEncryptedPassword());
+
+        $this->authenticate($this->userA);
+        $this->client->request('GET', '/api/settings/email');
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testLoginRequiresMfaAndConsumesRecoveryCode(): void
+    {
+        $cipher = self::getContainer()->get(SecretCipher::class);
+        $recoveryCode = 'ABCD-12345678';
+        $this->adminA->enableMfa($cipher->encrypt('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'), [password_hash($recoveryCode, PASSWORD_ARGON2ID)]);
+        $this->entityManager->flush();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+
+        $credentials = ['email' => $this->adminA->getEmail(), 'password' => 'StrongPassword123!'];
+        $this->client->request('POST', '/api/auth/login', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($credentials, JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(202);
+        self::assertTrue(json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR)['mfaRequired']);
+
+        $this->client->request('POST', '/api/auth/login', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([...$credentials, 'mfaCode' => $recoveryCode], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+        self::assertArrayHasKey('token', json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $reloadedUser = $entityManager->getRepository(User::class)->find($this->adminA->getId());
+        self::assertInstanceOf(User::class, $reloadedUser);
+        self::assertSame([], $reloadedUser->getMfaRecoveryCodes());
     }
 
     #[DataProvider('inventoryResources')]

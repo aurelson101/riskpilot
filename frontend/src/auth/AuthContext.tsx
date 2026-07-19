@@ -30,14 +30,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (token && profile.isError) logout();
   }, [token, profile.isError, logout]);
   const login = useCallback(
-    async (email: string, password: string) => {
-      const { data } = await api.post<{ token: string }>("/auth/login", {
+    async (email: string, password: string, mfaCode?: string) => {
+      const { data, status } = await api.post<{
+        token?: string;
+        mfaRequired?: boolean;
+      }>("/auth/login", {
         email,
         password,
+        mfaCode,
       });
+      if (status === 202 || data.mfaRequired) return true;
+      if (!data.token) throw new Error("Jeton de connexion manquant");
       sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
       setToken(data.token);
       await queryClient.invalidateQueries({ queryKey: ["me"] });
+      return false;
     },
     [queryClient],
   );

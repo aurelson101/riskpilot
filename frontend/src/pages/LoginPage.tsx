@@ -20,6 +20,7 @@ import { useAuth } from "../auth/useAuth";
 const schema = z.object({
   email: z.email("Adresse email invalide"),
   password: z.string().min(1, "Mot de passe obligatoire"),
+  mfaCode: z.string().optional(),
 });
 type LoginForm = z.infer<typeof schema>;
 
@@ -27,6 +28,7 @@ export function LoginPage() {
   const { token, login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
   const {
     register,
     handleSubmit,
@@ -37,12 +39,22 @@ export function LoginPage() {
   const onSubmit = async (values: LoginForm) => {
     setError(null);
     try {
-      await login(values.email, values.password);
+      const needsMfa = await login(
+        values.email,
+        values.password,
+        values.mfaCode,
+      );
+      if (needsMfa) {
+        setMfaRequired(true);
+        return;
+      }
       navigate("/");
     } catch (reason) {
       setError(
         axios.isAxiosError(reason) && reason.response?.status === 401
-          ? "Email ou mot de passe incorrect."
+          ? mfaRequired
+            ? "Code MFA ou code de secours invalide."
+            : "Email ou mot de passe incorrect."
           : "Le service est momentanément indisponible.",
       );
     }
@@ -99,6 +111,15 @@ export function LoginPage() {
               helperText={errors.password?.message}
               {...register("password")}
             />
+            {mfaRequired && (
+              <TextField
+                label="Code MFA ou code de secours"
+                autoComplete="one-time-code"
+                autoFocus
+                helperText="Saisissez le code à 6 chiffres de votre application d’authentification."
+                {...register("mfaCode")}
+              />
+            )}
             <Button
               type="submit"
               variant="contained"

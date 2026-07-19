@@ -6,16 +6,19 @@ Le point `GET /api/health` permet de vérifier le service sans authentification.
 
 ## Authentification
 
-- `POST /api/auth/login` : échange email/mot de passe contre un JWT de 15 minutes.
+- `POST /api/auth/login` : échange email/mot de passe contre un JWT de 15 minutes ; répond `202` avec `mfaRequired` lorsqu’un second facteur est requis.
 - `GET /api/me` : profil de l’utilisateur courant.
 - `PUT /api/me` : modification du prénom, du nom et de l’adresse email du profil courant.
 - `PUT /api/me/password` : changement du mot de passe courant.
+- `POST /api/me/mfa/setup`, `/enable`, `/disable` : enrôlement et retrait du MFA après confirmation du mot de passe.
 
 ## Administration
 
 - `GET|POST /api/users` et `GET|PUT /api/users/{id}`.
 - `GET|POST /api/organizations` et `GET|PUT /api/organizations/{id}`.
 - `GET /api/audit-logs` : 500 dernières mutations visibles par l’administrateur.
+- `GET|PUT /api/settings/email` : configuration SMTP isolée par organisation.
+- `POST /api/settings/email/test` : test immédiat vers le destinataire choisi.
 
 Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié au niveau du repository. Une ressource d’une autre organisation est renvoyée comme inexistante.
 

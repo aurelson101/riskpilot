@@ -74,6 +74,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastLoginAt = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $mfaSecret = null;
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json')]
+    private array $mfaRecoveryCodes = [];
+
+    #[ORM\Column]
+    private bool $mfaEnabled = false;
+
     /** @param list<string> $roles */
     public function __construct(string $email, string $firstName, string $lastName, Organization $organization, array $roles = [])
     {
@@ -206,6 +216,43 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function markLogin(): void
     {
         $this->lastLoginAt = new \DateTimeImmutable();
+    }
+
+    public function isMfaEnabled(): bool
+    {
+        return $this->mfaEnabled;
+    }
+
+    public function getMfaSecret(): ?string
+    {
+        return $this->mfaSecret;
+    }
+
+    /** @return list<string> */
+    public function getMfaRecoveryCodes(): array
+    {
+        return $this->mfaRecoveryCodes;
+    }
+
+    /** @param list<string> $recoveryCodes */
+    public function enableMfa(string $secret, array $recoveryCodes): void
+    {
+        $this->mfaSecret = $secret;
+        $this->mfaRecoveryCodes = $recoveryCodes;
+        $this->mfaEnabled = true;
+    }
+
+    /** @param list<string> $recoveryCodes */
+    public function setMfaRecoveryCodes(array $recoveryCodes): void
+    {
+        $this->mfaRecoveryCodes = $recoveryCodes;
+    }
+
+    public function disableMfa(): void
+    {
+        $this->mfaSecret = null;
+        $this->mfaRecoveryCodes = [];
+        $this->mfaEnabled = false;
     }
 
     #[ORM\PreUpdate]

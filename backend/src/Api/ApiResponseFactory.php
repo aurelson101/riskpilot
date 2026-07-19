@@ -117,6 +117,7 @@ final class ApiResponseFactory
             'createdAt' => $user->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $user->getUpdatedAt()->format(DATE_ATOM),
             'lastLoginAt' => $user->getLastLoginAt()?->format(DATE_ATOM),
+            'mfaEnabled' => $user->isMfaEnabled(),
         ];
     }
 

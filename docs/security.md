@@ -10,10 +10,11 @@ Les mutations réussies sont inscrites dans un journal tenant-aware avec l’aut
 
 - mots de passe Argon2id via Sodium ;
 - JWT signé d’une durée de 15 minutes ;
+- MFA TOTP facultatif par utilisateur avec codes de secours à usage unique ;
 - hiérarchie RBAC centralisée ;
 - statut actif exigé par le chargeur d’utilisateurs ;
 - requêtes utilisateurs et organisations contraintes par le tenant ;
 - réponse 404 pour une ressource appartenant à un autre tenant ;
 - tests fonctionnels couvrant la liste, l’accès direct et le refus RBAC.
 
-Les clés JWT locales sont ignorées par Git. En production, elles doivent être fournies par le gestionnaire de secrets. Lorsqu’un JWT local expire ou devient invalide, l’interface efface la session et renvoie vers la connexion au lieu de conserver un écran de chargement. Le renouvellement sécurisé et la révocation centralisée des sessions restent nécessaires avant la mise en production.
+Les clés JWT locales sont ignorées par Git. En production, elles doivent être fournies par le gestionnaire de secrets. Les secrets TOTP et mots de passe SMTP sont chiffrés avec libsodium à partir de `APP_SECRET` : ce secret doit rester stable, unique et conservé dans le gestionnaire de secrets. Lorsqu’un JWT local expire ou devient invalide, l’interface efface la session et renvoie vers la connexion au lieu de conserver un écran de chargement. Le renouvellement sécurisé et la révocation centralisée des sessions restent nécessaires avant la mise en production.

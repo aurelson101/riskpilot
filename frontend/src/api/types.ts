@@ -176,6 +176,7 @@ export interface User {
   status: string;
   organization: Organization;
   lastLoginAt: string | null;
+  mfaEnabled: boolean;
 }
 
 export interface Scope {
