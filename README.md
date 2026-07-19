@@ -2,6 +2,8 @@
 
 RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité, les plans d’action et la documentation ISMS. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports CSV et le rapport exécutif imprimable.
 
+![Aperçu du tableau de bord RiskPilot](riskpilot.png)
+
 ## Prérequis
 
 - Docker 24+ avec Docker Compose v2
@@ -42,7 +44,7 @@ docker compose exec backend php bin/console app:user:create-admin \
 - `backend/` : API Symfony, organisée en couches Domain, Application, Infrastructure et Api.
 - `frontend/` : SPA React, TypeScript, Vite et Material UI.
 - `docker/` : configuration Nginx et infrastructure locale.
-- `docs/` : architecture, sécurité, données, API, déploiement et développement.
+- `docs/` : architecture, sécurité, données, API, déploiement et développement. Commencez par le [guide d’architecture](docs/architecture.md) pour comprendre les composants et leurs flux.
 
 La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de priorité avant une exploitation critique.
 
