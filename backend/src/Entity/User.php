@@ -13,6 +13,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
 #[ORM\UniqueConstraint(name: 'uniq_user_email', columns: ['email'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_calendar_token', columns: ['calendar_token_hash'])]
 #[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['email'], message: 'Cette adresse email est déjà utilisée.')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
@@ -83,6 +84,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private bool $mfaEnabled = false;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $calendarTokenHash = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $calendarTokenCreatedAt = null;
 
     /** @param list<string> $roles */
     public function __construct(string $email, string $firstName, string $lastName, Organization $organization, array $roles = [])
@@ -253,6 +260,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->mfaSecret = null;
         $this->mfaRecoveryCodes = [];
         $this->mfaEnabled = false;
+    }
+
+    public function getCalendarTokenHash(): ?string
+    {
+        return $this->calendarTokenHash;
+    }
+
+    public function getCalendarTokenCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->calendarTokenCreatedAt;
+    }
+
+    public function enableCalendarSubscription(string $tokenHash): void
+    {
+        $this->calendarTokenHash = $tokenHash;
+        $this->calendarTokenCreatedAt = new \DateTimeImmutable();
+    }
+
+    public function disableCalendarSubscription(): void
+    {
+        $this->calendarTokenHash = null;
+        $this->calendarTokenCreatedAt = null;
     }
 
     #[ORM\PreUpdate]

@@ -50,4 +50,12 @@ final class UserRepository extends ServiceEntityRepository implements UserLoader
 
         return $builder->getQuery()->getOneOrNullResult();
     }
+
+    public function findActiveByCalendarToken(string $token): ?User
+    {
+        return $this->findOneBy([
+            'calendarTokenHash' => hash('sha256', $token),
+            'status' => User::STATUS_ACTIVE,
+        ]);
+    }
 }

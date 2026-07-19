@@ -42,6 +42,7 @@ security:
         - { path: ^/api/auth/login$, roles: PUBLIC_ACCESS }
         - { path: ^/api/settings/email/oauth/.+/callback$, roles: PUBLIC_ACCESS }
         - { path: ^/api/public/documents/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/calendar/, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: ROLE_VIEWER }
 

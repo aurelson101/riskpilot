@@ -33,10 +33,12 @@ import {
   CalendarMonthOutlined,
   ChevronLeft,
   ChevronRight,
+  ContentCopyOutlined,
   DeleteOutline,
   EditOutlined,
   PersonOutline,
   TodayOutlined,
+  SyncOutlined,
   TableRowsOutlined,
   ViewKanbanOutlined,
 } from "@mui/icons-material";
@@ -137,6 +139,11 @@ type ActionForm = {
   expectedRiskReduction: number | null;
   evidence: string[];
 };
+type CalendarSubscription = {
+  enabled: boolean;
+  createdAt: string | null;
+  url?: string;
+};
 const emptyForm: ActionForm = {
   title: "",
   description: "",
@@ -228,6 +235,9 @@ export function ActionsPage() {
   const [calendarMonth, setCalendarMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [subscriptionUrl, setSubscriptionUrl] = useState("");
+  const [copied, setCopied] = useState(false);
   const canManage = user?.roles.some((role) =>
     ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
   );
@@ -248,6 +258,11 @@ export function ActionsPage() {
     queryKey: ["users"],
     queryFn: async () => (await api.get<User[]>("/users")).data,
     enabled: Boolean(canManage),
+  });
+  const calendarSubscription = useQuery({
+    queryKey: ["calendar-subscription"],
+    queryFn: async () =>
+      (await api.get<CalendarSubscription>("/me/calendar")).data,
   });
   const save = useMutation({
     mutationFn: () =>
@@ -277,6 +292,29 @@ export function ActionsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["actions"] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (caught) => setError(apiMessage(caught)),
+  });
+  const createSubscription = useMutation({
+    mutationFn: async () =>
+      (await api.post<CalendarSubscription>("/me/calendar")).data,
+    onSuccess: async (data) => {
+      setSubscriptionUrl(data.url ?? "");
+      setCopied(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["calendar-subscription"],
+      });
+    },
+    onError: (caught) => setError(apiMessage(caught)),
+  });
+  const revokeSubscription = useMutation({
+    mutationFn: () => api.delete("/me/calendar"),
+    onSuccess: async () => {
+      setSubscriptionUrl("");
+      setCopied(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["calendar-subscription"],
+      });
     },
     onError: (caught) => setError(apiMessage(caught)),
   });
@@ -640,6 +678,13 @@ export function ActionsPage() {
               <Stack direction="row">
                 <Button
                   size="small"
+                  startIcon={<SyncOutlined />}
+                  onClick={() => setSubscriptionOpen(true)}
+                >
+                  Synchroniser
+                </Button>
+                <Button
+                  size="small"
                   startIcon={<TodayOutlined />}
                   onClick={() =>
                     setCalendarMonth(
@@ -775,6 +820,95 @@ export function ActionsPage() {
           </CardContent>
         </Card>
       )}
+      <Dialog
+        open={subscriptionOpen}
+        onClose={() => setSubscriptionOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Synchroniser mon calendrier</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography color="text.secondary">
+              Abonnez Apple Calendar, Google Calendar ou Outlook aux actions qui
+              vous sont affectées. Les changements seront récupérés
+              automatiquement par votre application de calendrier.
+            </Typography>
+            <Alert severity="warning">
+              Ce lien donne accès à vos échéances sans connexion. Gardez-le
+              privé et révoquez-le immédiatement s’il est partagé par erreur.
+            </Alert>
+            {calendarSubscription.data?.enabled && !subscriptionUrl && (
+              <Alert severity="info">
+                Un abonnement est actif depuis le{" "}
+                {calendarSubscription.data.createdAt
+                  ? new Date(
+                      calendarSubscription.data.createdAt,
+                    ).toLocaleDateString("fr-FR")
+                  : "une date inconnue"}
+                . Pour des raisons de sécurité, son adresse n’est affichée qu’à
+                sa création. Régénérez-la pour obtenir un nouveau lien.
+              </Alert>
+            )}
+            {subscriptionUrl && (
+              <>
+                <TextField
+                  label="Adresse d’abonnement iCalendar"
+                  value={subscriptionUrl}
+                  fullWidth
+                  InputProps={{ readOnly: true }}
+                />
+                <Button
+                  variant="contained"
+                  startIcon={<ContentCopyOutlined />}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(subscriptionUrl);
+                    setCopied(true);
+                  }}
+                >
+                  {copied ? "Lien copié" : "Copier le lien"}
+                </Button>
+              </>
+            )}
+            <Box>
+              <Typography fontWeight={700} gutterBottom>
+                Ajouter l’abonnement
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                iPhone/iPad : Réglages → Apps → Calendrier → Comptes → Ajouter
+                un calendrier avec abonnement. Android/Google : Google Agenda
+                sur le web → Autres agendas → À partir de l’URL. Outlook :
+                Ajouter un calendrier → S’abonner à partir du web.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: "space-between" }}>
+          {calendarSubscription.data?.enabled ? (
+            <Button
+              color="error"
+              onClick={() => revokeSubscription.mutate()}
+              disabled={revokeSubscription.isPending}
+            >
+              Révoquer
+            </Button>
+          ) : (
+            <Box />
+          )}
+          <Stack direction="row" spacing={1}>
+            <Button onClick={() => setSubscriptionOpen(false)}>Fermer</Button>
+            <Button
+              variant="contained"
+              onClick={() => createSubscription.mutate()}
+              disabled={createSubscription.isPending}
+            >
+              {calendarSubscription.data?.enabled
+                ? "Régénérer le lien"
+                : "Créer le lien"}
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

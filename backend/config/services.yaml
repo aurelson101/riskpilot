@@ -41,6 +41,10 @@ services:
         arguments:
             $appUrl: '%app.url%'
 
+    App\Controller\CalendarController:
+        arguments:
+            $appUrl: '%app.url%'
+
     App\Controller\PublicIsmsDocumentController:
         arguments:
             $shareLimiter: '@limiter.document_share'
