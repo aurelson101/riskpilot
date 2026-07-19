@@ -29,6 +29,7 @@ class ActionPlan
     #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $completionDate = null;
     #[ORM\Column] private int $progress = 0;
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2, nullable: true)] private ?string $estimatedCost = null;
+    #[ORM\Column(type: 'decimal', precision: 8, scale: 2, nullable: true)] private ?string $estimatedEffortDays = null;
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2, nullable: true)] private ?string $actualCost = null;
     #[ORM\Column(nullable: true)] private ?int $expectedRiskReduction = null;
     /** @var list<string> */
@@ -216,6 +217,18 @@ class ActionPlan
     public function getActualCost(): ?string
     {
         return $this->actualCost;
+    }
+
+    public function getEstimatedEffortDays(): ?string
+    {
+        return $this->estimatedEffortDays;
+    }
+
+    public function setEstimatedEffortDays(?string $value): self
+    {
+        $this->estimatedEffortDays = $value;
+
+        return $this;
     }
 
     public function setActualCost(?string $value): self

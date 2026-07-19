@@ -27,6 +27,10 @@ export interface RiskScenario {
   id: number;
   title: string;
   description: string | null;
+  family: string;
+  analysisMethod: "SIMPLIFIED" | "ISO_27005" | "EBIOS_RM";
+  strategic: boolean;
+  methodData: Record<string, string>;
   scope: { id: number; name: string };
   asset: { id: number; name: string };
   threat: { id: number; name: string };
@@ -45,6 +49,71 @@ export interface RiskScenario {
   treatmentDecision: string;
   status: string;
   reviewDate: string | null;
+}
+
+export interface RiskGovernancePolicy {
+  id: number;
+  domain: string;
+  family: string;
+  appetiteScore: number;
+  toleranceScore: number;
+  capacityScore: number;
+  method: "SIMPLIFIED" | "ISO_27005" | "EBIOS_RM";
+  rationale: string | null;
+  owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  updatedAt: string;
+}
+
+export interface RiskRecommendation {
+  riskId: number;
+  title: string;
+  family: string;
+  strategic: boolean;
+  method: string;
+  residualScore: number;
+  position: string;
+  recommendedDecision: string;
+  treatment: {
+    estimatedCost: number;
+    estimatedEffortDays: number;
+    expectedReduction: number;
+    coverageGap: number;
+    reductionPerThousand: number | null;
+  };
+  priority: number;
+}
+
+export interface RiskAcceptance {
+  id: number;
+  risk: { id: number; title: string; residualScore: number };
+  requestedBy: { id: number; name: string };
+  decidedBy: { id: number; name: string } | null;
+  justification: string;
+  authority: string;
+  status: string;
+  expiresAt: string;
+  decisionComment: string | null;
+  evidenceReference: string | null;
+}
+
+export interface RiskReviewCampaign {
+  id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  startsAt: string;
+  dueAt: string;
+  progress: { completed: number; total: number };
+  reviews: Array<{
+    id: number;
+    risk: { id: number; title: string };
+    reviewer: { id: number; name: string };
+    status: string;
+    baselineScore: number;
+    reviewedScore: number | null;
+    delta: number | null;
+    comment: string | null;
+  }>;
 }
 
 export interface RiskMatrixCell {
@@ -83,6 +152,7 @@ export interface ActionPlan {
   completionDate: string | null;
   progress: number;
   estimatedCost: string | null;
+  estimatedEffortDays: string | null;
   actualCost: string | null;
   expectedRiskReduction: number | null;
   evidence: string[];

@@ -21,6 +21,7 @@ final class ActionPlanInput
     #[Assert\Date] public ?string $completionDate = null;
     #[Assert\Range(min: 0, max: 100)] public int $progress = 0;
     #[Assert\PositiveOrZero] public ?float $estimatedCost = null;
+    #[Assert\PositiveOrZero] public ?float $estimatedEffortDays = null;
     #[Assert\PositiveOrZero] public ?float $actualCost = null;
     #[Assert\Range(min: 0, max: 25)] public ?int $expectedRiskReduction = null;
     /** @var list<string> */

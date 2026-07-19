@@ -39,6 +39,7 @@ import type {
   Vulnerability,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { RiskGovernancePanel } from "../components/RiskGovernancePanel";
 
 const levelLabels: Record<RiskLevel, string> = {
   LOW: "Faible",
@@ -49,6 +50,10 @@ const levelLabels: Record<RiskLevel, string> = {
 type RiskForm = {
   title: string;
   description: string;
+  family: string;
+  analysisMethod: string;
+  strategic: boolean;
+  methodData: Record<string, string>;
   scopeId: number | "";
   assetId: number | "";
   threatId: number | "";
@@ -68,6 +73,10 @@ type RiskForm = {
 const emptyForm: RiskForm = {
   title: "",
   description: "",
+  family: "GENERAL",
+  analysisMethod: "SIMPLIFIED",
+  strategic: false,
+  methodData: {},
   scopeId: "",
   assetId: "",
   threatId: "",
@@ -182,6 +191,10 @@ export function RisksPage() {
     setForm({
       title: risk.title,
       description: risk.description ?? "",
+      family: risk.family,
+      analysisMethod: risk.analysisMethod,
+      strategic: risk.strategic,
+      methodData: risk.methodData,
       scopeId: risk.scope.id,
       assetId: risk.asset.id,
       threatId: risk.threat.id,
@@ -203,6 +216,11 @@ export function RisksPage() {
   }
   const update = <K extends keyof RiskForm>(key: K, value: RiskForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const updateMethodData = (key: string, value: string) =>
+    setForm((current) => ({
+      ...current,
+      methodData: { ...current.methodData, [key]: value },
+    }));
   function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -237,6 +255,7 @@ export function RisksPage() {
         )}
       </Stack>
       {error && !dialogOpen && <Alert severity="error">{error}</Alert>}
+      <RiskGovernancePanel risks={query.data ?? []} />
       <Card variant="outlined">
         <CardContent>
           <Table aria-label="Registre des risques">
@@ -346,6 +365,95 @@ export function RisksPage() {
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
               />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  required
+                  fullWidth
+                  label="Famille de risque"
+                  value={form.family}
+                  onChange={(e) => update("family", e.target.value)}
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Méthode d’analyse</InputLabel>
+                  <Select
+                    label="Méthode d’analyse"
+                    value={form.analysisMethod}
+                    onChange={(e) => update("analysisMethod", e.target.value)}
+                  >
+                    {["SIMPLIFIED", "ISO_27005", "EBIOS_RM"].map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>Portée</InputLabel>
+                  <Select
+                    label="Portée"
+                    value={form.strategic ? "STRATEGIC" : "OPERATIONAL"}
+                    onChange={(e) =>
+                      update("strategic", e.target.value === "STRATEGIC")
+                    }
+                  >
+                    <MenuItem value="OPERATIONAL">Opérationnel</MenuItem>
+                    <MenuItem value="STRATEGIC">Stratégique</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+              {form.analysisMethod === "ISO_27005" && (
+                <Stack spacing={2}>
+                  <Alert severity="info">
+                    ISO 27005 : documentez les critères qui justifient
+                    l’évaluation.
+                  </Alert>
+                  {[
+                    [
+                      "Justification de la vraisemblance",
+                      "likelihoodRationale",
+                    ],
+                    ["Justification de l’impact", "impactRationale"],
+                    ["Efficacité des mesures existantes", "controlRationale"],
+                  ].map(([label, key]) => (
+                    <TextField
+                      key={key}
+                      required
+                      multiline
+                      label={label}
+                      value={form.methodData[key] ?? ""}
+                      onChange={(event) =>
+                        updateMethodData(key, event.target.value)
+                      }
+                    />
+                  ))}
+                </Stack>
+              )}
+              {form.analysisMethod === "EBIOS_RM" && (
+                <Stack spacing={2}>
+                  <Alert severity="info">
+                    EBIOS RM : reliez valeur métier, événement redouté, source
+                    et scénarios.
+                  </Alert>
+                  {[
+                    ["Valeur métier", "businessValue"],
+                    ["Événement redouté", "fearedEvent"],
+                    ["Source de risque", "threatSource"],
+                    ["Scénario stratégique", "strategicScenario"],
+                    ["Scénario opérationnel", "operationalScenario"],
+                  ].map(([label, key]) => (
+                    <TextField
+                      key={key}
+                      required
+                      multiline
+                      label={label}
+                      value={form.methodData[key] ?? ""}
+                      onChange={(event) =>
+                        updateMethodData(key, event.target.value)
+                      }
+                    />
+                  ))}
+                </Stack>
+              )}
               {[
                 ["Périmètre", "scopeId", scopes.data],
                 ["Actif", "assetId", assets.data],

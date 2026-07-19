@@ -116,6 +116,10 @@ function actionPayload(action: ActionPlan, status = action.status) {
     progress: status === "COMPLETED" ? 100 : action.progress,
     estimatedCost:
       action.estimatedCost === null ? null : Number(action.estimatedCost),
+    estimatedEffortDays:
+      action.estimatedEffortDays === null
+        ? null
+        : Number(action.estimatedEffortDays),
     actualCost: action.actualCost === null ? null : Number(action.actualCost),
     expectedRiskReduction: action.expectedRiskReduction,
     evidence: action.evidence,
@@ -135,6 +139,7 @@ type ActionForm = {
   completionDate: string | null;
   progress: number;
   estimatedCost: number | null;
+  estimatedEffortDays: number | null;
   actualCost: number | null;
   expectedRiskReduction: number | null;
   evidence: string[];
@@ -157,6 +162,7 @@ const emptyForm: ActionForm = {
   completionDate: null,
   progress: 0,
   estimatedCost: null,
+  estimatedEffortDays: null,
   actualCost: null,
   expectedRiskReduction: null,
   evidence: [],
@@ -342,6 +348,10 @@ export function ActionsPage() {
       progress: action.progress,
       estimatedCost:
         action.estimatedCost === null ? null : Number(action.estimatedCost),
+      estimatedEffortDays:
+        action.estimatedEffortDays === null
+          ? null
+          : Number(action.estimatedEffortDays),
       actualCost: action.actualCost === null ? null : Number(action.actualCost),
       expectedRiskReduction: action.expectedRiskReduction,
       evidence: action.evidence,
@@ -1090,6 +1100,19 @@ export function ActionsPage() {
                   onChange={(e) =>
                     update(
                       "actualCost",
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Charge estimée (jours)"
+                  inputProps={{ min: 0, step: 0.5 }}
+                  value={form.estimatedEffortDays ?? ""}
+                  onChange={(e) =>
+                    update(
+                      "estimatedEffortDays",
                       e.target.value === "" ? null : Number(e.target.value),
                     )
                   }

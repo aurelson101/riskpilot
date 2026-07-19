@@ -16,10 +16,16 @@ class RiskScenario
 {
     public const TREATMENTS = ['REDUCE', 'ACCEPT', 'TRANSFER', 'AVOID'];
     public const STATUSES = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'TREATMENT_IN_PROGRESS', 'ACCEPTED', 'CLOSED', 'ARCHIVED'];
+    public const METHODS = ['SIMPLIFIED', 'ISO_27005', 'EBIOS_RM'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
     #[ORM\Column(length: 255)] private string $title;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $description = null;
+    #[ORM\Column(length: 100)] private string $family = 'GENERAL';
+    #[ORM\Column(length: 20)] private string $analysisMethod = 'SIMPLIFIED';
+    #[ORM\Column] private bool $strategic = false;
+    /** @var array<string, string> */
+    #[ORM\Column(type: 'json')] private array $methodData = [];
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Scope $scope;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Asset $asset;
@@ -84,6 +90,38 @@ class RiskScenario
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getFamily(): string
+    {
+        return $this->family;
+    }
+
+    public function getAnalysisMethod(): string
+    {
+        return $this->analysisMethod;
+    }
+
+    public function isStrategic(): bool
+    {
+        return $this->strategic;
+    }
+
+    /** @return array<string, string> */
+    public function getMethodData(): array
+    {
+        return $this->methodData;
+    }
+
+    /** @param array<string, string> $methodData */
+    public function configureGovernance(string $family, string $method, bool $strategic, array $methodData = []): self
+    {
+        $this->family = trim($family);
+        $this->analysisMethod = $method;
+        $this->strategic = $strategic;
+        $this->methodData = $methodData;
 
         return $this;
     }
@@ -155,7 +193,7 @@ class RiskScenario
             $this->vulnerabilities->add($item);
         }
 
-return $this;
+        return $this;
     }
 
     /** @return Collection<int, SecurityControl> */
@@ -172,7 +210,7 @@ return $this;
             $this->currentControls->add($item);
         }
 
-return $this;
+        return $this;
     }
 
     public function getLikelihood(): int

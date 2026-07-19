@@ -51,6 +51,17 @@ services:
       retries: 3
       start_period: 20s
 
+  scheduler:
+    <<: *backend
+    command: sh -c 'while true; do php bin/console app:risk:expire-acceptances; php bin/console app:risk:remind-reviews; sleep 3600; done'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ps | grep -q '[a]pp:risk:expire-acceptances'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   frontend:
     build:
       context: ./frontend

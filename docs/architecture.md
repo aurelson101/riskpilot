@@ -160,6 +160,8 @@ Le compose expose uniquement :
 
 PostgreSQL, Redis, PHP-FPM et Vite restent sur le réseau privé `riskpilot`. Nginx utilise le DNS Docker dynamique pour retrouver le backend et le frontend après un rebuild. Le fichier autonome `nginx.conf.example` fournit le modèle HTTPS externe et ne fait pas partie du compose HTTP.
 
+Le service `scheduler` exécute les maintenances périodiques, notamment l’expiration des acceptations de risques. Une expiration replace automatiquement le risque en revue et notifie son propriétaire. Le module `risk-governance` conserve les politiques par tenant, les décisions signées par leur auteur, les campagnes et les instantanés de scores ; aucun statut `ACCEPTED` ne peut être saisi sans acceptation approuvée encore valide.
+
 ## Variables et secrets structurants
 
 | Variable | Usage |

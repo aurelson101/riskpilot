@@ -11,6 +11,10 @@ final class RiskScenarioInput
 {
     #[Assert\NotBlank] #[Assert\Length(max: 255)] public string $title = '';
     #[Assert\Length(max: 10000)] public ?string $description = null;
+    #[Assert\NotBlank] #[Assert\Length(max: 100)] public string $family = 'GENERAL';
+    #[Assert\Choice(choices: RiskScenario::METHODS)] public string $analysisMethod = 'SIMPLIFIED';
+    public bool $strategic = false;
+    /** @var array<string, string> */ public array $methodData = [];
     #[Assert\NotNull] #[Assert\Positive] public ?int $scopeId = null;
     #[Assert\NotNull] #[Assert\Positive] public ?int $assetId = null;
     #[Assert\NotNull] #[Assert\Positive] public ?int $threatId = null;

@@ -10,9 +10,11 @@ use App\Api\JsonInputMapper;
 use App\Application\CurrentUser;
 use App\Application\NotificationService;
 use App\Domain\Risk\RiskCalculation;
+use App\Domain\Risk\RiskMethodValidator;
 use App\Entity\RiskScenario;
 use App\Entity\User;
 use App\Repository\AssetRepository;
+use App\Repository\RiskAcceptanceRepository;
 use App\Repository\RiskScenarioRepository;
 use App\Repository\ScopeRepository;
 use App\Repository\SecurityControlRepository;
@@ -35,6 +37,8 @@ final readonly class RiskScenarioController
         private RiskCalculation $calculation, private EntityManagerInterface $entityManager,
         private JsonInputMapper $mapper, private ApiResponseFactory $responses,
         private NotificationService $notifications,
+        private RiskAcceptanceRepository $acceptances,
+        private RiskMethodValidator $methodValidator,
     ) {
     }
 
@@ -98,8 +102,16 @@ final readonly class RiskScenarioController
             return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'Une ou plusieurs relations sont invalides.'], 422);
         }
         $created = null === $risk;
+        if ('ACCEPTED' === $input->status && (null === $risk?->getId() || !$this->acceptances->hasApprovedForRisk($risk->getId()))) {
+            return new JsonResponse(['code' => 'FORMAL_ACCEPTANCE_REQUIRED', 'message' => 'Le statut ACCEPTED exige une acceptation formelle approuvée et non expirée.'], 422);
+        }
+        try {
+            $methodData = $this->methodValidator->validate($input->analysisMethod, $input->methodData);
+        } catch (\InvalidArgumentException $error) {
+            return new JsonResponse(['code' => 'METHOD_VALIDATION_ERROR', 'message' => $error->getMessage()], 422);
+        }
         $risk ??= new RiskScenario($input->title, $actor->getOrganization(), $scope, $asset, $threat, $owner);
-        $risk->setTitle($input->title)->setDescription($input->description)->setScope($scope)->setAsset($asset)->setThreat($threat)->setRiskOwner($owner)->replaceVulnerabilities($vulnerabilities)->replaceCurrentControls($controls)
+        $risk->setTitle($input->title)->setDescription($input->description)->configureGovernance($input->family, $input->analysisMethod, $input->strategic, $methodData)->setScope($scope)->setAsset($asset)->setThreat($threat)->setRiskOwner($owner)->replaceVulnerabilities($vulnerabilities)->replaceCurrentControls($controls)
             ->setEvaluations($input->likelihood, $input->impact, $this->calculation->score($input->likelihood, $input->impact), $input->currentLikelihood, $input->currentImpact, $this->calculation->score($input->currentLikelihood, $input->currentImpact), $input->residualLikelihood, $input->residualImpact, $this->calculation->score($input->residualLikelihood, $input->residualImpact))
             ->setTreatmentDecision($input->treatmentDecision)->setStatus($input->status)->setReviewDate(null === $input->reviewDate ? null : new \DateTimeImmutable($input->reviewDate));
         $this->entityManager->persist($risk);

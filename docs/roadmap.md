@@ -42,6 +42,8 @@ Chaque étape doit inclure : migrations réversibles, isolation par organisation
 
 ## Étape 3 — gouvernance et analyse des risques
 
+**État : réalisé.** Les politiques d’appétence/tolérance/capacité, méthodes ISO 27005/EBIOS RM, acceptations formelles expirables, campagnes déléguées, consolidation du portefeuille et priorisation coût/charge/réduction sont opérationnelles.
+
 - appétence, capacité et tolérance par organisation, domaine et famille ;
 - acceptation formelle : décideur, justification, autorité, preuve et expiration ;
 - campagnes de revue, délégation, relances et comparaison historique ;

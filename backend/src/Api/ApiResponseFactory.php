@@ -57,7 +57,7 @@ final class ApiResponseFactory
             'relatedControl' => null === $action->getRelatedControl() ? null : ['id' => $action->getRelatedControl()->getId(), 'name' => $action->getRelatedControl()->getName()],
             'owner' => $this->userSummary($action->getOwner()), 'priority' => $action->getPriority(), 'status' => $action->getStatus(),
             'startDate' => $action->getStartDate()?->format('Y-m-d'), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'completionDate' => $action->getCompletionDate()?->format('Y-m-d'),
-            'progress' => $action->getProgress(), 'estimatedCost' => $action->getEstimatedCost(), 'actualCost' => $action->getActualCost(),
+            'progress' => $action->getProgress(), 'estimatedCost' => $action->getEstimatedCost(), 'estimatedEffortDays' => $action->getEstimatedEffortDays(), 'actualCost' => $action->getActualCost(),
             'expectedRiskReduction' => $action->getExpectedRiskReduction(), 'evidence' => $action->getEvidence(),
             'createdAt' => $action->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $action->getUpdatedAt()->format(DATE_ATOM),
         ];
@@ -155,7 +155,7 @@ final class ApiResponseFactory
     public function riskScenario(RiskScenario $risk): array
     {
         return [
-            'id' => $risk->getId(), 'title' => $risk->getTitle(), 'description' => $risk->getDescription(),
+            'id' => $risk->getId(), 'title' => $risk->getTitle(), 'description' => $risk->getDescription(), 'family' => $risk->getFamily(), 'analysisMethod' => $risk->getAnalysisMethod(), 'strategic' => $risk->isStrategic(), 'methodData' => $risk->getMethodData(),
             'scope' => ['id' => $risk->getScope()->getId(), 'name' => $risk->getScope()->getName()],
             'asset' => ['id' => $risk->getAsset()->getId(), 'name' => $risk->getAsset()->getName()],
             'threat' => ['id' => $risk->getThreat()->getId(), 'name' => $risk->getThreat()->getName()],

@@ -27,4 +27,10 @@ final class ActionPlanRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['id' => $id, 'organization' => $actor->getOrganization()]);
     }
+
+    /** @return list<ActionPlan> */
+    public function findForRisk(int $riskId, User $actor): array
+    {
+        return $this->findBy(['relatedRisk' => $riskId, 'organization' => $actor->getOrganization()]);
+    }
 }
