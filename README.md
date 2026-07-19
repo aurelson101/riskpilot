@@ -130,6 +130,8 @@ Le registre des tiers centralise services, données confiées, criticité, dépe
 
 Le module résilience gère les incidents de la détection à la clôture avec chronologie, impacts, preuves, obligations de notification, retour d’expérience et liens vers actifs, tiers, risques et actions. La BIA documente les processus, dépendances et impacts, impose un RTO cohérent avec le MTPD, suit le RPO, les procédures PCA/PRA et les exercices avec écarts et améliorations.
 
+Le registre réglementaire regroupe traitements RGPD, AIPD, violations de données, obligations légales/contractuelles et dérogations. Chaque type impose ses informations probantes (finalité, base légale, conservation, risques, mesures, source ou décision de notification). Une dérogation doit documenter le risque et la compensation, expirer et être approuvée par une personne distincte du responsable.
+
 ## Tests
 
 Après démarrage :

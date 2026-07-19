@@ -91,6 +91,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `SecurityIncident` porte le cycle opérationnel, les impacts structurés, la chronologie, les preuves et les relations vers actifs, tiers, risques et actions du même tenant. Une clôture soumise à notification réglementaire est refusée tant que la date d’envoi manque. `ContinuityProcess` porte la BIA, contrôle `RTO <= MTPD`, documente RPO, dépendances, PCA/PRA et conserve les exercices, participants, écarts et améliorations sous forme d’instantanés.
 
+### Registre réglementaire
+
+`RegulatoryRecord` utilise un type fermé et des schémas de validation métier pour les traitements, AIPD, violations, obligations et exceptions. Les détails restent structurés en JSON afin d’accepter les évolutions réglementaires sans mélanger les tenants. Les exceptions sont temporaires et appliquent une séparation demandeur/approbateur.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |

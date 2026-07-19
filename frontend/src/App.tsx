@@ -157,6 +157,11 @@ const ResiliencePage = lazy(() =>
     default: module.ResiliencePage,
   })),
 );
+const RegulatoryPage = lazy(() =>
+  import("./pages/RegulatoryPage").then((module) => ({
+    default: module.RegulatoryPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -229,6 +234,7 @@ function Layout() {
     "/security-controls": "Mesures de sécurité",
     "/third-parties": "Tiers et fournisseurs",
     "/resilience": "Incidents et continuité",
+    "/regulatory": "Vie privée et obligations",
     "/vulnerabilities": "Vulnérabilités",
     "/notifications": "Notifications",
     "/reports/executive": "Rapport exécutif",
@@ -369,6 +375,11 @@ function Layout() {
           path="/resilience"
           label="Résilience"
           icon={<ShieldOutlined />}
+        />
+        <NavItem
+          path="/regulatory"
+          label="Réglementaire"
+          icon={<VerifiedUserOutlined />}
         />
         <Tooltip
           title={collapsed && !mobile ? "Documents ISMS" : ""}
@@ -694,6 +705,7 @@ export default function App() {
             <Route path="compliance" element={<CompliancePage />} />
             <Route path="third-parties" element={<ThirdPartiesPage />} />
             <Route path="resilience" element={<ResiliencePage />} />
+            <Route path="regulatory" element={<RegulatoryPage />} />
             <Route path="risk-matrix" element={<RiskMatrixPage />} />
             <Route path="scopes" element={<InventoryPage kind="scopes" />} />
             <Route path="assets" element={<InventoryPage kind="assets" />} />

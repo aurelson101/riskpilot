@@ -96,6 +96,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 8 — vie privée, obligations et dérogations
 
+**État : réalisé.** Un registre réglementaire typé applique des champs obligatoires propres aux traitements, AIPD, violations, obligations et dérogations. Les exceptions exigent compensation, risque, expiration et approbation indépendante.
+
 - registre des traitements, finalités, données, bases légales, durées et destinataires ;
 - DPIA/AIPD, DPA, transferts, violations et notifications RGPD ;
 - registre des obligations légales, réglementaires et contractuelles ;
