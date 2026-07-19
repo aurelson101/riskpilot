@@ -12,4 +12,6 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 
 Le template redirige le port 80 vers 443, active TLS 1.2/1.3 et HSTS, et transmet le contexte HTTPS aux callbacks OAuth. SMTP2GO est une connexion TCP sortante du backend ; Gmail API et Microsoft Graph sont des connexions HTTPS sortantes. Aucun flux email ne doit être publié par Nginx.
 
+Une instance publique réinitialisée toutes les deux heures est fournie dans `deploy/demo`. Elle utilise un nom de projet et des volumes dédiés, expose uniquement `127.0.0.1:18081` et conserve la terminaison TLS sur le Nginx externe.
+
 Exécuter `doctrine:migrations:migrate --no-interaction` à chaque livraison, avant de rendre la nouvelle version disponible. Ne jamais lancer `doctrine:fixtures:load` en production : cette commande purge la base avant de charger les données de démonstration. Vérifier ensuite `/api/health`, la connexion, le tableau de bord et un export avec un compte de contrôle.

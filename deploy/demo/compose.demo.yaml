@@ -1,0 +1,41 @@
+name: riskpilot_demo
+
+services:
+  nginx:
+    ports: !override
+      - "127.0.0.1:18081:80"
+
+  demo-reset-scheduler:
+    build:
+      context: ./backend
+      target: development
+    env_file: .env
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - isms_document_files:/app/var/isms-documents
+    networks: [riskpilot]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          sleep 7200
+          find /app/var/isms-documents -mindepth 1 -delete
+          php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate
+          php -r '$$redis = new Redis(); $$redis->connect("redis", 6379); $$redis->flushDB();'
+          echo "Demo reset completed at $$(date -Iseconds)"
+        done
+    healthcheck:
+      test: ["CMD-SHELL", "ps | grep -q '[s]leep 7200'"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
