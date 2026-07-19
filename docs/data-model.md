@@ -17,3 +17,7 @@ Ces quatre agrégats portent une organisation obligatoire. Les repositories ajou
 ## Étape 6
 
 `Framework` contient une arborescence de `Requirement`. `ComplianceAssessment` appartient à une organisation, un périmètre et un évaluateur. Ses `ComplianceResult` portent la maturité, le statut, les preuves et une action corrective facultative. Une contrainte garantit un seul résultat par couple évaluation/exigence.
+
+## Étape 7
+
+Le tableau de bord et les exports ne créent pas de nouvel agrégat : ils constituent des projections des risques, actions et résultats de conformité existants. Les fixtures assemblent un graphe cohérent de ces entités pour le développement et les démonstrations.

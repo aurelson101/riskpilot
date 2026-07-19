@@ -42,3 +42,12 @@ Les actions et toutes leurs relations sont limitées au tenant courant. Les noti
 - `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 
 Les référentiels sont partagés, tandis que les évaluations, résultats et actions correctives sont systématiquement résolus dans l’organisation courante.
+
+## Tableau de bord et exports
+
+- `GET /api/dashboard` : indicateurs consolidés, niveaux de risque, actions à échéance, principaux risques et conformité par référentiel ;
+- `GET /api/exports/risks.csv` : registre des risques en CSV ;
+- `GET /api/exports/actions.csv` : plans d’action en CSV ;
+- `GET /api/exports/compliance/{id}.csv` : résultats d’une évaluation en CSV.
+
+Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralisent les cellules susceptibles d’être interprétées comme des formules par un tableur et appliquent les mêmes contrôles JWT et tenant que les écrans.

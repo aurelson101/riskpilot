@@ -47,6 +47,7 @@ import { RiskMatrixPage } from "./pages/RiskMatrixPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { CompliancePage } from "./pages/CompliancePage";
+import { DashboardPage } from "./pages/DashboardPage";
 
 const drawerWidth = 250;
 
@@ -246,20 +247,6 @@ function Layout() {
         </Container>
       </Box>
     </Box>
-  );
-}
-
-function DashboardPage() {
-  const { user } = useAuth();
-  return (
-    <Stack spacing={1}>
-      <Typography variant="h4" fontWeight={750}>
-        Bonjour {user?.firstName}
-      </Typography>
-      <Typography color="text.secondary">
-        Votre espace sécurisé {user?.organization.name} est prêt.
-      </Typography>
-    </Stack>
   );
 }
 

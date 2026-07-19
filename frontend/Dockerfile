@@ -1,7 +1,9 @@
 FROM node:22-alpine AS development
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# OverlayFS peut maintenir brièvement le binaire esbuild occupé (ETXTBSY).
+# Une seconde installation propre rend le build reproductible sur ces hôtes.
+RUN npm install || (sleep 2 && npm install)
 COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
@@ -9,7 +11,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm install || (sleep 2 && npm install)
 COPY . .
 RUN npm run build
 

@@ -36,6 +36,7 @@
         "symfony/yaml": "7.4.*"
     },
     "require-dev": {
+        "doctrine/doctrine-fixtures-bundle": "^4.0",
         "friendsofphp/php-cs-fixer": "^3.95.15",
         "phpstan/phpstan": "^2.2.5",
         "phpstan/phpstan-doctrine": "^2.0",

@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 6 : socle technique, authentification multi-tenant, risques, plans d’action, notifications et conformité.
+RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 7 : socle technique, authentification multi-tenant, risques, plans d’action, notifications, conformité, tableaux de bord, exports et données de démonstration.
 
 ## Prérequis
 
@@ -20,7 +20,13 @@ make start
 
 L’application est disponible sur <http://localhost:8080>, l’API sur <http://localhost:8080/api> et Mailpit sur <http://localhost:8025>.
 
-Après l’installation, créez le premier administrateur :
+Chargez facultativement le jeu de démonstration reproductible :
+
+```bash
+make fixtures
+```
+
+Cette commande remplace les données de la base courante. Pour une base vide sans démonstration, créez le premier administrateur :
 
 ```bash
 docker compose exec backend php bin/console app:user:create-admin \
@@ -68,7 +74,15 @@ L’écran `/compliance` regroupe les référentiels et les évaluations. Une é
 
 Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 
-Le compte de développement `admin@riskpilot.local` / `ChangeMe123!` n’est créé que dans la base locale utilisée pendant le développement. Les fixtures reproductibles seront ajoutées à l’étape 7.
+## Tableau de bord, exports et démonstration
+
+Le tableau de bord consolide les risques par niveau, les actions proches de leur échéance et la conformité par référentiel. Les boutons d’export produisent des fichiers CSV UTF-8 pour le registre des risques, les plans d’action et une évaluation de conformité, toujours limités à l’organisation courante.
+
+Les fixtures créent une organisation, trois utilisateurs, plusieurs périmètres, 10 actifs, 10 menaces, 10 vulnérabilités, 15 risques, 20 actions et une évaluation d’un référentiel générique. Elles sont réservées au développement :
+
+- `admin@riskpilot.local` / `ChangeMe123!` ;
+- `risk.manager@riskpilot.local` / `ChangeMe123!` ;
+- `action.owner@riskpilot.local` / `ChangeMe123!`.
 
 ## Tests
 
@@ -82,6 +96,6 @@ curl http://localhost:8080/api/health
 
 ## Limitations connues
 
-Les étapes 1 à 6 fournissent l’environnement, l’authentification, l’isolation multi-tenant, les risques, les actions, les notifications, les référentiels et les évaluations de conformité. Les tableaux de bord, exports et fixtures reproductibles seront intégrés à l’étape 7.
+Le compose fourni cible d’abord le développement. Le renouvellement/révocation avancé des sessions, le stockage externe des preuves, l’import de référentiels sous licence et l’observabilité de production restent à intégrer avant une exploitation critique.
 
 Licence : AGPL-3.0-or-later.

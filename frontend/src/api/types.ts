@@ -145,6 +145,28 @@ export interface ComplianceResult {
   evidence: string[];
   remediationAction: { id: number; title: string } | null;
 }
+
+export interface Dashboard {
+  summary: {
+    totalRisks: number;
+    criticalRisks: number;
+    highRisks: number;
+    overdueActions: number;
+    dueActions: number;
+    globalCompliance: number;
+  };
+  riskLevels: Record<RiskLevel, number>;
+  actionStatuses: Record<string, number>;
+  complianceByFramework: Record<string, number>;
+  topRisks: Array<{ id: number; title: string; score: number; status: string }>;
+  dueActions: Array<{
+    id: number;
+    title: string;
+    dueDate: string;
+    status: string;
+    priority: string;
+  }>;
+}
 export interface User {
   id: number;
   email: string;

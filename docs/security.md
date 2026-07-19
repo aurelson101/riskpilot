@@ -2,7 +2,7 @@
 
 Le socle prévoit JWT, Symfony Security, le rate limiting, une validation serveur et des en-têtes HTTP défensifs. Les secrets sont injectés par environnement et `.env` n’est jamais versionné.
 
-L’isolation multi-tenant et le RBAC sont appliqués dès l’étape 2. Les étapes suivantes compléteront la révocation des sessions, la journalisation des actions sensibles et les politiques propres aux nouveaux domaines métier.
+L’isolation multi-tenant et le RBAC sont appliqués à tous les modules. Les tableaux de bord et exports sont calculés uniquement depuis les données de l’organisation authentifiée. Les valeurs CSV commençant par un marqueur de formule sont neutralisées avant téléchargement.
 
 ## Contrôles implémentés à l’étape 2
 
@@ -14,4 +14,4 @@ L’isolation multi-tenant et le RBAC sont appliqués dès l’étape 2. Les ét
 - réponse 404 pour une ressource appartenant à un autre tenant ;
 - tests fonctionnels couvrant la liste, l’accès direct et le refus RBAC.
 
-Les clés JWT locales sont ignorées par Git. En production, elles doivent être fournies par le gestionnaire de secrets. Le renouvellement sécurisé et la révocation des sessions seront ajoutés avant la mise en production.
+Les clés JWT locales sont ignorées par Git. En production, elles doivent être fournies par le gestionnaire de secrets. Lorsqu’un JWT local expire ou devient invalide, l’interface efface la session et renvoie vers la connexion au lieu de conserver un écran de chargement. Le renouvellement sécurisé et la révocation centralisée des sessions restent nécessaires avant la mise en production.

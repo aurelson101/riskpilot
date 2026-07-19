@@ -1,5 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState, type PropsWithChildren } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import { api, TOKEN_STORAGE_KEY } from "../api/client";
 import type { User } from "../api/types";
 import { AuthContext } from "./auth-context";
@@ -20,6 +26,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setToken(null);
     queryClient.clear();
   }, [queryClient]);
+  useEffect(() => {
+    if (token && profile.isError) logout();
+  }, [token, profile.isError, logout]);
   const login = useCallback(
     async (email: string, password: string) => {
       const { data } = await api.post<{ token: string }>("/auth/login", {

@@ -261,4 +261,24 @@ final class TenantIsolationTest extends WebTestCase
         $this->client->request('PUT', '/api/compliance-results/'.$this->foreignComplianceResultId, server: ['CONTENT_TYPE' => 'application/json'], content: json_encode(['maturityLevel' => 5, 'complianceStatus' => 'COMPLIANT'], JSON_THROW_ON_ERROR));
         self::assertResponseStatusCodeSame(404);
     }
+
+    public function testDashboardOnlyAggregatesCurrentTenant(): void
+    {
+        $this->client->request('GET', '/api/dashboard');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(1, $payload['summary']['totalRisks']);
+        self::assertCount(1, $payload['topRisks']);
+        self::assertSame('Risque A', $payload['topRisks'][0]['title']);
+    }
+
+    public function testRiskExportNeverContainsForeignTenant(): void
+    {
+        $this->client->request('GET', '/api/exports/risks.csv');
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
+        $content = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('Risque A', $content);
+        self::assertStringNotContainsString('Risque B', $content);
+    }
 }
