@@ -120,24 +120,23 @@ make lint
 curl http://localhost:8080/api/health
 ```
 
-## Déploiement HTTPS avec Nginx
+## Reverse proxy HTTPS séparé
 
-Le compose de production corrige le port du frontend construit (`80`) et utilise [docker/nginx/production-http.conf](docker/nginx/production-http.conf) lorsqu’un load balancer termine déjà TLS.
+Docker reste volontairement en HTTP sur le port `8080`. Aucun certificat, port `443` ou redirection HTTP vers HTTPS n’est intégré aux fichiers Compose. Le compose de production utilise uniquement [docker/nginx/production-http.conf](docker/nginx/production-http.conf).
 
-Pour terminer TLS directement avec le Nginx RiskPilot :
+Pour exposer RiskPilot en HTTPS, installez Nginx séparément sur l’hôte ou sur un reverse proxy :
 
-1. copiez `compose.https.yaml.example` en `compose.https.yaml` ;
-2. remplacez `riskpilot.example.com` dans `docker/nginx/https.conf.template` ;
-3. placez `fullchain.pem` et `privkey.pem` dans `docker/tls/` ;
-4. définissez `APP_ENV=prod`, `APP_DEBUG=0` et `APP_URL=https://votre-domaine` dans `.env` ;
-5. démarrez avec les trois fichiers Compose.
+1. copiez `nginx.conf.example` dans la configuration du Nginx hôte ;
+2. remplacez le domaine et les chemins des certificats ;
+3. gardez RiskPilot accessible localement sur `127.0.0.1:8080` ;
+4. définissez `APP_ENV=prod`, `APP_DEBUG=0` et `APP_URL=https://votre-domaine` dans `.env`.
 
 ```bash
-docker compose -f compose.yaml -f compose.prod.yaml -f compose.https.yaml up -d --build
+docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 docker compose exec backend php bin/console doctrine:migrations:migrate --no-interaction
 ```
 
-Le template redirige HTTP vers HTTPS, active TLS 1.2/1.3 et HSTS, transmet correctement les requêtes API/callbacks OAuth et sert la SPA. Nginx ne relaie pas SMTP : les connexions SMTP2GO sortent directement du backend vers le fournisseur, tandis que Google et Microsoft utilisent HTTPS vers Gmail API et Microsoft Graph.
+Le fichier autonome [nginx.conf.example](nginx.conf.example) redirige HTTP vers HTTPS, active TLS 1.2/1.3 et HSTS, puis relaie l’ensemble vers le port HTTP Docker `8080`. Les en-têtes transmis préservent les callbacks OAuth Google et Microsoft. Nginx ne relaie pas SMTP : SMTP2GO sort directement du backend, tandis que Google et Microsoft utilisent leurs API HTTPS.
 
 ## Limitations connues
 

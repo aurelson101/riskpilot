@@ -1,6 +1,8 @@
-# Template de production RiskPilot.
-# Remplacer riskpilot.example.com et monter les certificats dans /etc/nginx/tls.
-# Le conteneur frontend de production écoute sur le port 80.
+# Configuration Nginx autonome à installer sur l'hôte ou un reverse proxy.
+# Elle ne doit pas être montée dans les conteneurs RiskPilot.
+#
+# Prérequis : RiskPilot reste exposé en HTTP sur 127.0.0.1:8080.
+# Remplacer riskpilot.example.com et les chemins des certificats.
 
 map $http_upgrade $connection_upgrade {
     default upgrade;
@@ -27,8 +29,8 @@ server {
     http2 on;
     server_name riskpilot.example.com;
 
-    ssl_certificate /etc/nginx/tls/fullchain.pem;
-    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/riskpilot.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/riskpilot.example.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
@@ -42,28 +44,8 @@ server {
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
-    # API Symfony, y compris les callbacks OAuth 2.0 Google et Microsoft.
-    location ~ ^/(api|docs) {
-        try_files $uri /index.php$is_args$args;
-    }
-
-    location ~ ^/index\.php(/|$) {
-        fastcgi_pass backend:9000;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME /app/public/index.php;
-        fastcgi_param DOCUMENT_ROOT /app/public;
-        fastcgi_param HTTPS on;
-        fastcgi_param SERVER_PORT 443;
-        fastcgi_param HTTP_HOST $host;
-        fastcgi_param HTTP_X_FORWARDED_HOST $host;
-        fastcgi_param HTTP_X_FORWARDED_PROTO https;
-        fastcgi_param HTTP_X_FORWARDED_PORT 443;
-        internal;
-    }
-
-    # SPA React construite par l’image frontend de production.
     location / {
-        proxy_pass http://frontend:80;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

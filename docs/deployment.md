@@ -4,10 +4,10 @@ Le fichier `compose.yaml` cible le développement. `compose.prod.yaml` supprime 
 
 Avant un déploiement, fournir des secrets uniques via le gestionnaire de secrets de la plateforme, générer la paire de clés JWT hors image, terminer TLS, sauvegarder PostgreSQL et Redis, puis exécuter les migrations en tâche contrôlée. `APP_URL` doit être l’origine HTTPS publique exacte : RiskPilot l’utilise pour générer les callbacks OAuth Google Workspace et Microsoft 365.
 
-`docker/nginx/production-http.conf` convient derrière un load balancer TLS. Pour une terminaison TLS dans RiskPilot, copier `compose.https.yaml.example` en `compose.https.yaml`, adapter le domaine dans `docker/nginx/https.conf.template`, monter les certificats puis démarrer avec :
+Docker et les fichiers Compose restent exclusivement en HTTP. `docker/nginx/production-http.conf` sert l’application sur le port publié `8080`. Pour HTTPS, installer un Nginx séparé sur l’hôte ou un reverse proxy et adapter `nginx.conf.example` ; ce fichier relaie vers `127.0.0.1:8080` avec les en-têtes OAuth nécessaires.
 
 ```bash
-docker compose -f compose.yaml -f compose.prod.yaml -f compose.https.yaml up -d --build
+docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 ```
 
 Le template redirige le port 80 vers 443, active TLS 1.2/1.3 et HSTS, et transmet le contexte HTTPS aux callbacks OAuth. SMTP2GO est une connexion TCP sortante du backend ; Gmail API et Microsoft Graph sont des connexions HTTPS sortantes. Aucun flux email ne doit être publié par Nginx.

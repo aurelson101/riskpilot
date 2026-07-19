@@ -1,8 +1,5 @@
 /.env
 /.env.local
-/compose.https.yaml
-/docker/tls/
-/docker/certbot/
 /.idea/
 /.vscode/
 /backend/.env.local
