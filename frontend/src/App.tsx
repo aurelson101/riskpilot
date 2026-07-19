@@ -13,6 +13,7 @@ import {
   TaskAltOutlined,
   NotificationsOutlined,
   FactCheckOutlined,
+  AccountCircleOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -48,6 +49,7 @@ import { ActionsPage } from "./pages/ActionsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { CompliancePage } from "./pages/CompliancePage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
 const drawerWidth = 250;
 
@@ -221,6 +223,15 @@ function Layout() {
             </ListItemButton>
           )}
           <ListItemButton
+            selected={location.pathname === "/profile"}
+            onClick={() => navigate("/profile")}
+          >
+            <ListItemIcon>
+              <AccountCircleOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Mon profil" />
+          </ListItemButton>
+          <ListItemButton
             selected={location.pathname === "/notifications"}
             onClick={() => navigate("/notifications")}
           >
@@ -274,6 +285,7 @@ export default function App() {
             element={<InventoryPage kind="security-controls" />}
           />
           <Route path="administration/users" element={<UsersPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

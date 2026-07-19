@@ -8,6 +8,7 @@ Le point `GET /api/health` permet de vérifier le service sans authentification.
 
 - `POST /api/auth/login` : échange email/mot de passe contre un JWT de 15 minutes.
 - `GET /api/me` : profil de l’utilisateur courant.
+- `PUT /api/me` : modification du prénom, du nom et de l’adresse email du profil courant.
 - `PUT /api/me/password` : changement du mot de passe courant.
 
 ## Administration

@@ -111,6 +111,34 @@ final class TenantIsolationTest extends WebTestCase
         );
     }
 
+    public function testAuthenticatedUserCanUpdateOwnProfile(): void
+    {
+        $this->client->request('PUT', '/api/me', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'firstName' => 'Alicia',
+            'lastName' => 'Administratrice',
+            'email' => 'alicia@example.test',
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Alicia', $payload['firstName']);
+        self::assertSame('Administratrice', $payload['lastName']);
+        self::assertSame('alicia@example.test', $payload['email']);
+    }
+
+    public function testProfileEmailMustBeUnique(): void
+    {
+        $this->client->request('PUT', '/api/me', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'firstName' => 'Alice',
+            'lastName' => 'Admin',
+            'email' => 'user-b@example.test',
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(422);
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('EMAIL_ALREADY_USED', $payload['code']);
+    }
+
     public function testUserFromAnotherOrganizationIsNotAddressable(): void
     {
         $this->client->request('GET', '/api/users/'.$this->userB->getId());
