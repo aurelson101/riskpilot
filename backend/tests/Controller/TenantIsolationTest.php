@@ -177,6 +177,23 @@ final class TenantIsolationTest extends WebTestCase
         self::assertSame('[REDACTED]', $logs[0]['newValues']['password']);
     }
 
+    public function testAuditLogRedactsOauthAndMfaSecrets(): void
+    {
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'provider' => 'GOOGLE_WORKSPACE', 'oauthClientId' => 'client-id',
+            'oauthClientSecret' => 'must-never-be-logged', 'senderName' => 'RiskPilot',
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+
+        $this->authenticate($this->adminA);
+        $this->client->request('GET', '/api/audit-logs');
+        self::assertResponseIsSuccessful();
+        $logs = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $settingsLog = current(array_filter($logs, static fn (array $log): bool => 'settings' === $log['entityType']));
+        self::assertIsArray($settingsLog);
+        self::assertSame('[REDACTED]', $settingsLog['newValues']['oauthClientSecret']);
+    }
+
     public function testAuthenticatedUserCanUpdateOwnProfile(): void
     {
         $this->client->request('PUT', '/api/me', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([

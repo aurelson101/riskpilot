@@ -1,0 +1,77 @@
+# Template de production RiskPilot.
+# Remplacer riskpilot.example.com et monter les certificats dans /etc/nginx/tls.
+# Le conteneur frontend de production écoute sur le port 80.
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name riskpilot.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name riskpilot.example.com;
+
+    ssl_certificate /etc/nginx/tls/fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    client_max_body_size 10m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # API Symfony, y compris les callbacks OAuth 2.0 Google et Microsoft.
+    location ~ ^/(api|docs) {
+        try_files $uri /index.php$is_args$args;
+    }
+
+    location ~ ^/index\.php(/|$) {
+        fastcgi_pass backend:9000;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /app/public/index.php;
+        fastcgi_param DOCUMENT_ROOT /app/public;
+        fastcgi_param HTTPS on;
+        fastcgi_param SERVER_PORT 443;
+        fastcgi_param HTTP_HOST $host;
+        fastcgi_param HTTP_X_FORWARDED_HOST $host;
+        fastcgi_param HTTP_X_FORWARDED_PROTO https;
+        fastcgi_param HTTP_X_FORWARDED_PORT 443;
+        internal;
+    }
+
+    # SPA React construite par l’image frontend de production.
+    location / {
+        proxy_pass http://frontend:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}

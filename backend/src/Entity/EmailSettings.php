@@ -143,6 +143,11 @@ class EmailSettings
 
     public function configureOauth(string $provider, string $clientId, ?string $encryptedClientSecret, ?string $tenant, string $senderName, ?string $replyTo): void
     {
+        $providerChanged = $this->provider !== $provider;
+        $this->disconnectOauth();
+        if ($providerChanged) {
+            $this->encryptedOauthClientSecret = null;
+        }
         $this->provider = $provider;
         $this->oauthClientId = $clientId;
         if (null !== $encryptedClientSecret) {
@@ -151,6 +156,8 @@ class EmailSettings
         $this->oauthTenant = null === $tenant || '' === trim($tenant) ? 'common' : trim($tenant);
         $this->senderName = $senderName;
         $this->replyTo = null === $replyTo || '' === trim($replyTo) ? null : mb_strtolower(trim($replyTo));
+        $this->username = '';
+        $this->encryptedPassword = null;
         $this->enabled = false;
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -194,6 +201,12 @@ class EmailSettings
 
     public function configure(string $provider, string $host, int $port, string $encryption, string $username, string $senderEmail, string $senderName, ?string $replyTo, bool $enabled): void
     {
+        $this->disconnectOauth();
+        $this->oauthClientId = null;
+        $this->encryptedOauthClientSecret = null;
+        $this->oauthTenant = null;
+        $this->oauthStateHash = null;
+        $this->oauthStateExpiresAt = null;
         $this->provider = $provider;
         $this->host = $host;
         $this->port = $port;

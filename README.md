@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 7 : socle technique, authentification multi-tenant, risques, plans d’action, notifications, conformité, tableaux de bord, exports et données de démonstration.
+RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité et les plans d’action. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports CSV et le rapport exécutif imprimable.
 
 ## Prérequis
 
@@ -48,7 +48,21 @@ La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de pr
 
 ## Authentification et administration
 
-La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes. `GET /api/me` retourne le profil courant. Les administrateurs gèrent les utilisateurs de leur propre organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
+La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes et les tentatives sont limitées. `GET /api/me` retourne le profil courant. Chaque utilisateur peut activer un MFA TOTP compatible Google Authenticator et Microsoft Authenticator depuis **Paramètres → Mon profil et MFA**, avec QR code et codes de secours à usage unique. Les administrateurs gèrent les utilisateurs de leur organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
+
+La navigation est responsive : tiroir mobile sous `md`, barre latérale repliable sur ordinateur et sous-menu **Paramètres** regroupant profil/MFA, messagerie, utilisateurs, organisations et audit selon les droits.
+
+## Messagerie SMTP et OAuth 2.0
+
+Dans **Paramètres → Messagerie**, un administrateur configure la messagerie de son organisation :
+
+- SMTP2GO ou un serveur SMTP personnalisé avec STARTTLS/TLS ;
+- Google Workspace via OAuth 2.0 et Gmail API (`gmail.send`) ;
+- Microsoft 365 via OAuth 2.0 et Microsoft Graph (`Mail.Send`).
+
+Les mots de passe SMTP, secrets clients et jetons OAuth sont chiffrés avec libsodium. Ils ne sont jamais retournés par l’API ni écrits dans le journal d’audit. Les jetons OAuth sont renouvelés automatiquement. Pour Google ou Microsoft, créez une application Web chez le fournisseur, recopiez le Client ID et le secret dans RiskPilot, déclarez l’URI de callback affichée puis cliquez sur **Connecter le compte**.
+
+`APP_URL` doit correspondre exactement à l’URL publique, par exemple `https://grc.example.com`. Cette valeur est utilisée pour les callbacks OAuth ; elle doit donc utiliser HTTPS en production et correspondre aux URI enregistrées dans Google Cloud et Microsoft Entra.
 
 Les écrans `/scopes`, `/assets`, `/threats`, `/vulnerabilities` et `/security-controls` donnent accès à l’inventaire de l’organisation. Le registre `/risks` présente les scores brut, actuel et résiduel. La matrice interactive `/risk-matrix` restitue ces évaluations sur une grille 5 × 5 selon les seuils configurés par organisation. Les API associées permettent la création et la modification aux Risk Managers et administrateurs, avec contrôle systématique des relations entre tenants.
 
@@ -98,8 +112,27 @@ make lint
 curl http://localhost:8080/api/health
 ```
 
+## Déploiement HTTPS avec Nginx
+
+Le compose de production corrige le port du frontend construit (`80`) et utilise [docker/nginx/production-http.conf](docker/nginx/production-http.conf) lorsqu’un load balancer termine déjà TLS.
+
+Pour terminer TLS directement avec le Nginx RiskPilot :
+
+1. copiez `compose.https.yaml.example` en `compose.https.yaml` ;
+2. remplacez `riskpilot.example.com` dans `docker/nginx/https.conf.template` ;
+3. placez `fullchain.pem` et `privkey.pem` dans `docker/tls/` ;
+4. définissez `APP_ENV=prod`, `APP_DEBUG=0` et `APP_URL=https://votre-domaine` dans `.env` ;
+5. démarrez avec les trois fichiers Compose.
+
+```bash
+docker compose -f compose.yaml -f compose.prod.yaml -f compose.https.yaml up -d --build
+docker compose exec backend php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+Le template redirige HTTP vers HTTPS, active TLS 1.2/1.3 et HSTS, transmet correctement les requêtes API/callbacks OAuth et sert la SPA. Nginx ne relaie pas SMTP : les connexions SMTP2GO sortent directement du backend vers le fournisseur, tandis que Google et Microsoft utilisent HTTPS vers Gmail API et Microsoft Graph.
+
 ## Limitations connues
 
-Le compose fourni cible d’abord le développement. Le renouvellement/révocation avancé des sessions, le stockage externe des preuves, l’import de référentiels sous licence et l’observabilité de production restent à intégrer avant une exploitation critique.
+Le renouvellement/révocation centralisée des sessions JWT, le stockage externe des preuves, l’import de référentiels sous licence, les sauvegardes automatisées et l’observabilité de production restent à intégrer avant une exploitation critique. Consultez la [roadmap](docs/roadmap.md).
 
 Licence : AGPL-3.0-or-later.

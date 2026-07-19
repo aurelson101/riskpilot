@@ -22,8 +22,6 @@ final readonly class EmailSettingsController
 {
     private const PRESETS = [
         'SMTP2GO' => ['host' => 'mail.smtp2go.com', 'port' => 587, 'encryption' => 'tls'],
-        'GOOGLE_WORKSPACE' => ['host' => 'smtp.gmail.com', 'port' => 587, 'encryption' => 'tls'],
-        'MICROSOFT_365' => ['host' => 'smtp.office365.com', 'port' => 587, 'encryption' => 'tls'],
     ];
 
     public function __construct(
@@ -33,6 +31,7 @@ final readonly class EmailSettingsController
         private SecretCipher $cipher,
         private OrganizationMailer $mailer,
         private OauthMailProvider $oauth,
+        private string $appUrl,
     ) {
     }
 
@@ -84,7 +83,7 @@ final readonly class EmailSettingsController
     }
 
     #[Route('/oauth/{provider}/authorize', methods: ['POST'])]
-    public function authorize(string $provider, Request $request): JsonResponse
+    public function authorize(string $provider): JsonResponse
     {
         $user = $this->admin();
         $provider = strtoupper($provider);
@@ -95,7 +94,7 @@ final readonly class EmailSettingsController
         $state = bin2hex(random_bytes(32));
         $settings->beginOauth($state, new \DateTimeImmutable('+10 minutes'));
         $this->entityManager->flush();
-        $redirectUri = $request->getSchemeAndHttpHost().'/api/settings/email/oauth/'.strtolower($provider).'/callback';
+        $redirectUri = rtrim($this->appUrl, '/').'/api/settings/email/oauth/'.strtolower($provider).'/callback';
 
         return new JsonResponse(['authorizationUrl' => $this->oauth->authorizationUrl($settings, $redirectUri, $state), 'redirectUri' => $redirectUri]);
     }
@@ -105,7 +104,7 @@ final readonly class EmailSettingsController
     {
         $state = (string) $request->query->get('state', '');
         $settings = $this->repository->findOneBy(['oauthStateHash' => hash('sha256', $state), 'provider' => strtoupper($provider)]);
-        $frontend = $request->getSchemeAndHttpHost().'/administration/email-settings';
+        $frontend = rtrim($this->appUrl, '/').'/administration/email-settings';
         if (!$settings instanceof EmailSettings || !$settings->consumeOauthState($state) || $request->query->has('error')) {
             if ($settings instanceof EmailSettings) {
                 $this->entityManager->flush();
@@ -114,7 +113,7 @@ final readonly class EmailSettingsController
             return new RedirectResponse($frontend.'?oauth=error');
         }
         try {
-            $redirectUri = $request->getSchemeAndHttpHost().$request->getPathInfo();
+            $redirectUri = rtrim($this->appUrl, '/').$request->getPathInfo();
             $tokens = $this->oauth->exchangeCode($settings, $redirectUri, (string) $request->query->get('code', ''));
             $email = $this->oauth->connectedEmail($settings, $tokens['access_token']);
             $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.max(60, $tokens['expires_in']).' seconds'), $email);
@@ -188,7 +187,8 @@ final readonly class EmailSettingsController
         $senderName = trim((string) ($input['senderName'] ?? 'RiskPilot'));
         $replyTo = isset($input['replyTo']) ? trim((string) $input['replyTo']) : null;
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new EmailSettings($user->getOrganization());
-        if ('' === $clientId || ('' === $clientSecret && null === $settings->getEncryptedOauthClientSecret()) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
+        $clientSecretRequired = null === $settings->getEncryptedOauthClientSecret() || $settings->getProvider() !== $provider;
+        if ('' === $clientId || ('' === $clientSecret && $clientSecretRequired) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
             return $this->error('Renseignez un client ID, un secret OAuth et une adresse de réponse valide.');
         }
         $settings->configureOauth($provider, $clientId, '' === $clientSecret ? null : $this->cipher->encrypt($clientSecret), $tenant, '' === $senderName ? 'RiskPilot' : $senderName, $replyTo);
