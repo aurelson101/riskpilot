@@ -113,7 +113,7 @@ final readonly class ActionPlanController
         $created = null === $item;
         $previousOwner = $item?->getOwner();
         $item ??= new ActionPlan($input->title, $actor->getOrganization(), $risk, $owner, $dueDate);
-        if (!$created && $item->getOwner() !== $actor && !array_intersect([User::ROLE_ADMIN, User::ROLE_RISK_MANAGER], $actor->getRoles())) {
+        if (!$created && $item->getOwner() !== $actor && !array_intersect([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RISK_MANAGER], $actor->getRoles())) {
             return new JsonResponse(['code' => 'FORBIDDEN', 'message' => 'Seul le responsable ou un gestionnaire peut modifier cette action.'], 403);
         }
         $item->setTitle($input->title)->setDescription($input->description)->setRelatedRisk($risk)->setRelatedControl($control)->setOwner($owner)->setPriority($input->priority)->setStatus($input->status)->setStartDate($startDate)->setDueDate($dueDate)->setCompletionDate(null === $input->completionDate ? null : new \DateTimeImmutable($input->completionDate))->setProgress($input->progress)->setEstimatedCost(null === $input->estimatedCost ? null : number_format($input->estimatedCost, 2, '.', ''))->setActualCost(null === $input->actualCost ? null : number_format($input->actualCost, 2, '.', ''))->setExpectedRiskReduction($input->expectedRiskReduction)->setEvidence($input->evidence);

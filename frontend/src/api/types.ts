@@ -97,6 +97,54 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
+
+export interface Framework {
+  id: number;
+  name: string;
+  version: string;
+  description: string | null;
+  publisher: string | null;
+  status: string;
+  requirementCount: number;
+}
+
+export interface Requirement {
+  id: number;
+  frameworkId: number;
+  reference: string;
+  title: string;
+  description: string | null;
+  category: string;
+  parentRequirementId: number | null;
+  status: string;
+}
+
+export interface ComplianceAssessment {
+  id: number;
+  framework: Pick<Framework, "id" | "name" | "version">;
+  scope: { id: number; name: string };
+  assessor: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  assessmentDate: string;
+  status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "ARCHIVED";
+  globalScore: number;
+  resultCount: number;
+}
+
+export interface ComplianceResult {
+  id: number;
+  assessmentId: number;
+  requirement: Requirement;
+  maturityLevel: number;
+  complianceStatus:
+    | "COMPLIANT"
+    | "PARTIAL"
+    | "NON_COMPLIANT"
+    | "NOT_APPLICABLE"
+    | "NOT_ASSESSED";
+  comment: string | null;
+  evidence: string[];
+  remediationAction: { id: number; title: string } | null;
+}
 export interface User {
   id: number;
   email: string;

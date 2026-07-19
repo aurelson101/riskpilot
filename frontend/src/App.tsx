@@ -12,6 +12,7 @@ import {
   VerifiedUserOutlined,
   TaskAltOutlined,
   NotificationsOutlined,
+  FactCheckOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -45,6 +46,7 @@ import { RisksPage } from "./pages/RisksPage";
 import { RiskMatrixPage } from "./pages/RiskMatrixPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
+import { CompliancePage } from "./pages/CompliancePage";
 
 const drawerWidth = 250;
 
@@ -180,6 +182,15 @@ function Layout() {
             <ListItemText primary="Menaces" />
           </ListItemButton>
           <ListItemButton
+            selected={location.pathname === "/compliance"}
+            onClick={() => navigate("/compliance")}
+          >
+            <ListItemIcon>
+              <FactCheckOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Conformité" />
+          </ListItemButton>
+          <ListItemButton
             selected={location.pathname === "/security-controls"}
             onClick={() => navigate("/security-controls")}
           >
@@ -262,6 +273,7 @@ export default function App() {
           <Route path="risks" element={<RisksPage />} />
           <Route path="actions" element={<ActionsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="compliance" element={<CompliancePage />} />
           <Route path="risk-matrix" element={<RiskMatrixPage />} />
           <Route path="scopes" element={<InventoryPage kind="scopes" />} />
           <Route path="assets" element={<InventoryPage kind="assets" />} />

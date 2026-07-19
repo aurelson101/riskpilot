@@ -13,3 +13,7 @@ Ces quatre agrégats portent une organisation obligatoire. Les repositories ajou
 ## Étape 5
 
 `ActionPlan` relie un traitement à un `RiskScenario`, une mesure facultative et un responsable. `ActionComment` conserve les échanges horodatés. `Notification` appartient à un destinataire et à son organisation ; l’email correspondant est distribué de façon asynchrone par Messenger.
+
+## Étape 6
+
+`Framework` contient une arborescence de `Requirement`. `ComplianceAssessment` appartient à une organisation, un périmètre et un évaluateur. Ses `ComplianceResult` portent la maturité, le statut, les preuves et une action corrective facultative. Une contrainte garantit un seul résultat par couple évaluation/exigence.

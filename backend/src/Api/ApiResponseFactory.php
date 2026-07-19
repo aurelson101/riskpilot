@@ -7,8 +7,12 @@ namespace App\Api;
 use App\Entity\ActionComment;
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\ComplianceAssessment;
+use App\Entity\ComplianceResult;
+use App\Entity\Framework;
 use App\Entity\Notification;
 use App\Entity\Organization;
+use App\Entity\Requirement;
 use App\Entity\RiskScenario;
 use App\Entity\Scope;
 use App\Entity\SecurityControl;
@@ -20,6 +24,30 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 final class ApiResponseFactory
 {
+    /** @return array<string, mixed> */
+    public function framework(Framework $framework): array
+    {
+        return ['id' => $framework->getId(), 'name' => $framework->getName(), 'version' => $framework->getVersion(), 'description' => $framework->getDescription(), 'publisher' => $framework->getPublisher(), 'status' => $framework->getStatus(), 'requirementCount' => $framework->getRequirements()->count()];
+    }
+
+    /** @return array<string, mixed> */
+    public function requirement(Requirement $requirement): array
+    {
+        return ['id' => $requirement->getId(), 'frameworkId' => $requirement->getFramework()->getId(), 'reference' => $requirement->getReference(), 'title' => $requirement->getTitle(), 'description' => $requirement->getDescription(), 'category' => $requirement->getCategory(), 'parentRequirementId' => $requirement->getParentRequirement()?->getId(), 'status' => $requirement->getStatus()];
+    }
+
+    /** @return array<string, mixed> */
+    public function complianceAssessment(ComplianceAssessment $assessment): array
+    {
+        return ['id' => $assessment->getId(), 'framework' => ['id' => $assessment->getFramework()->getId(), 'name' => $assessment->getFramework()->getName(), 'version' => $assessment->getFramework()->getVersion()], 'scope' => ['id' => $assessment->getScope()->getId(), 'name' => $assessment->getScope()->getName()], 'assessor' => $this->userSummary($assessment->getAssessor()), 'assessmentDate' => $assessment->getAssessmentDate()->format('Y-m-d'), 'status' => $assessment->getStatus(), 'globalScore' => $assessment->getGlobalScore(), 'resultCount' => $assessment->getResults()->count(), 'createdAt' => $assessment->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $assessment->getUpdatedAt()->format(DATE_ATOM)];
+    }
+
+    /** @return array<string, mixed> */
+    public function complianceResult(ComplianceResult $result): array
+    {
+        return ['id' => $result->getId(), 'assessmentId' => $result->getAssessment()->getId(), 'requirement' => $this->requirement($result->getRequirement()), 'maturityLevel' => $result->getMaturityLevel(), 'complianceStatus' => $result->getComplianceStatus(), 'comment' => $result->getComment(), 'evidence' => $result->getEvidence(), 'remediationAction' => null === $result->getRemediationAction() ? null : ['id' => $result->getRemediationAction()->getId(), 'title' => $result->getRemediationAction()->getTitle()]];
+    }
+
     /** @return array<string, mixed> */
     public function actionPlan(ActionPlan $action): array
     {

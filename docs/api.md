@@ -33,3 +33,12 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 - `GET /api/notifications` et `PUT /api/notifications/{id}/read`.
 
 Les actions et toutes leurs relations sont limitées au tenant courant. Les notifications ne sont visibles que par leur destinataire.
+
+## Conformité
+
+- `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;
+- `GET|POST /api/frameworks/{id}/requirements` et `PUT /api/requirements/{id}` ;
+- `GET|POST /api/compliance-assessments` et `GET|PUT /api/compliance-assessments/{id}` ;
+- `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
+
+Les référentiels sont partagés, tandis que les évaluations, résultats et actions correctives sont systématiquement résolus dans l’organisation courante.

@@ -6,8 +6,12 @@ namespace App\Tests\Controller;
 
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\ComplianceAssessment;
+use App\Entity\ComplianceResult;
+use App\Entity\Framework;
 use App\Entity\Notification;
 use App\Entity\Organization;
+use App\Entity\Requirement;
 use App\Entity\RiskScenario;
 use App\Entity\Scope;
 use App\Entity\SecurityControl;
@@ -32,6 +36,7 @@ final class TenantIsolationTest extends WebTestCase
     private array $foreignResourceIds = [];
     private int $localScopeId;
     private int $foreignNotificationId;
+    private int $foreignComplianceResultId;
 
     protected function setUp(): void
     {
@@ -64,8 +69,16 @@ final class TenantIsolationTest extends WebTestCase
         $actionB = new ActionPlan('Action B', $this->organizationB, $riskB, $this->userB, new \DateTimeImmutable('+20 days'));
         $notificationA = new Notification($this->adminA, 'ACTION_ASSIGNED', 'Action A', 'Une action vous est affectée.');
         $notificationB = new Notification($this->userB, 'ACTION_ASSIGNED', 'Action B', 'Une action vous est affectée.');
+        $framework = new Framework('Référentiel public', '1.0');
+        $requirement = new Requirement($framework, 'ID-1', 'Gestion des identités', 'Protection');
+        $assessmentA = new ComplianceAssessment($organizationA, $framework, $scopeA, $this->adminA, new \DateTimeImmutable());
+        $assessmentB = new ComplianceAssessment($this->organizationB, $framework, $scopeB, $this->userB, new \DateTimeImmutable());
+        $resultA = (new ComplianceResult($assessmentA, $requirement))->setComplianceStatus('COMPLIANT')->setMaturityLevel(4);
+        $resultB = (new ComplianceResult($assessmentB, $requirement))->setComplianceStatus('NON_COMPLIANT')->setMaturityLevel(1);
+        $assessmentA->recalculateScore();
+        $assessmentB->recalculateScore();
 
-        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB, $controlA, $controlB, $riskA, $riskB, $actionA, $actionB, $notificationA, $notificationB] as $entity) {
+        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB, $controlA, $controlB, $riskA, $riskB, $actionA, $actionB, $notificationA, $notificationB, $framework, $requirement, $assessmentA, $assessmentB, $resultA, $resultB] as $entity) {
             $this->entityManager->persist($entity);
         }
         $this->entityManager->flush();
@@ -77,8 +90,10 @@ final class TenantIsolationTest extends WebTestCase
             'security-controls' => (int) $controlB->getId(),
             'risks' => (int) $riskB->getId(),
             'actions' => (int) $actionB->getId(),
+            'compliance-assessments' => (int) $assessmentB->getId(),
         ];
         $this->foreignNotificationId = (int) $notificationB->getId();
+        $this->foreignComplianceResultId = (int) $resultB->getId();
         $this->localScopeId = (int) $scopeA->getId();
         $this->client->loginUser($this->adminA, 'api');
     }
@@ -223,6 +238,27 @@ final class TenantIsolationTest extends WebTestCase
     public function testForeignNotificationCannotBeMarkedRead(): void
     {
         $this->client->request('PUT', '/api/notifications/'.$this->foreignNotificationId.'/read');
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testComplianceAssessmentsAreTenantScoped(): void
+    {
+        $this->client->request('GET', '/api/compliance-assessments');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertCount(1, $payload);
+        self::assertSame(100, $payload[0]['globalScore']);
+    }
+
+    public function testForeignComplianceAssessmentIsNotAddressable(): void
+    {
+        $this->client->request('GET', '/api/compliance-assessments/'.$this->foreignResourceIds['compliance-assessments']);
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testForeignComplianceResultCannotBeUpdated(): void
+    {
+        $this->client->request('PUT', '/api/compliance-results/'.$this->foreignComplianceResultId, server: ['CONTENT_TYPE' => 'application/json'], content: json_encode(['maturityLevel' => 5, 'complianceStatus' => 'COMPLIANT'], JSON_THROW_ON_ERROR));
         self::assertResponseStatusCodeSame(404);
     }
 }

@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 5 : socle technique, authentification multi-tenant, contexte et moteur de risque, plans d’action et notifications.
+RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 6 : socle technique, authentification multi-tenant, risques, plans d’action, notifications et conformité.
 
 ## Prérequis
 
@@ -62,6 +62,12 @@ docker compose exec backend php bin/console app:actions:notify-deadlines
 
 Les API principales sont `GET|POST /api/actions`, `GET|PUT /api/actions/{id}`, `GET|POST /api/actions/{id}/comments`, `GET /api/notifications` et `PUT /api/notifications/{id}/read`.
 
+## Référentiels et conformité
+
+L’écran `/compliance` regroupe les référentiels et les évaluations. Une évaluation porte sur un périmètre et génère un résultat pour chaque exigence active. Les évaluateurs saisissent un niveau de maturité de 0 à 5, un statut conforme, partiel, non conforme, non applicable ou non évalué, ainsi que des preuves et une action corrective facultative. Le score global exclut les exigences non applicables ou non évaluées.
+
+Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
+
 Le compte de développement `admin@riskpilot.local` / `ChangeMe123!` n’est créé que dans la base locale utilisée pendant le développement. Les fixtures reproductibles seront ajoutées à l’étape 7.
 
 ## Tests
@@ -76,6 +82,6 @@ curl http://localhost:8080/api/health
 
 ## Limitations connues
 
-Les étapes 1 à 5 fournissent l’environnement, l’authentification, l’isolation multi-tenant, les catalogues de contexte, le registre, la cotation, la matrice, les plans d’action et les notifications. La pagination et les relations graphiques entre actifs seront enrichies dans les prochaines étapes. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les données de démonstration.
+Les étapes 1 à 6 fournissent l’environnement, l’authentification, l’isolation multi-tenant, les risques, les actions, les notifications, les référentiels et les évaluations de conformité. Les tableaux de bord, exports et fixtures reproductibles seront intégrés à l’étape 7.
 
 Licence : AGPL-3.0-or-later.
