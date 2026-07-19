@@ -3,6 +3,63 @@ export interface Organization {
   name: string;
   description: string | null;
   status: string;
+  riskThresholds: {
+    lowMax: number;
+    moderateMax: number;
+    highMax: number;
+    criticalMax: number;
+  };
+}
+
+export type RiskLevel = "LOW" | "MODERATE" | "HIGH" | "CRITICAL";
+
+export interface SecurityControl {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  effectiveness: number;
+  implementationStatus: string;
+  owner: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
+}
+
+export interface RiskScenario {
+  id: number;
+  title: string;
+  description: string | null;
+  scope: { id: number; name: string };
+  asset: { id: number; name: string };
+  threat: { id: number; name: string };
+  vulnerabilities: Array<{ id: number; name: string }>;
+  currentControls: Array<{ id: number; name: string; effectiveness: number }>;
+  riskOwner: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  likelihood: number;
+  impact: number;
+  grossRiskScore: number;
+  currentLikelihood: number;
+  currentImpact: number;
+  currentRiskScore: number;
+  residualLikelihood: number;
+  residualImpact: number;
+  residualRiskScore: number;
+  treatmentDecision: string;
+  status: string;
+  reviewDate: string | null;
+}
+
+export interface RiskMatrixCell {
+  likelihood: number;
+  impact: number;
+  score: number;
+  level: RiskLevel;
+  count: number;
+  risks: Array<{ id: number; title: string; status: string }>;
+}
+
+export interface RiskMatrix {
+  scoreType: "gross" | "current" | "residual";
+  thresholds: Organization["riskThresholds"];
+  cells: RiskMatrixCell[];
 }
 export interface User {
   id: number;

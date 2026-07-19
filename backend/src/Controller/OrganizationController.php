@@ -58,7 +58,6 @@ final readonly class OrganizationController
         if (count($violations) > 0) {
             return $this->responses->validationError($violations);
         }
-
         $organization = (new Organization($input->name))->setDescription($input->description);
         $this->entityManager->persist($organization);
         $this->entityManager->flush();
@@ -79,11 +78,15 @@ final readonly class OrganizationController
         if (count($violations) > 0) {
             return $this->responses->validationError($violations);
         }
+        if (!($input->lowMax < $input->moderateMax && $input->moderateMax < $input->highMax)) {
+            return new JsonResponse(['code' => 'INVALID_THRESHOLDS', 'message' => 'Les seuils de risque doivent être strictement croissants.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         $organization
             ->setName($input->name)
             ->setDescription($input->description)
-            ->setStatus($input->status);
+            ->setStatus($input->status)
+            ->setRiskThresholds(['lowMax' => $input->lowMax, 'moderateMax' => $input->moderateMax, 'highMax' => $input->highMax, 'criticalMax' => 25]);
         $this->entityManager->flush();
 
         return new JsonResponse($this->responses->organization($organization));

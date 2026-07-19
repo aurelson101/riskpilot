@@ -31,6 +31,10 @@ class Organization
     #[ORM\Column(length: 20)]
     private string $status = self::STATUS_ACTIVE;
 
+    /** @var array{lowMax: int, moderateMax: int, highMax: int, criticalMax: int} */
+    #[ORM\Column(type: 'json')]
+    private array $riskThresholds = ['lowMax' => 4, 'moderateMax' => 9, 'highMax' => 16, 'criticalMax' => 25];
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -86,6 +90,20 @@ class Organization
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
+        return $this;
+    }
+
+    /** @return array{lowMax: int, moderateMax: int, highMax: int, criticalMax: int} */
+    public function getRiskThresholds(): array
+    {
+        return $this->riskThresholds;
+    }
+
+    /** @param array{lowMax: int, moderateMax: int, highMax: int, criticalMax: int} $thresholds */
+    public function setRiskThresholds(array $thresholds): self
+    {
+        $this->riskThresholds = $thresholds;
 
         return $this;
     }

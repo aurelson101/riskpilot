@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Ce dépôt contient le socle de l’étape 1 : Symfony 7.4 LTS, API Platform, React/TypeScript et l’infrastructure Docker.
+RiskPilot est une plateforme GRC open source développée de zéro pour gérer les risques cyber, la conformité et les plans d’action. Le dépôt couvre désormais les étapes 1 à 4 : socle technique, authentification multi-tenant, contexte du risque et moteur d’évaluation.
 
 ## Prérequis
 
@@ -42,7 +42,13 @@ docker compose exec backend php bin/console app:user:create-admin \
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes. `GET /api/me` retourne le profil courant. Les administrateurs gèrent les utilisateurs de leur propre organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
 
-Les écrans `/scopes`, `/assets`, `/threats` et `/vulnerabilities` donnent accès à l’inventaire de l’organisation. Les API associées permettent la création et la modification aux Risk Managers et administrateurs, avec contrôle systématique des relations entre tenants.
+Les écrans `/scopes`, `/assets`, `/threats`, `/vulnerabilities` et `/security-controls` donnent accès à l’inventaire de l’organisation. Le registre `/risks` présente les scores brut, actuel et résiduel. La matrice interactive `/risk-matrix` restitue ces évaluations sur une grille 5 × 5 selon les seuils configurés par organisation. Les API associées permettent la création et la modification aux Risk Managers et administrateurs, avec contrôle systématique des relations entre tenants.
+
+## Moteur de risque
+
+Un scénario associe un périmètre, un actif, une menace, des vulnérabilités, des mesures de sécurité et un responsable. Chaque évaluation utilise une vraisemblance et un impact de 1 à 5 ; le score est leur produit. Les seuils par défaut sont faible jusqu’à 4, modéré jusqu’à 9, élevé jusqu’à 16 et critique au-delà. Ils sont personnalisables sur l’organisation.
+
+Les principales API sont `GET|POST /api/risks`, `GET|PUT /api/risks/{id}`, `GET|POST /api/security-controls`, `GET|PUT /api/security-controls/{id}` et `GET /api/risk-matrix?scoreType=current`.
 
 Le compte de développement `admin@riskpilot.local` / `ChangeMe123!` n’est créé que dans la base locale utilisée pendant le développement. Les fixtures reproductibles seront ajoutées à l’étape 7.
 
@@ -58,6 +64,6 @@ curl http://localhost:8080/api/health
 
 ## Limitations connues
 
-Les étapes 1 à 3 fournissent l’environnement, l’authentification, l’isolation multi-tenant et les catalogues de contexte du risque. Les formulaires avancés, la pagination et les relations graphiques entre actifs seront enrichis avec les modules de risque. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les notifications et les données de démonstration.
+Les étapes 1 à 4 fournissent l’environnement, l’authentification, l’isolation multi-tenant, les catalogues de contexte, le registre, la cotation et la matrice des risques. Les formulaires avancés, la pagination et les relations graphiques entre actifs seront enrichis dans les prochaines étapes. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les notifications et les données de démonstration.
 
 Licence : AGPL-3.0-or-later.

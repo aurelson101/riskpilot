@@ -15,11 +15,12 @@ import {
 } from "@mui/material";
 import { api } from "../api/client";
 
-type InventoryKind = "scopes" | "assets" | "threats" | "vulnerabilities";
+type InventoryKind =
+  "scopes" | "assets" | "threats" | "vulnerabilities" | "security-controls";
 type InventoryItem = Record<string, unknown> & {
   id: number;
   name: string;
-  status: string;
+  status?: string;
 };
 
 const configurations: Record<
@@ -63,6 +64,16 @@ const configurations: Record<
       { key: "category", label: "Catégorie" },
       { key: "severity", label: "Sévérité" },
       { key: "affectedAssets", label: "Actifs affectés" },
+    ],
+  },
+  "security-controls": {
+    title: "Mesures de sécurité",
+    subtitle: "Mesures existantes et efficacité déclarée",
+    columns: [
+      { key: "category", label: "Catégorie" },
+      { key: "effectiveness", label: "Efficacité (%)" },
+      { key: "implementationStatus", label: "Déploiement" },
+      { key: "owner", label: "Responsable" },
     ],
   },
 };
@@ -119,15 +130,17 @@ export function InventoryPage({ kind }: { kind: InventoryKind }) {
                 {config.columns.map((column) => (
                   <TableCell key={column.key}>{column.label}</TableCell>
                 ))}
-                <TableCell>Statut</TableCell>
+                {kind !== "security-controls" && <TableCell>Statut</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {query.data?.map((item) => (
                 <TableRow key={item.id} hover>
-                  <TableCell>
-                    <Typography fontWeight={650}>{item.name}</Typography>
-                  </TableCell>
+                  {kind !== "security-controls" && (
+                    <TableCell>
+                      <Typography fontWeight={650}>{item.name}</Typography>
+                    </TableCell>
+                  )}
                   {config.columns.map((column) => (
                     <TableCell key={column.key}>
                       {renderValue(item[column.key])}

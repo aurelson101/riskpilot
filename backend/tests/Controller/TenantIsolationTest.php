@@ -6,7 +6,9 @@ namespace App\Tests\Controller;
 
 use App\Entity\Asset;
 use App\Entity\Organization;
+use App\Entity\RiskScenario;
 use App\Entity\Scope;
+use App\Entity\SecurityControl;
 use App\Entity\Threat;
 use App\Entity\User;
 use App\Entity\Vulnerability;
@@ -51,8 +53,12 @@ final class TenantIsolationTest extends WebTestCase
         $threatB = new Threat('Menace B', 'TECHNICAL', $this->organizationB);
         $vulnerabilityA = new Vulnerability('Vulnérabilité A', 'CONFIGURATION', 'MEDIUM', $organizationA);
         $vulnerabilityB = new Vulnerability('Vulnérabilité B', 'PATCH', 'HIGH', $this->organizationB);
+        $controlA = new SecurityControl('MFA A', 'ACCESS', $organizationA);
+        $controlB = new SecurityControl('MFA B', 'ACCESS', $this->organizationB);
+        $riskA = (new RiskScenario('Risque A', $organizationA, $scopeA, $assetA, $threatA, $this->adminA))->setEvaluations(5, 5, 25, 4, 4, 16, 2, 2, 4);
+        $riskB = (new RiskScenario('Risque B', $this->organizationB, $scopeB, $assetB, $threatB, $this->userB))->setEvaluations(4, 5, 20, 3, 4, 12, 2, 3, 6);
 
-        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB] as $entity) {
+        foreach ([$organizationA, $this->organizationB, $this->adminA, $this->userA, $this->userB, $scopeA, $scopeB, $assetA, $assetB, $threatA, $threatB, $vulnerabilityA, $vulnerabilityB, $controlA, $controlB, $riskA, $riskB] as $entity) {
             $this->entityManager->persist($entity);
         }
         $this->entityManager->flush();
@@ -61,6 +67,8 @@ final class TenantIsolationTest extends WebTestCase
             'assets' => (int) $assetB->getId(),
             'threats' => (int) $threatB->getId(),
             'vulnerabilities' => (int) $vulnerabilityB->getId(),
+            'security-controls' => (int) $controlB->getId(),
+            'risks' => (int) $riskB->getId(),
         ];
         $this->localScopeId = (int) $scopeA->getId();
         $this->client->loginUser($this->adminA, 'api');
@@ -146,5 +154,36 @@ final class TenantIsolationTest extends WebTestCase
         foreach (['scopes', 'assets', 'threats', 'vulnerabilities'] as $resource) {
             yield $resource => [$resource];
         }
+    }
+
+    #[DataProvider('riskResources')]
+    public function testRiskResourcesAreTenantScoped(string $resource): void
+    {
+        $this->client->request('GET', '/api/'.$resource);
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertCount(1, $payload);
+    }
+
+    #[DataProvider('riskResources')]
+    public function testForeignRiskResourcesAreNotAddressable(string $resource): void
+    {
+        $this->client->request('GET', sprintf('/api/%s/%d', $resource, $this->foreignResourceIds[$resource]));
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testRiskMatrixOnlyContainsCurrentTenant(): void
+    {
+        $this->client->request('GET', '/api/risk-matrix?scoreType=current');
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(1, array_sum(array_column($payload['cells'], 'count')));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function riskResources(): iterable
+    {
+        yield 'controls' => ['security-controls'];
+        yield 'risks' => ['risks'];
     }
 }

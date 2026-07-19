@@ -7,6 +7,9 @@ import {
   DashboardOutlined,
   Logout,
   ShieldOutlined,
+  AssessmentOutlined,
+  GridViewOutlined,
+  VerifiedUserOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -36,6 +39,8 @@ import { useAuth } from "./auth/useAuth";
 import { LoginPage } from "./pages/LoginPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { UsersPage } from "./pages/UsersPage";
+import { RisksPage } from "./pages/RisksPage";
+import { RiskMatrixPage } from "./pages/RiskMatrixPage";
 
 const drawerWidth = 250;
 
@@ -117,6 +122,24 @@ function Layout() {
             <ListItemText primary="Tableau de bord" />
           </ListItemButton>
           <ListItemButton
+            selected={location.pathname === "/risks"}
+            onClick={() => navigate("/risks")}
+          >
+            <ListItemIcon>
+              <AssessmentOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Risques" />
+          </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/risk-matrix"}
+            onClick={() => navigate("/risk-matrix")}
+          >
+            <ListItemIcon>
+              <GridViewOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Matrice des risques" />
+          </ListItemButton>
+          <ListItemButton
             selected={location.pathname === "/scopes"}
             onClick={() => navigate("/scopes")}
           >
@@ -142,6 +165,15 @@ function Layout() {
               <GppMaybeOutlined sx={{ color: "inherit" }} />
             </ListItemIcon>
             <ListItemText primary="Menaces" />
+          </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/security-controls"}
+            onClick={() => navigate("/security-controls")}
+          >
+            <ListItemIcon>
+              <VerifiedUserOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Mesures de sécurité" />
           </ListItemButton>
           <ListItemButton
             selected={location.pathname === "/vulnerabilities"}
@@ -205,12 +237,18 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="risks" element={<RisksPage />} />
+          <Route path="risk-matrix" element={<RiskMatrixPage />} />
           <Route path="scopes" element={<InventoryPage kind="scopes" />} />
           <Route path="assets" element={<InventoryPage kind="assets" />} />
           <Route path="threats" element={<InventoryPage kind="threats" />} />
           <Route
             path="vulnerabilities"
             element={<InventoryPage kind="vulnerabilities" />}
+          />
+          <Route
+            path="security-controls"
+            element={<InventoryPage kind="security-controls" />}
           />
           <Route path="administration/users" element={<UsersPage />} />
         </Route>

@@ -6,7 +6,9 @@ namespace App\Api;
 
 use App\Entity\Asset;
 use App\Entity\Organization;
+use App\Entity\RiskScenario;
 use App\Entity\Scope;
+use App\Entity\SecurityControl;
 use App\Entity\Threat;
 use App\Entity\User;
 use App\Entity\Vulnerability;
@@ -37,6 +39,7 @@ final class ApiResponseFactory
             'name' => $organization->getName(),
             'description' => $organization->getDescription(),
             'status' => $organization->getStatus(),
+            'riskThresholds' => $organization->getRiskThresholds(),
             'createdAt' => $organization->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $organization->getUpdatedAt()->format(DATE_ATOM),
         ];
@@ -81,6 +84,31 @@ final class ApiResponseFactory
     public function vulnerability(Vulnerability $vulnerability): array
     {
         return ['id' => $vulnerability->getId(), 'name' => $vulnerability->getName(), 'description' => $vulnerability->getDescription(), 'category' => $vulnerability->getCategory(), 'severity' => $vulnerability->getSeverity(), 'affectedAssets' => array_map(fn (Asset $asset): array => ['id' => $asset->getId(), 'name' => $asset->getName()], $vulnerability->getAffectedAssets()->toArray()), 'status' => $vulnerability->getStatus()];
+    }
+
+    /** @return array<string, mixed> */
+    public function securityControl(SecurityControl $control): array
+    {
+        return ['id' => $control->getId(), 'name' => $control->getName(), 'description' => $control->getDescription(), 'category' => $control->getCategory(), 'effectiveness' => $control->getEffectiveness(), 'implementationStatus' => $control->getImplementationStatus(), 'owner' => null === $control->getOwner() ? null : $this->userSummary($control->getOwner())];
+    }
+
+    /** @return array<string, mixed> */
+    public function riskScenario(RiskScenario $risk): array
+    {
+        return [
+            'id' => $risk->getId(), 'title' => $risk->getTitle(), 'description' => $risk->getDescription(),
+            'scope' => ['id' => $risk->getScope()->getId(), 'name' => $risk->getScope()->getName()],
+            'asset' => ['id' => $risk->getAsset()->getId(), 'name' => $risk->getAsset()->getName()],
+            'threat' => ['id' => $risk->getThreat()->getId(), 'name' => $risk->getThreat()->getName()],
+            'vulnerabilities' => array_map(fn (Vulnerability $item): array => ['id' => $item->getId(), 'name' => $item->getName()], $risk->getVulnerabilities()->toArray()),
+            'currentControls' => array_map(fn (SecurityControl $item): array => ['id' => $item->getId(), 'name' => $item->getName(), 'effectiveness' => $item->getEffectiveness()], $risk->getCurrentControls()->toArray()),
+            'riskOwner' => $this->userSummary($risk->getRiskOwner()),
+            'likelihood' => $risk->getLikelihood(), 'impact' => $risk->getImpact(), 'grossRiskScore' => $risk->getGrossRiskScore(),
+            'currentLikelihood' => $risk->getCurrentLikelihood(), 'currentImpact' => $risk->getCurrentImpact(), 'currentRiskScore' => $risk->getCurrentRiskScore(),
+            'residualLikelihood' => $risk->getResidualLikelihood(), 'residualImpact' => $risk->getResidualImpact(), 'residualRiskScore' => $risk->getResidualRiskScore(),
+            'treatmentDecision' => $risk->getTreatmentDecision(), 'status' => $risk->getStatus(), 'reviewDate' => $risk->getReviewDate()?->format('Y-m-d'),
+            'createdAt' => $risk->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $risk->getUpdatedAt()->format(DATE_ATOM),
+        ];
     }
 
     /** @return array{id: int|null, email: string, firstName: string, lastName: string} */
