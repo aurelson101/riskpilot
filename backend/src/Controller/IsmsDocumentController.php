@@ -68,7 +68,7 @@ final readonly class IsmsDocumentController
             return $this->invalid('Propriétaire invalide.');
         }
         $document = new IsmsDocument($user->getOrganization(), $owner, (string) $input['title'], (string) $input['category'], (string) ($input['content'] ?? ''));
-        $document->updateMetadata((string) $input['title'], (string) $input['category'], (string) ($input['status'] ?? 'DRAFT'), (string) ($input['classification'] ?? 'INTERNAL'), (string) ($input['visibility'] ?? IsmsDocument::VISIBILITY_ORGANIZATION), $owner);
+        $document->updateMetadata((string) $input['title'], (string) $input['category'], 'DRAFT', (string) ($input['classification'] ?? 'INTERNAL'), (string) ($input['visibility'] ?? IsmsDocument::VISIBILITY_ORGANIZATION), $owner);
         $document->initializeVersion($user, isset($input['versionComment']) ? (string) $input['versionComment'] : 'Création');
         $this->entityManager->persist($document);
         $this->entityManager->flush();
@@ -94,15 +94,28 @@ final readonly class IsmsDocumentController
             return $this->invalid('Propriétaire invalide.');
         }
         $canManage = $this->access->canManage($document, $user);
-        $document->updateMetadata(
+        $requestedStatus = (string) ($input['status'] ?? $document->getStatus());
+        if ('APPROVED' === $requestedStatus && 'APPROVED' !== $document->getStatus()) {
+            return $this->invalid('Utilisez l’action d’approbation afin de tracer le valideur et la prochaine revue.');
+        }
+        if ('ARCHIVED' === $requestedStatus && !$canManage) {
+            return $this->invalid('Seul un gestionnaire peut archiver un document.');
+        }
+        $metadataChanged = $document->updateMetadata(
             (string) $input['title'],
             (string) $input['category'],
-            (string) ($input['status'] ?? $document->getStatus()),
+            $requestedStatus,
             $canManage ? (string) ($input['classification'] ?? $document->getClassification()) : $document->getClassification(),
             $canManage ? (string) ($input['visibility'] ?? $document->getVisibility()) : $document->getVisibility(),
             $owner,
         );
-        $document->revise((string) ($input['content'] ?? $document->getContent()), $user, isset($input['versionComment']) ? (string) $input['versionComment'] : null);
+        $content = (string) ($input['content'] ?? $document->getContent());
+        $comment = isset($input['versionComment']) ? (string) $input['versionComment'] : null;
+        if ($content !== $document->getContent()) {
+            $document->revise($content, $user, $comment);
+        } elseif ($metadataChanged) {
+            $document->recordRevision($user, $comment ?: 'Mise à jour des métadonnées');
+        }
         $this->entityManager->flush();
 
         return new JsonResponse($this->serialize($document, $user, true));
@@ -116,9 +129,10 @@ final readonly class IsmsDocumentController
         if (null === $document || !$this->access->canManage($document, $user)) {
             return $this->notFound();
         }
-        $this->storage->delete($document->getFileStorageName());
+        $storageName = $document->getFileStorageName();
         $this->entityManager->remove($document);
         $this->entityManager->flush();
+        $this->storage->delete($storageName);
 
         return new JsonResponse(null, 204);
     }
@@ -141,7 +155,8 @@ final readonly class IsmsDocumentController
             return $this->invalid($exception->getMessage());
         }
         $previous = $document->getFileStorageName();
-        $document->attachFile($file->getClientOriginalName(), $stored['storageName'], $stored['mimeType'], $stored['size']);
+        $document->attachFile($file->getClientOriginalName(), $stored['storageName'], $stored['mimeType'], $stored['size'], $stored['checksum']);
+        $document->recordRevision($user, null === $previous ? 'Ajout du fichier Word' : 'Remplacement du fichier Word');
         $this->entityManager->flush();
         $this->storage->delete($previous);
 
@@ -176,7 +191,11 @@ final readonly class IsmsDocumentController
             return $this->notFound();
         }
         $storageName = $document->getFileStorageName();
+        if (null === $storageName) {
+            return $this->notFound();
+        }
         $document->detachFile();
+        $document->recordRevision($user, 'Retrait du fichier Word');
         $this->entityManager->flush();
         $this->storage->delete($storageName);
 
@@ -199,6 +218,32 @@ final readonly class IsmsDocumentController
         $this->entityManager->flush();
 
         return new JsonResponse($this->serialize($document, $user, true));
+    }
+
+    #[Route('/{id<\d+>}/approve', methods: ['POST'])]
+    public function approve(int $id, Request $request): JsonResponse
+    {
+        $actor = $this->currentUser->get();
+        $document = $this->find($id, $actor);
+        if (null === $document || !$this->access->canManage($document, $actor)) {
+            return $this->notFound();
+        }
+        if ('' === trim($document->getContent()) && !$document->hasFile()) {
+            return $this->invalid('Un document vide ne peut pas être approuvé.');
+        }
+        $input = $this->input($request);
+        try {
+            $nextReviewAt = new \DateTimeImmutable((string) ($input['nextReviewAt'] ?? ''));
+        } catch (\Exception) {
+            return $this->invalid('La date de prochaine revue est invalide.');
+        }
+        if ($nextReviewAt <= new \DateTimeImmutable('today')) {
+            return $this->invalid('La prochaine revue doit être postérieure à aujourd’hui.');
+        }
+        $document->approve($actor, $nextReviewAt);
+        $this->entityManager->flush();
+
+        return new JsonResponse($this->serialize($document, $actor, true));
     }
 
     #[Route('/{id<\d+>}/acl', methods: ['POST'])]
@@ -269,6 +314,15 @@ final readonly class IsmsDocumentController
         if ('' !== $password && mb_strlen($password) < 8) {
             return $this->invalid('Le mot de passe doit contenir au moins 8 caractères.');
         }
+        if (in_array($document->getClassification(), ['CONFIDENTIAL', 'RESTRICTED'], true) && '' === $password) {
+            return $this->invalid('Un mot de passe est obligatoire pour un document confidentiel ou restreint.');
+        }
+        if ('RESTRICTED' === $document->getClassification() && null === $expiresAt) {
+            return $this->invalid('Une expiration est obligatoire pour un document restreint.');
+        }
+        if ('RESTRICTED' === $document->getClassification() && $expiresAt > new \DateTimeImmutable('+30 days')) {
+            return $this->invalid('Un partage restreint ne peut pas dépasser 30 jours.');
+        }
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $share = new IsmsDocumentShare($document, $actor, hash('sha256', $token), '' === $password ? null : password_hash($password, PASSWORD_ARGON2ID), $expiresAt);
         $this->entityManager->persist($share);
@@ -332,10 +386,10 @@ final readonly class IsmsDocumentController
     /** @return array<string, mixed> */
     private function serialize(IsmsDocument $document, User $user, bool $detail): array
     {
-        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'owner' => $this->user($document->getOwner()), 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
+        $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'owner' => $this->user($document->getOwner()), 'approval' => ['approvedBy' => null === $document->getApprovedBy() ? null : $this->user($document->getApprovedBy()), 'approvedAt' => $document->getApprovedAt()?->format(DATE_ATOM), 'nextReviewAt' => $document->getNextReviewAt()?->format(DATE_ATOM), 'reviewOverdue' => $document->isReviewOverdue()], 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize(), 'checksum' => $document->getFileChecksum()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
         if ($detail) {
             $data['content'] = $document->getContent();
-            $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());
+            $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'fileName' => $version->getFileName(), 'fileChecksum' => $version->getFileChecksum(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());
             $data['acl'] = array_map(fn (IsmsDocumentAcl $acl): array => ['id' => $acl->getId(), 'permission' => $acl->getPermission(), 'user' => $this->user($acl->getUser())], $document->getAclEntries()->toArray());
             $data['shares'] = $this->access->canManage($document, $user) ? array_map($this->share(...), $document->getShares()->toArray()) : [];
         }
@@ -346,7 +400,7 @@ final readonly class IsmsDocumentController
     /** @return array<string, mixed> */
     private function share(IsmsDocumentShare $share): array
     {
-        return ['id' => $share->getId(), 'enabled' => $share->isEnabled(), 'hasPassword' => $share->hasPassword(), 'expiresAt' => $share->getExpiresAt()?->format(DATE_ATOM), 'accessCount' => $share->getAccessCount(), 'createdAt' => $share->getCreatedAt()->format(DATE_ATOM)];
+        return ['id' => $share->getId(), 'enabled' => $share->isEnabled(), 'available' => $share->isAvailable(), 'hasPassword' => $share->hasPassword(), 'expiresAt' => $share->getExpiresAt()?->format(DATE_ATOM), 'accessCount' => $share->getAccessCount(), 'createdAt' => $share->getCreatedAt()->format(DATE_ATOM)];
     }
 
     /** @return array<string, mixed> */

@@ -94,9 +94,11 @@ Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{
 
 Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.
 
-Un gestionnaire peut créer un lien externe révocable, avec mot de passe facultatif d’au moins huit caractères et date d’expiration. RiskPilot ne stocke que les empreintes du jeton et du mot de passe ; le lien complet n’est affiché qu’à sa création. Les partages expirés ou révoqués ne révèlent plus le document.
+Un document naît en brouillon, peut être soumis à revue puis approuvé par un gestionnaire avec identité du valideur et date de prochaine revue. Toute modification ultérieure du contenu ou du fichier invalide automatiquement l’approbation. L’interface signale les revues arrivées à échéance.
 
-Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo et conservés dans un volume Docker privé ; ils ne sont accessibles qu’au travers des ACL ou d’un lien de partage valide. Le stockage chiffré S3/MinIO, l’antivirus et les circuits d’approbation restent planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
+Un gestionnaire peut créer un lien externe révocable et expirable. Les documents confidentiels ou restreints exigent un mot de passe ; un partage restreint expire obligatoirement sous 30 jours. RiskPilot ne stocke que les empreintes du jeton et du mot de passe ; le lien complet n’est affiché qu’à sa création.
+
+Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo, protégés contre les archives décompressées excessives et conservés dans un volume Docker privé. Chaque changement crée une version et enregistre l’empreinte SHA-256 de la pièce jointe. Le stockage chiffré S3/MinIO et l’antivirus restent planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
 
 ## Tableau de bord, exports et démonstration
 

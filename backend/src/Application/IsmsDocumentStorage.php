@@ -9,6 +9,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 final readonly class IsmsDocumentStorage
 {
     public const MAX_SIZE = 10_485_760;
+    private const MAX_DOCX_ENTRIES = 2_000;
+    private const MAX_DOCX_UNCOMPRESSED_SIZE = 52_428_800;
     private const EXTENSIONS = ['doc', 'docx'];
     private const MIME_TYPES = ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/octet-stream', 'application/x-ole-storage'];
 
@@ -16,7 +18,7 @@ final readonly class IsmsDocumentStorage
     {
     }
 
-    /** @return array{storageName: string, mimeType: string, size: int} */
+    /** @return array{storageName: string, mimeType: string, size: int, checksum: string} */
     public function store(UploadedFile $file): array
     {
         $extension = mb_strtolower((string) $file->getClientOriginalExtension());
@@ -31,8 +33,14 @@ final readonly class IsmsDocumentStorage
         }
         $storageName = bin2hex(random_bytes(24)).'.'.$extension;
         $file->move($this->directory, $storageName);
+        $path = $this->path($storageName);
+        $checksum = hash_file('sha256', $path);
+        if (false === $checksum) {
+            $this->delete($storageName);
+            throw new \RuntimeException('Impossible de calculer l’empreinte du document.');
+        }
 
-        return ['storageName' => $storageName, 'mimeType' => $mimeType, 'size' => $size];
+        return ['storageName' => $storageName, 'mimeType' => $mimeType, 'size' => $size, 'checksum' => $checksum];
     }
 
     public function path(string $storageName): string
@@ -72,6 +80,19 @@ final readonly class IsmsDocumentStorage
                 $archive->close();
             }
             throw new \InvalidArgumentException('Le fichier .docx n’est pas un document Word valide.');
+        }
+        $uncompressedSize = 0;
+        if ($archive->numFiles > self::MAX_DOCX_ENTRIES) {
+            $archive->close();
+            throw new \InvalidArgumentException('Le fichier .docx contient trop d’éléments.');
+        }
+        for ($index = 0; $index < $archive->numFiles; ++$index) {
+            $statistics = $archive->statIndex($index);
+            $uncompressedSize += is_array($statistics) ? (int) $statistics['size'] : 0;
+            if ($uncompressedSize > self::MAX_DOCX_UNCOMPRESSED_SIZE) {
+                $archive->close();
+                throw new \InvalidArgumentException('Le contenu décompressé du fichier .docx est trop volumineux.');
+            }
         }
         $archive->close();
     }

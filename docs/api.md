@@ -68,10 +68,11 @@ Les noms de fichiers incluent l’organisation et la date d’extraction. Les ex
 - `GET /api/isms-documents/collaborators` : utilisateurs actifs sélectionnables comme propriétaire ou ACL ;
 - `GET|PUT|DELETE /api/isms-documents/{id}` : détail, nouvelle version et suppression ;
 - `POST|GET|DELETE /api/isms-documents/{id}/file` : ajout, téléchargement et retrait d’un fichier Word ;
+- `POST /api/isms-documents/{id}/approve` : approbation nominative avec date obligatoire de prochaine revue ;
 - `POST /api/isms-documents/{id}/versions/{versionId}/restore` : restauration sous forme d’une nouvelle version ;
 - `POST /api/isms-documents/{id}/acl` et `DELETE /api/isms-documents/{id}/acl/{aclId}` : ACL nominatives ;
 - `POST /api/isms-documents/{id}/shares` et `DELETE /api/isms-documents/{id}/shares/{shareId}` : création et révocation d’un partage ;
 - `GET|POST /api/public/documents/{token}` : ouverture publique, avec mot de passe en `POST` lorsque requis.
 - `GET|POST /api/public/documents/{token}/file` : téléchargement du fichier Word partagé, avec mot de passe en `POST` lorsque requis.
 
-La liste et les accès directs sont filtrés par organisation. Une visibilité `RESTRICTED` limite la lecture au propriétaire, aux administrateurs et aux ACL. `EDIT` permet de produire une version ; `MANAGE` permet de gérer ACL, propriétaire et partages. Le jeton public n’est retourné qu’une fois.
+La liste et les accès directs sont filtrés par organisation. Une visibilité `RESTRICTED` limite la lecture au propriétaire, aux administrateurs et aux ACL. `EDIT` permet de produire une version et de soumettre à revue ; `MANAGE` permet d’approuver, d’archiver et de gérer ACL, propriétaire et partages. Le jeton public n’est retourné qu’une fois.

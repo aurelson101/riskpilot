@@ -224,6 +224,8 @@ export interface IsmsDocumentVersion {
   id: number;
   versionNumber: number;
   comment: string | null;
+  fileName: string | null;
+  fileChecksum: string | null;
   author: Pick<User, "id" | "email" | "firstName" | "lastName">;
   createdAt: string;
 }
@@ -237,6 +239,7 @@ export interface IsmsDocumentAcl {
 export interface IsmsDocumentShare {
   id: number;
   enabled: boolean;
+  available: boolean;
   hasPassword: boolean;
   expiresAt: string | null;
   accessCount: number;
@@ -252,8 +255,19 @@ export interface IsmsDocument {
   visibility: "ORGANIZATION" | "RESTRICTED";
   content?: string;
   owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  approval: {
+    approvedBy: Pick<User, "id" | "email" | "firstName" | "lastName"> | null;
+    approvedAt: string | null;
+    nextReviewAt: string | null;
+    reviewOverdue: boolean;
+  };
   currentVersion: number;
-  file: { name: string; mimeType: string; size: number } | null;
+  file: {
+    name: string;
+    mimeType: string;
+    size: number;
+    checksum: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   permissions: { read: boolean; edit: boolean; manage: boolean };

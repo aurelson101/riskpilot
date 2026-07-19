@@ -17,6 +17,8 @@ class IsmsDocumentVersion
     #[ORM\Column] private int $versionNumber;
     #[ORM\Column(type: 'text')] private string $content;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $comment;
+    #[ORM\Column(length: 255, nullable: true)] private ?string $fileName;
+    #[ORM\Column(length: 64, nullable: true)] private ?string $fileChecksum;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     public function __construct(IsmsDocument $document, User $author, int $versionNumber, string $content, ?string $comment)
     {
@@ -25,6 +27,8 @@ class IsmsDocumentVersion
         $this->versionNumber = $versionNumber;
         $this->content = $content;
         $this->comment = null === $comment || '' === trim($comment) ? null : trim($comment);
+        $this->fileName = $document->getFileName();
+        $this->fileChecksum = $document->getFileChecksum();
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -51,6 +55,16 @@ class IsmsDocumentVersion
     public function getComment(): ?string
     {
         return $this->comment;
+    }
+
+    public function getFileName(): ?string
+    {
+        return $this->fileName;
+    }
+
+    public function getFileChecksum(): ?string
+    {
+        return $this->fileChecksum;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

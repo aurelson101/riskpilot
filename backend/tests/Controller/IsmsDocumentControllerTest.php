@@ -67,6 +67,7 @@ final class IsmsDocumentControllerTest extends WebTestCase
         $this->client->request('POST', '/api/isms-documents/'.$document['id'].'/file', files: ['file' => $uploaded]);
         self::assertResponseIsSuccessful();
         self::assertSame('politique.docx', $this->payload()['file']['name']);
+        self::assertSame(2, $this->payload()['currentVersion']);
 
         $this->authenticate($this->admin);
         $this->client->request('GET', '/api/isms-documents/'.$document['id'].'/file');
@@ -79,8 +80,18 @@ final class IsmsDocumentControllerTest extends WebTestCase
 
         $this->authenticate($this->viewer);
         $this->json('PUT', '/api/isms-documents/'.$document['id'], ['title' => 'Politique de sécurité', 'category' => 'Politique', 'status' => 'APPROVED', 'classification' => 'CONFIDENTIAL', 'visibility' => 'RESTRICTED', 'content' => '# Version approuvée', 'ownerId' => $this->admin->getId(), 'versionComment' => 'Approbation']);
+        self::assertResponseStatusCodeSame(422);
+
+        $this->authenticate($this->viewer);
+        $this->json('PUT', '/api/isms-documents/'.$document['id'], ['title' => 'Politique de sécurité', 'category' => 'Politique', 'status' => 'IN_REVIEW', 'classification' => 'CONFIDENTIAL', 'visibility' => 'RESTRICTED', 'content' => '# Version approuvée', 'ownerId' => $this->admin->getId(), 'versionComment' => 'Soumission pour approbation']);
         self::assertResponseIsSuccessful();
-        self::assertSame(2, $this->payload()['currentVersion']);
+        self::assertSame(3, $this->payload()['currentVersion']);
+
+        $this->authenticate($this->admin);
+        $this->json('POST', '/api/isms-documents/'.$document['id'].'/approve', ['nextReviewAt' => (new \DateTimeImmutable('+1 year'))->format('Y-m-d')]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('APPROVED', $this->payload()['status']);
+        self::assertSame($this->admin->getId(), $this->payload()['approval']['approvedBy']['id']);
 
         $this->authenticate($this->admin);
         $this->json('POST', '/api/isms-documents/'.$document['id'].'/shares', ['password' => 'Secret123!', 'expiresAt' => (new \DateTimeImmutable('+1 day'))->format(DATE_ATOM)]);

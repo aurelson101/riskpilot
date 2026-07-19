@@ -10,6 +10,7 @@ import {
   ShareOutlined,
   AttachFileOutlined,
   DownloadOutlined,
+  TaskAltOutlined,
 } from "@mui/icons-material";
 import {
   Alert,
@@ -99,6 +100,7 @@ export function IsmsDocumentsPage() {
   const [shareExpiry, setShareExpiry] = useState("");
   const [createdUrl, setCreatedUrl] = useState("");
   const [wordFile, setWordFile] = useState<File | null>(null);
+  const [nextReviewAt, setNextReviewAt] = useState("");
 
   const list = useQuery({
     queryKey: ["isms-documents"],
@@ -207,6 +209,15 @@ export function IsmsDocumentsPage() {
     onSuccess: refresh,
     onError: (caught) => setError(message(caught)),
   });
+  const approve = useMutation({
+    mutationFn: () =>
+      api.post(`/isms-documents/${selectedId}/approve`, { nextReviewAt }),
+    onSuccess: async () => {
+      setNextReviewAt("");
+      await refresh();
+    },
+    onError: (caught) => setError(message(caught)),
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -309,6 +320,9 @@ export function IsmsDocumentsPage() {
                     variant="outlined"
                   />
                   <Chip size="small" label={document.status} />
+                  {document.approval.reviewOverdue && (
+                    <Chip size="small" label="Revue en retard" color="error" />
+                  )}
                   <Chip
                     size="small"
                     icon={
@@ -429,6 +443,39 @@ export function IsmsDocumentsPage() {
                   }
                 />
               </Stack>
+              {current.status === "APPROVED" && current.approval.approvedBy && (
+                <Alert
+                  severity={
+                    current.approval.reviewOverdue ? "warning" : "success"
+                  }
+                  icon={<TaskAltOutlined />}
+                >
+                  Approuvé par {person(current.approval.approvedBy)} le{" "}
+                  {date(current.approval.approvedAt)}. Prochaine revue :{" "}
+                  {date(current.approval.nextReviewAt)}.
+                </Alert>
+              )}
+              {current.permissions.manage && current.status !== "APPROVED" && (
+                <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+                  <TextField
+                    label="Prochaine revue"
+                    type="date"
+                    value={nextReviewAt}
+                    onChange={(event) => setNextReviewAt(event.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={<TaskAltOutlined />}
+                    disabled={!nextReviewAt || approve.isPending}
+                    onClick={() => approve.mutate()}
+                  >
+                    Approuver
+                  </Button>
+                </Stack>
+              )}
               <Box
                 sx={{
                   bgcolor: "grey.50",
@@ -492,6 +539,16 @@ export function IsmsDocumentsPage() {
                     <Typography variant="caption" color="text.secondary">
                       {person(version.author)} · {date(version.createdAt)}
                     </Typography>
+                    {version.fileName && (
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                      >
+                        Fichier : {version.fileName} · SHA-256{" "}
+                        {version.fileChecksum?.slice(0, 12)}…
+                      </Typography>
+                    )}
                   </Box>
                   {current.permissions.edit &&
                     version.versionNumber !== current.currentVersion && (
@@ -591,7 +648,13 @@ export function IsmsDocumentsPage() {
                 <>
                   <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
                     <TextField
-                      label="Mot de passe (facultatif)"
+                      label={
+                        ["CONFIDENTIAL", "RESTRICTED"].includes(
+                          current.classification,
+                        )
+                          ? "Mot de passe (obligatoire)"
+                          : "Mot de passe (facultatif)"
+                      }
                       type="password"
                       value={sharePassword}
                       onChange={(event) => setSharePassword(event.target.value)}
@@ -614,6 +677,12 @@ export function IsmsDocumentsPage() {
                       Créer
                     </Button>
                   </Stack>
+                  {current.classification === "RESTRICTED" && (
+                    <Alert severity="info">
+                      Un document restreint exige un mot de passe et une
+                      expiration maximale de 30 jours.
+                    </Alert>
+                  )}
                   {createdUrl && (
                     <Alert
                       severity="success"
@@ -649,8 +718,14 @@ export function IsmsDocumentsPage() {
                     <Stack direction="row" gap={1}>
                       <Chip
                         size="small"
-                        color={share.enabled ? "success" : "default"}
-                        label={share.enabled ? "Actif" : "Révoqué"}
+                        color={share.available ? "success" : "default"}
+                        label={
+                          share.available
+                            ? "Actif"
+                            : share.enabled
+                              ? "Expiré"
+                              : "Révoqué"
+                        }
                       />
                       {share.hasPassword && (
                         <Chip
@@ -665,7 +740,7 @@ export function IsmsDocumentsPage() {
                       consultation(s)
                     </Typography>
                   </Box>
-                  {share.enabled && current.permissions.manage && (
+                  {share.available && current.permissions.manage && (
                     <Button
                       color="error"
                       onClick={() => revokeShare.mutate(share.id)}
@@ -750,13 +825,16 @@ export function IsmsDocumentsPage() {
                         setForm({ ...form, status: event.target.value })
                       }
                     >
-                      {["DRAFT", "IN_REVIEW", "APPROVED", "ARCHIVED"].map(
-                        (item) => (
-                          <MenuItem key={item} value={item}>
-                            {item}
-                          </MenuItem>
-                        ),
-                      )}
+                      {[
+                        "DRAFT",
+                        "IN_REVIEW",
+                        ...(editing?.status === "APPROVED" ? ["APPROVED"] : []),
+                        ...(editing?.permissions.manage ? ["ARCHIVED"] : []),
+                      ].map((item) => (
+                        <MenuItem key={item} value={item}>
+                          {item}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>
