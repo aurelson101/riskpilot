@@ -1,6 +1,18 @@
 name: riskpilot_demo
 
 services:
+  backend:
+    image: riskpilot-demo-backend:local
+
+  worker:
+    image: riskpilot-demo-backend:local
+
+  scheduler:
+    image: riskpilot-demo-backend:local
+
+  jwt-init:
+    image: riskpilot-demo-backend:local
+
   nginx:
     ports: !override
       - "127.0.0.1:18081:80"

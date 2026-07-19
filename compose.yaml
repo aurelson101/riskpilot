@@ -1,6 +1,7 @@
 name: riskpilot
 
 x-backend: &backend
+  image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-backend:local}
   build:
     context: ./backend
     target: development

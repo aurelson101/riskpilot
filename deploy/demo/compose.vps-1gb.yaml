@@ -1,0 +1,56 @@
+# Limites adaptées à une démonstration sur 1 vCPU / 1 Gio de RAM.
+services:
+  nginx:
+    mem_limit: 32m
+    cpus: 0.10
+
+  frontend:
+    mem_limit: 48m
+    cpus: 0.15
+
+  backend:
+    mem_limit: 220m
+    cpus: 0.60
+    build:
+      args:
+        PHP_BUILD_JOBS: 1
+    volumes:
+      - ./deploy/demo/php-vps.ini:/usr/local/etc/php/conf.d/zz-riskpilot-vps.ini:ro
+      - ./deploy/demo/php-fpm-vps.conf:/usr/local/etc/php-fpm.d/zz-riskpilot-vps.conf:ro
+
+  worker:
+    mem_limit: 112m
+    cpus: 0.20
+    command: php -d memory_limit=64M bin/console messenger:consume async --time-limit=900 --memory-limit=64M --sleep=2
+
+  scheduler:
+    mem_limit: 64m
+    cpus: 0.10
+
+  demo-reset-scheduler:
+    mem_limit: 128m
+    cpus: 0.10
+    build:
+      args:
+        PHP_BUILD_JOBS: 1
+
+  postgres:
+    mem_limit: 180m
+    cpus: 0.35
+    command:
+      - postgres
+      - -c
+      - shared_buffers=48MB
+      - -c
+      - effective_cache_size=128MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=24MB
+      - -c
+      - max_connections=25
+
+  redis:
+    mem_limit: 64m
+    cpus: 0.10
+    command: redis-server --save "" --appendonly no --maxmemory 48mb --maxmemory-policy allkeys-lru

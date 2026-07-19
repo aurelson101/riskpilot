@@ -17,6 +17,22 @@ deploy/demo/reset-demo.sh
 
 Identifiants rechargés à chaque reset : `admin@riskpilot.local` / `ChangeMe123!`.
 
+## VPS 1 vCPU / 1 Gio
+
+Prévoir au minimum 2 Gio de swap pour absorber la première compilation des extensions PHP. Le profil bas niveau limite PHP-FPM à deux processus, réduit PostgreSQL et Redis, plafonne la mémoire des conteneurs et construit les images l'une après l'autre :
+
+```bash
+sudo fallocate -l 2G /swapfile-riskpilot
+sudo chmod 600 /swapfile-riskpilot
+sudo mkswap /swapfile-riskpilot
+sudo swapon /swapfile-riskpilot
+
+chmod +x deploy/demo/install-vps-1gb.sh
+deploy/demo/install-vps-1gb.sh
+```
+
+Pour les commandes Compose ultérieures, ajouter `-f deploy/demo/compose.vps-1gb.yaml` après les trois fichiers habituels.
+
 ## Reset automatique
 
 Le service `demo-reset-scheduler` attend deux heures, puis recharge les fixtures, vide Redis et supprime les fichiers documentaires déposés pendant la démonstration. Il recommence toutes les deux heures et redémarre avec le projet. Le reset manuel utilise exactement le même périmètre via `deploy/demo/reset-demo.sh`.

@@ -1,8 +1,10 @@
 FROM php:8.4-fpm-alpine AS base
 
+ARG PHP_BUILD_JOBS=1
+
 RUN apk add --no-cache fcgi git icu-libs libpq libzip \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libpq-dev libzip-dev \
-    && docker-php-ext-install -j$(nproc) intl opcache pdo_pgsql zip \
+    && docker-php-ext-install -j"${PHP_BUILD_JOBS}" intl opcache pdo_pgsql zip \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps \

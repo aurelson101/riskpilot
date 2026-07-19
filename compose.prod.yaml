@@ -1,5 +1,6 @@
 services:
   jwt-init:
+    image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-backend:local}
     build:
       context: ./backend
       target: production
