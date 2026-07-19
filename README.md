@@ -124,6 +124,8 @@ Les fixtures créent une organisation, trois utilisateurs, plusieurs périmètre
 
 Le compte administrateur est super-administrateur. Depuis l’interface, il peut créer et modifier les utilisateurs et organisations, gérer les inventaires, risques, actions et évaluations, archiver ou désactiver les ressources importantes, et consulter le journal d’audit. Le rôle « Lecteur » hérité pour l’autorisation interne n’est pas présenté comme rôle assigné.
 
+Le même menu donne accès au pilotage des audits métier : programme annuel, missions et périmètres, équipe et déclaration d’indépendance, rapport final, observations et non-conformités majeures/mineures. Chaque constat porte un responsable, une échéance et des preuves. Son cycle CAPA impose l’analyse de cause, la correction et l’action corrective avant une revue d’efficacité ; la clôture doit être validée par une personne distincte du responsable.
+
 ## Tests
 
 Après démarrage :

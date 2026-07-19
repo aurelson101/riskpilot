@@ -66,6 +66,8 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 5 — audits, non-conformités et CAPA
 
+**État : réalisé.** RiskPilot distingue maintenant le journal technique du programme d’assurance : plans annuels, missions avec déclaration d’indépendance, équipes, constats classifiés et CAPA soumises à une validation d’efficacité indépendante.
+
 - programme annuel, missions, périmètre, équipe et indépendance ;
 - constats, observations et non-conformités majeures/mineures ;
 - analyse de cause, correction, action corrective/préventive et validation d’efficacité ;

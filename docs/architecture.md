@@ -79,6 +79,10 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `StatementOfApplicability` représente une version de SoA liée à une organisation, un référentiel et un périmètre. Ses lignes relient chaque exigence aux contrôles, risques, actions et références de preuve. Une approbation fige la version ; `revise` duplique les lignes dans une version suivante et marque l’ancienne comme remplacée. `SecurityControlTest` apporte la preuve de conception ou d’efficacité opérationnelle avec planification de la prochaine revue. `RequirementMapping` relie deux exigences et autorise, explicitement, la résolution de preuves héritées dans le tenant courant avec provenance et couverture.
 
+### Assurance, audits et CAPA
+
+`AuditProgram` porte le plan annuel d’une organisation. Il agrège des `AuditEngagement` rattachés à un périmètre, un auditeur principal, une équipe, des dates et une déclaration d’indépendance. Les `AuditFinding` séparent observation, opportunité et non-conformité mineure/majeure. Le workflow CAPA documente cause racine, correction, actions corrective/préventive et preuve ; la revue d’efficacité interdit l’auto-validation et rouvre automatiquement l’action si elle est jugée inefficace. Ces objets sont audités par le subscriber général mais restent distincts d’`AuditLog`, qui est le journal technique append-only.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |
