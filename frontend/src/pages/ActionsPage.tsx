@@ -31,12 +31,16 @@ import {
 import {
   Add,
   CalendarMonthOutlined,
+  ChevronLeft,
+  ChevronRight,
   DeleteOutline,
   EditOutlined,
+  PersonOutline,
+  TodayOutlined,
   TableRowsOutlined,
   ViewKanbanOutlined,
 } from "@mui/icons-material";
-import { useState, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 import { api } from "../api/client";
 import type {
   ActionPlan,
@@ -68,6 +72,53 @@ const priorityColors: Record<
   ActionPlan["priority"],
   "default" | "info" | "warning" | "error"
 > = { LOW: "default", MEDIUM: "info", HIGH: "warning", CRITICAL: "error" };
+const priorityLabels: Record<ActionPlan["priority"], string> = {
+  LOW: "Faible",
+  MEDIUM: "Modérée",
+  HIGH: "Haute",
+  CRITICAL: "Critique",
+};
+const kanbanColors: Record<(typeof statuses)[number], string> = {
+  OPEN: "#64748b",
+  PLANNED: "#2563eb",
+  IN_PROGRESS: "#f59e0b",
+  BLOCKED: "#7c3aed",
+  OVERDUE: "#dc2626",
+  COMPLETED: "#16a34a",
+};
+const weekDays = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+function toLocalDate(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function actionPayload(action: ActionPlan, status = action.status) {
+  return {
+    title: action.title,
+    description: action.description ?? "",
+    relatedRiskId: action.relatedRisk.id,
+    relatedControlId: action.relatedControl?.id ?? null,
+    ownerId: action.owner.id,
+    priority: action.priority,
+    status,
+    startDate: action.startDate,
+    dueDate: action.dueDate,
+    completionDate: status === "COMPLETED" ? dateKey(new Date()) : null,
+    progress: status === "COMPLETED" ? 100 : action.progress,
+    estimatedCost:
+      action.estimatedCost === null ? null : Number(action.estimatedCost),
+    actualCost: action.actualCost === null ? null : Number(action.actualCost),
+    expectedRiskReduction: action.expectedRiskReduction,
+    evidence: action.evidence,
+  };
+}
 
 type ActionForm = {
   title: string;
@@ -109,26 +160,53 @@ function apiMessage(error: unknown) {
     : "L’opération a échoué.";
 }
 
-function ActionCard({ action }: { action: ActionPlan }) {
+function ActionCard({
+  action,
+  canManage,
+  onEdit,
+}: {
+  action: ActionPlan;
+  canManage: boolean;
+  onEdit: (action: ActionPlan) => void;
+}) {
   return (
-    <Card variant="outlined">
-      <CardContent>
+    <Card
+      variant="outlined"
+      draggable={canManage}
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/action-id", String(action.id));
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={() => canManage && onEdit(action)}
+      sx={{
+        cursor: canManage ? "grab" : "default",
+        transition: "transform .15s ease, box-shadow .15s ease",
+        "&:hover": { transform: "translateY(-2px)", boxShadow: 3 },
+      }}
+    >
+      <CardContent sx={{ "&:last-child": { pb: 2 } }}>
         <Stack spacing={1.2}>
           <Stack direction="row" justifyContent="space-between" gap={1}>
             <Typography fontWeight={700}>{action.title}</Typography>
             <Chip
               size="small"
-              label={action.priority}
+              label={priorityLabels[action.priority]}
               color={priorityColors[action.priority]}
             />
           </Stack>
           <Typography variant="caption" color="text.secondary">
             {action.relatedRisk.title}
           </Typography>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <PersonOutline sx={{ fontSize: 15, color: "text.secondary" }} />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {action.owner.firstName} {action.owner.lastName}
+            </Typography>
+          </Stack>
           <LinearProgress variant="determinate" value={action.progress} />
           <Typography variant="caption">
             {action.progress}% · échéance{" "}
-            {new Date(`${action.dueDate}T00:00:00`).toLocaleDateString("fr-FR")}
+            {toLocalDate(action.dueDate).toLocaleDateString("fr-FR")}
           </Typography>
         </Stack>
       </CardContent>
@@ -144,6 +222,12 @@ export function ActionsPage() {
   const [editing, setEditing] = useState<ActionPlan | null>(null);
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [ownerFilter, setOwnerFilter] = useState("ALL");
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
   const canManage = user?.roles.some((role) =>
     ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
   );
@@ -180,6 +264,20 @@ export function ActionsPage() {
   const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/actions/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["actions"] }),
+    onError: (caught) => setError(apiMessage(caught)),
+  });
+  const moveAction = useMutation({
+    mutationFn: ({
+      action,
+      status,
+    }: {
+      action: ActionPlan;
+      status: ActionPlan["status"];
+    }) => api.put(`/actions/${action.id}`, actionPayload(action, status)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["actions"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
     onError: (caught) => setError(apiMessage(caught)),
   });
   const update = <K extends keyof ActionForm>(key: K, value: ActionForm[K]) =>
@@ -224,6 +322,47 @@ export function ActionsPage() {
       <Alert severity="error">Impossible de charger les plans d’action.</Alert>
     );
   const actions = query.data ?? [];
+  const filteredActions = actions.filter((action) => {
+    const term = search.trim().toLocaleLowerCase("fr");
+    const matchesSearch =
+      !term ||
+      action.title.toLocaleLowerCase("fr").includes(term) ||
+      action.relatedRisk.title.toLocaleLowerCase("fr").includes(term) ||
+      `${action.owner.firstName} ${action.owner.lastName}`
+        .toLocaleLowerCase("fr")
+        .includes(term);
+    return (
+      matchesSearch &&
+      (priorityFilter === "ALL" || action.priority === priorityFilter) &&
+      (ownerFilter === "ALL" || String(action.owner.id) === ownerFilter)
+    );
+  });
+  const availableOwners = Array.from(
+    new Map(actions.map((action) => [action.owner.id, action.owner])).values(),
+  ).sort((left, right) => left.lastName.localeCompare(right.lastName, "fr"));
+  const calendarDays = (() => {
+    const first = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth(),
+      1,
+    );
+    const offset = (first.getDay() + 6) % 7;
+    const start = new Date(first);
+    start.setDate(first.getDate() - offset);
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return date;
+    });
+  })();
+  function dropAction(event: DragEvent, status: ActionPlan["status"]) {
+    event.preventDefault();
+    if (!canManage || status === "OVERDUE") return;
+    const id = Number(event.dataTransfer.getData("text/action-id"));
+    const action = actions.find((item) => item.id === id);
+    if (action && action.status !== status)
+      moveAction.mutate({ action, status });
+  }
   return (
     <Stack spacing={3}>
       <Stack
@@ -266,6 +405,49 @@ export function ActionsPage() {
         )}
       </Stack>
       {error && !dialogOpen && <Alert severity="error">{error}</Alert>}
+      <Card variant="outlined">
+        <CardContent sx={{ py: 2, "&:last-child": { pb: 2 } }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+            <TextField
+              size="small"
+              fullWidth
+              label="Rechercher une action, un risque ou un responsable"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Priorité</InputLabel>
+              <Select
+                label="Priorité"
+                value={priorityFilter}
+                onChange={(event) => setPriorityFilter(event.target.value)}
+              >
+                <MenuItem value="ALL">Toutes</MenuItem>
+                {Object.entries(priorityLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 190 }}>
+              <InputLabel>Responsable</InputLabel>
+              <Select
+                label="Responsable"
+                value={ownerFilter}
+                onChange={(event) => setOwnerFilter(event.target.value)}
+              >
+                <MenuItem value="ALL">Tous</MenuItem>
+                {availableOwners.map((owner) => (
+                  <MenuItem key={owner.id} value={String(owner.id)}>
+                    {owner.firstName} {owner.lastName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </CardContent>
+      </Card>
       {view === "table" && (
         <Card variant="outlined">
           <CardContent>
@@ -283,7 +465,7 @@ export function ActionsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {actions.map((action) => (
+                {filteredActions.map((action) => (
                   <TableRow key={action.id} hover>
                     <TableCell>
                       <Typography fontWeight={650}>{action.title}</Typography>
@@ -357,35 +539,66 @@ export function ActionsPage() {
       {view === "kanban" && (
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              md: "repeat(3, 1fr)",
-              xl: "repeat(6, 1fr)",
-            },
+            display: "flex",
+            overflowX: "auto",
             gap: 2,
+            pb: 1,
+            scrollSnapType: { xs: "x mandatory", lg: "none" },
           }}
         >
           {statuses.map((status) => (
             <Stack
               key={status}
               spacing={1.5}
+              onDragOver={(event) => {
+                if (canManage && status !== "OVERDUE") event.preventDefault();
+              }}
+              onDrop={(event) => dropAction(event, status)}
               sx={{
                 bgcolor: "#eef2f7",
                 p: 1.5,
                 borderRadius: 2,
-                minHeight: 180,
+                minHeight: 300,
+                minWidth: { xs: 280, md: 300 },
+                flex: "1 0 280px",
+                borderTop: `4px solid ${kanbanColors[status]}`,
+                scrollSnapAlign: "start",
               }}
             >
-              <Typography fontWeight={750}>
-                {statusLabels[status]} (
-                {actions.filter((item) => item.status === status).length})
-              </Typography>
-              {actions
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography fontWeight={750}>{statusLabels[status]}</Typography>
+                <Chip
+                  size="small"
+                  label={
+                    filteredActions.filter((item) => item.status === status)
+                      .length
+                  }
+                />
+              </Stack>
+              {filteredActions
                 .filter((item) => item.status === status)
                 .map((action) => (
-                  <ActionCard key={action.id} action={action} />
+                  <ActionCard
+                    key={action.id}
+                    action={action}
+                    canManage={Boolean(canManage)}
+                    onEdit={openEdit}
+                  />
                 ))}
+              {!filteredActions.some((item) => item.status === status) && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  textAlign="center"
+                  sx={{ py: 4 }}
+                >
+                  Aucune action
+                </Typography>
+              )}
             </Stack>
           ))}
         </Box>
@@ -393,55 +606,172 @@ export function ActionsPage() {
       {view === "calendar" && (
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="h6" fontWeight={700} mb={2}>
-              Échéancier
-            </Typography>
-            <Stack spacing={2}>
-              {actions.length === 0 ? (
-                <Typography color="text.secondary">
-                  Aucune échéance planifiée.
-                </Typography>
-              ) : (
-                actions.map((action) => (
-                  <Stack
-                    key={action.id}
-                    direction="row"
-                    spacing={2}
-                    alignItems="center"
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={2}
+              gap={1}
+            >
+              <IconButton
+                aria-label="Mois précédent"
+                onClick={() =>
+                  setCalendarMonth(
+                    new Date(
+                      calendarMonth.getFullYear(),
+                      calendarMonth.getMonth() - 1,
+                      1,
+                    ),
+                  )
+                }
+              >
+                <ChevronLeft />
+              </IconButton>
+              <Typography
+                variant="h6"
+                fontWeight={750}
+                textTransform="capitalize"
+              >
+                {calendarMonth.toLocaleDateString("fr-FR", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </Typography>
+              <Stack direction="row">
+                <Button
+                  size="small"
+                  startIcon={<TodayOutlined />}
+                  onClick={() =>
+                    setCalendarMonth(
+                      new Date(
+                        new Date().getFullYear(),
+                        new Date().getMonth(),
+                        1,
+                      ),
+                    )
+                  }
+                  sx={{ display: { xs: "none", sm: "inline-flex" } }}
+                >
+                  Aujourd’hui
+                </Button>
+                <IconButton
+                  aria-label="Mois suivant"
+                  onClick={() =>
+                    setCalendarMonth(
+                      new Date(
+                        calendarMonth.getFullYear(),
+                        calendarMonth.getMonth() + 1,
+                        1,
+                      ),
+                    )
+                  }
+                >
+                  <ChevronRight />
+                </IconButton>
+              </Stack>
+            </Stack>
+            <Box sx={{ overflowX: "auto" }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(100px, 1fr))",
+                  minWidth: 700,
+                }}
+              >
+                {weekDays.map((day) => (
+                  <Typography
+                    key={day}
+                    variant="caption"
+                    fontWeight={750}
+                    textAlign="center"
+                    color="text.secondary"
+                    sx={{ py: 1 }}
                   >
+                    {day}
+                  </Typography>
+                ))}
+                {calendarDays.map((day) => {
+                  const key = dateKey(day);
+                  const dayActions = filteredActions.filter(
+                    (action) => action.dueDate === key,
+                  );
+                  const isToday = key === dateKey(new Date());
+                  const inMonth = day.getMonth() === calendarMonth.getMonth();
+                  return (
                     <Box
+                      key={key}
                       sx={{
-                        width: 68,
-                        textAlign: "center",
-                        bgcolor:
-                          action.status === "OVERDUE"
-                            ? "error.main"
-                            : "primary.main",
-                        color: "white",
-                        borderRadius: 1,
-                        p: 1,
+                        minHeight: 112,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        p: 0.75,
+                        bgcolor: inMonth ? "background.paper" : "action.hover",
                       }}
                     >
-                      <Typography variant="caption">
-                        {new Date(
-                          `${action.dueDate}T00:00:00`,
-                        ).toLocaleDateString("fr-FR", { month: "short" })}
+                      <Typography
+                        variant="caption"
+                        fontWeight={isToday ? 800 : 500}
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 26,
+                          height: 26,
+                          borderRadius: "50%",
+                          bgcolor: isToday ? "primary.main" : "transparent",
+                          color: isToday
+                            ? "primary.contrastText"
+                            : inMonth
+                              ? "text.primary"
+                              : "text.disabled",
+                        }}
+                      >
+                        {day.getDate()}
                       </Typography>
-                      <Typography variant="h6">
-                        {new Date(`${action.dueDate}T00:00:00`).getDate()}
-                      </Typography>
+                      <Stack spacing={0.5} mt={0.5}>
+                        {dayActions.slice(0, 3).map((action) => (
+                          <Box
+                            key={action.id}
+                            onClick={() => canManage && openEdit(action)}
+                            title={`${action.title} — ${action.owner.firstName} ${action.owner.lastName}`}
+                            sx={{
+                              px: 0.75,
+                              py: 0.4,
+                              borderRadius: 1,
+                              bgcolor:
+                                action.status === "OVERDUE"
+                                  ? "error.light"
+                                  : action.status === "COMPLETED"
+                                    ? "success.light"
+                                    : "primary.light",
+                              color:
+                                action.status === "OVERDUE"
+                                  ? "error.contrastText"
+                                  : "primary.contrastText",
+                              cursor: canManage ? "pointer" : "default",
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              fontWeight={650}
+                              noWrap
+                              display="block"
+                            >
+                              {action.title}
+                            </Typography>
+                          </Box>
+                        ))}
+                        {dayActions.length > 3 && (
+                          <Typography variant="caption" color="text.secondary">
+                            + {dayActions.length - 3} autre(s)
+                          </Typography>
+                        )}
+                      </Stack>
                     </Box>
-                    <Stack>
-                      <Typography fontWeight={700}>{action.title}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {action.owner.firstName} {action.owner.lastName} ·{" "}
-                        {statusLabels[action.status]}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                ))
-              )}
-            </Stack>
+                  );
+                })}
+              </Box>
+            </Box>
           </CardContent>
         </Card>
       )}
