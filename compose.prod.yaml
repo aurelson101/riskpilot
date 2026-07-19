@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      target: production
+    volumes: []
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: 0
+  worker:
+    build:
+      target: production
+    volumes: []
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: 0
+  frontend:
+    build:
+      target: production
+    volumes: []
+  mailpit:
+    profiles: [development]

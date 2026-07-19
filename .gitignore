@@ -1,0 +1,12 @@
+/.env
+/.env.local
+/.idea/
+/.vscode/
+/backend/.env.local
+/backend/config/jwt/*.pem
+/backend/var/
+/backend/vendor/
+/frontend/dist/
+/frontend/node_modules/
+/playwright-report/
+/test-results/
