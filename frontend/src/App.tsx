@@ -23,6 +23,7 @@ import {
   ChevronRightOutlined,
   ExpandLess,
   ExpandMore,
+  FolderCopyOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -121,6 +122,16 @@ const EmailSettingsPage = lazy(() =>
     default: module.EmailSettingsPage,
   })),
 );
+const IsmsDocumentsPage = lazy(() =>
+  import("./pages/IsmsDocumentsPage").then((module) => ({
+    default: module.IsmsDocumentsPage,
+  })),
+);
+const PublicDocumentPage = lazy(() =>
+  import("./pages/PublicDocumentPage").then((module) => ({
+    default: module.PublicDocumentPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -175,6 +186,7 @@ function Layout() {
     "/vulnerabilities": "Vulnérabilités",
     "/notifications": "Notifications",
     "/reports/executive": "Rapport exécutif",
+    "/isms-documents": "Documents ISMS",
     "/profile": "Mon profil",
     "/administration/users": "Utilisateurs",
     "/administration/organizations": "Organisations",
@@ -295,6 +307,11 @@ function Layout() {
           path="/compliance"
           label="Conformité"
           icon={<FactCheckOutlined />}
+        />
+        <NavItem
+          path="/isms-documents"
+          label="Documents ISMS"
+          icon={<FolderCopyOutlined />}
         />
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavItem
@@ -544,6 +561,10 @@ export default function App() {
     >
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/shared/documents/:token"
+          element={<PublicDocumentPage />}
+        />
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route index element={<DashboardPage />} />
@@ -578,6 +599,7 @@ export default function App() {
               element={<EmailSettingsPage />}
             />
             <Route path="reports/executive" element={<ExecutiveReportPage />} />
+            <Route path="isms-documents" element={<IsmsDocumentsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

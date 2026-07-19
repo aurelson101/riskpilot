@@ -2,6 +2,8 @@
 
 Cette roadmap compare le cahier des charges initial à l’état exécutable du produit. Les priorités tiennent compte du risque métier, de la sécurité et de la valeur utilisateur.
 
+La gestion documentaire ISMS (registre, versions, ACL et partages protégés/expirables) est livrée. Ses extensions sont suivies dans la [roadmap dédiée](isms-documents-roadmap.md).
+
 ## État actuel
 
 Le MVP couvre l’authentification JWT, le RBAC et l’isolation multi-tenant, les inventaires, risques, actions, notifications, référentiels, évaluations de conformité, tableaux de bord, exports CSV, administration, fixtures et journal d’audit. Les opérations métier principales sont disponibles depuis l’interface.

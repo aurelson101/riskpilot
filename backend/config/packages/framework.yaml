@@ -9,6 +9,10 @@ framework:
             policy: sliding_window
             limit: 5
             interval: '1 minute'
+        document_share:
+            policy: sliding_window
+            limit: 10
+            interval: '1 minute'
 
     #esi: true
     #fragments: true

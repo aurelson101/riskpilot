@@ -219,3 +219,44 @@ export interface Vulnerability {
   affectedAssets: Array<{ id: number; name: string }>;
   status: string;
 }
+
+export interface IsmsDocumentVersion {
+  id: number;
+  versionNumber: number;
+  comment: string | null;
+  author: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  createdAt: string;
+}
+
+export interface IsmsDocumentAcl {
+  id: number;
+  permission: "READ" | "EDIT" | "MANAGE";
+  user: Pick<User, "id" | "email" | "firstName" | "lastName">;
+}
+
+export interface IsmsDocumentShare {
+  id: number;
+  enabled: boolean;
+  hasPassword: boolean;
+  expiresAt: string | null;
+  accessCount: number;
+  createdAt: string;
+}
+
+export interface IsmsDocument {
+  id: number;
+  title: string;
+  category: string;
+  status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
+  classification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+  visibility: "ORGANIZATION" | "RESTRICTED";
+  content?: string;
+  owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+  permissions: { read: boolean; edit: boolean; manage: boolean };
+  versions?: IsmsDocumentVersion[];
+  acl?: IsmsDocumentAcl[];
+  shares?: IsmsDocumentShare[];
+}

@@ -33,5 +33,13 @@ services:
         arguments:
             $appUrl: '%app.url%'
 
+    App\Controller\IsmsDocumentController:
+        arguments:
+            $appUrl: '%app.url%'
+
+    App\Controller\PublicIsmsDocumentController:
+        arguments:
+            $shareLimiter: '@limiter.document_share'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

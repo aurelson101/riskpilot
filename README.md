@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité et les plans d’action. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports CSV et le rapport exécutif imprimable.
+RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité, les plans d’action et la documentation ISMS. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports CSV et le rapport exécutif imprimable.
 
 ## Prérequis
 
@@ -90,6 +90,14 @@ L’écran `/compliance` regroupe les référentiels et les évaluations. Une é
 
 Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 
+## Documents ISMS
+
+Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.
+
+Un gestionnaire peut créer un lien externe révocable, avec mot de passe facultatif d’au moins huit caractères et date d’expiration. RiskPilot ne stocke que les empreintes du jeton et du mot de passe ; le lien complet n’est affiché qu’à sa création. Les partages expirés ou révoqués ne révèlent plus le document.
+
+Le premier lot utilise un contenu textuel Markdown. Le stockage de pièces jointes chiffrées S3/MinIO, l’antivirus et les circuits d’approbation sont planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
+
 ## Tableau de bord, exports et démonstration
 
 Le tableau de bord consolide les risques par niveau, les actions proches de leur échéance et la conformité par référentiel. Les boutons d’export produisent des fichiers CSV UTF-8 pour le registre des risques, les plans d’action et une évaluation de conformité, toujours limités à l’organisation courante.
@@ -133,6 +141,6 @@ Le template redirige HTTP vers HTTPS, active TLS 1.2/1.3 et HSTS, transmet corre
 
 ## Limitations connues
 
-Le renouvellement/révocation centralisée des sessions JWT, le stockage externe des preuves, l’import de référentiels sous licence, les sauvegardes automatisées et l’observabilité de production restent à intégrer avant une exploitation critique. Consultez la [roadmap](docs/roadmap.md).
+Le renouvellement/révocation centralisée des sessions JWT, le stockage externe chiffré des pièces jointes, l’import de référentiels sous licence, les sauvegardes automatisées et l’observabilité de production restent à intégrer avant une exploitation critique. Consultez la [roadmap](docs/roadmap.md).
 
 Licence : AGPL-3.0-or-later.

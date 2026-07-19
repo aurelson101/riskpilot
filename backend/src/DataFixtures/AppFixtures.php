@@ -9,6 +9,7 @@ use App\Entity\Asset;
 use App\Entity\ComplianceAssessment;
 use App\Entity\ComplianceResult;
 use App\Entity\Framework;
+use App\Entity\IsmsDocument;
 use App\Entity\Notification;
 use App\Entity\Organization;
 use App\Entity\Requirement;
@@ -89,7 +90,10 @@ final class AppFixtures extends Fixture
         }
         $assessment->recalculateScore();
         $notification = new Notification($actionOwner, 'ACTION_DUE_SOON', 'Actions à suivre', 'Plusieurs actions de démonstration arrivent à échéance.', '/actions');
-        foreach ([$organization, $admin, $riskManager, $actionOwner, ...$scopes, ...$assets, ...$threats, ...$vulnerabilities, ...$controls, ...$risks, ...$actions, $framework, ...$requirements, $assessment, $notification] as $entity) {
+        $document = new IsmsDocument($organization, $admin, 'Politique de sécurité de l’information', 'Politique', "# Politique de sécurité de l’information\n\nCe document de démonstration présente les principes directeurs du SMSI RiskPilot.");
+        $document->updateMetadata($document->getTitle(), $document->getCategory(), 'APPROVED', 'INTERNAL', IsmsDocument::VISIBILITY_ORGANIZATION, $admin);
+        $document->initializeVersion($admin, 'Version initiale approuvée');
+        foreach ([$organization, $admin, $riskManager, $actionOwner, ...$scopes, ...$assets, ...$threats, ...$vulnerabilities, ...$controls, ...$risks, ...$actions, $framework, ...$requirements, $assessment, $notification, $document] as $entity) {
             $manager->persist($entity);
         }
         $manager->flush();

@@ -61,3 +61,15 @@ Les référentiels sont partagés, tandis que les évaluations, résultats et ac
 Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralisent les cellules susceptibles d’être interprétées comme des formules par un tableur et appliquent les mêmes contrôles JWT et tenant que les écrans.
 
 Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports contiennent les libellés français et les codes métier bruts afin de rester à la fois lisibles et exploitables. Les graphiques et styles ne faisant pas partie du format CSV, `/reports/executive` fournit le rapport visuel imprimable ou enregistrable en PDF depuis le navigateur.
+
+## Documents ISMS
+
+- `GET|POST /api/isms-documents` : registre visible et création ;
+- `GET /api/isms-documents/collaborators` : utilisateurs actifs sélectionnables comme propriétaire ou ACL ;
+- `GET|PUT|DELETE /api/isms-documents/{id}` : détail, nouvelle version et suppression ;
+- `POST /api/isms-documents/{id}/versions/{versionId}/restore` : restauration sous forme d’une nouvelle version ;
+- `POST /api/isms-documents/{id}/acl` et `DELETE /api/isms-documents/{id}/acl/{aclId}` : ACL nominatives ;
+- `POST /api/isms-documents/{id}/shares` et `DELETE /api/isms-documents/{id}/shares/{shareId}` : création et révocation d’un partage ;
+- `GET|POST /api/public/documents/{token}` : ouverture publique, avec mot de passe en `POST` lorsque requis.
+
+La liste et les accès directs sont filtrés par organisation. Une visibilité `RESTRICTED` limite la lecture au propriétaire, aux administrateurs et aux ACL. `EDIT` permet de produire une version ; `MANAGE` permet de gérer ACL, propriétaire et partages. Le jeton public n’est retourné qu’une fois.
