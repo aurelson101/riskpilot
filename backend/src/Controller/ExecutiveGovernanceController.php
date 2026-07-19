@@ -49,7 +49,7 @@ use Symfony\Component\Routing\Attribute\Route;
             return $this->invalid($exception->getMessage());
         }
 
-return new JsonResponse($this->response($record), 201);
+        return new JsonResponse($this->response($record), 201);
     }
 
     #[Route('/vision-360', methods: ['GET'])]

@@ -48,7 +48,9 @@ final readonly class RiskMatrixController
     private function coordinates(RiskScenario $risk, string $type): array
     {
         return match ($type) {
-            'gross' => [$risk->getLikelihood(), $risk->getImpact()], 'residual' => [$risk->getResidualLikelihood(), $risk->getResidualImpact()], default => [$risk->getCurrentLikelihood(), $risk->getCurrentImpact()]
+            'gross' => [$risk->getLikelihood(), $risk->getImpact()],
+            'residual' => [$risk->getResidualLikelihood(), $risk->getResidualImpact()],
+            default => [$risk->getCurrentLikelihood(), $risk->getCurrentImpact()],
         };
     }
 }

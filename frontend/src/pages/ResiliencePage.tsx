@@ -27,6 +27,7 @@ import {
   Typography,
 } from "@mui/material";
 import { api } from "../api/client";
+import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
 import type { Scope, User } from "../api/types";
 
@@ -114,7 +115,13 @@ export function ResiliencePage() {
     queryKey: ["scopes"],
     queryFn: async () => (await api.get<Scope[]>("/scopes")).data,
   });
-  const canManage = Boolean(user?.roles.some((role) => role !== "ROLE_VIEWER"));
+  const canManage = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
+    "ROLE_RISK_MANAGER",
+    "ROLE_AUDITOR",
+    "ROLE_ACTION_OWNER",
+  ]);
   const [kind, setKind] = useState<DialogKind>(null);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(
     null,

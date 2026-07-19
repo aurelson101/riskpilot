@@ -24,6 +24,7 @@ import {
   Typography,
 } from "@mui/material";
 import { api } from "../api/client";
+import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
 import type { User } from "../api/types";
 
@@ -126,21 +127,13 @@ export function RegulatoryPage() {
     queryKey: ["users"],
     queryFn: async () => (await api.get<User[]>("/users")).data,
   });
-  const canManage = Boolean(
-    user?.roles.some((role) =>
-      [
-        "ROLE_SUPER_ADMIN",
-        "ROLE_ADMIN",
-        "ROLE_RISK_MANAGER",
-        "ROLE_AUDITOR",
-      ].includes(role),
-    ),
-  );
-  const isAdmin = Boolean(
-    user?.roles.some((role) =>
-      ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"].includes(role),
-    ),
-  );
+  const canManage = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
+    "ROLE_RISK_MANAGER",
+    "ROLE_AUDITOR",
+  ]);
+  const isAdmin = hasAnyRole(user?.roles, ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"]);
   const [selected, setSelected] = useState<RecordItem | null>(null);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("ALL");
