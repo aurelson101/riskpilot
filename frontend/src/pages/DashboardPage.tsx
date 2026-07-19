@@ -11,7 +11,8 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { DownloadOutlined } from "@mui/icons-material";
+import { DownloadOutlined, PrintOutlined } from "@mui/icons-material";
+import { Link } from "react-router-dom";
 import {
   Cell,
   Legend,
@@ -93,6 +94,14 @@ export function DashboardPage() {
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1}>
+          <Button
+            component={Link}
+            to="/reports/executive"
+            variant="contained"
+            startIcon={<PrintOutlined />}
+          >
+            Rapport PDF
+          </Button>
           <Button
             variant="outlined"
             startIcon={<DownloadOutlined />}

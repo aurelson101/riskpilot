@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("affiche la connexion RiskPilot", () => {
+  it("affiche la connexion RiskPilot", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/login"]}>
@@ -24,7 +24,7 @@ describe("App", () => {
       </QueryClientProvider>,
     );
     expect(
-      screen.getByRole("heading", { name: "RiskPilot" }),
+      await screen.findByRole("heading", { name: "RiskPilot" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Connexion à votre espace GRC"),

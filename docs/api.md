@@ -53,3 +53,5 @@ Les référentiels sont partagés, tandis que les évaluations, résultats et ac
 - `GET /api/exports/compliance/{id}.csv` : résultats d’une évaluation en CSV.
 
 Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralisent les cellules susceptibles d’être interprétées comme des formules par un tableur et appliquent les mêmes contrôles JWT et tenant que les écrans.
+
+Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports contiennent les libellés français et les codes métier bruts afin de rester à la fois lisibles et exploitables. Les graphiques et styles ne faisant pas partie du format CSV, `/reports/executive` fournit le rapport visuel imprimable ou enregistrable en PDF depuis le navigateur.

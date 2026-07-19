@@ -21,3 +21,30 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+@media print {
+  .MuiDrawer-root,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  main > .MuiContainer-root {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .executive-report {
+    padding: 12mm;
+    background: white;
+  }
+
+  .executive-report .MuiCard-root {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}

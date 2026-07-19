@@ -44,6 +44,8 @@ docker compose exec backend php bin/console app:user:create-admin \
 - `docker/` : configuration Nginx et infrastructure locale.
 - `docs/` : architecture, sécurité, données, API, déploiement et développement.
 
+La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de priorité avant une exploitation critique.
+
 ## Authentification et administration
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes. `GET /api/me` retourne le profil courant. Les administrateurs gèrent les utilisateurs de leur propre organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.

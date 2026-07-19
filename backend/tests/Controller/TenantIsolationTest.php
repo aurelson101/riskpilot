@@ -366,7 +366,10 @@ final class TenantIsolationTest extends WebTestCase
         $this->client->request('GET', '/api/exports/risks.csv');
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
+        self::assertStringContainsString('organisation-a-registre-risques-', (string) $this->client->getResponse()->headers->get('content-disposition'));
         $content = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('Email responsable', $content);
+        self::assertStringContainsString('Vraisemblance résiduelle', $content);
         self::assertStringContainsString('Risque A', $content);
         self::assertStringNotContainsString('Risque B', $content);
     }

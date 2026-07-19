@@ -16,6 +16,7 @@ import {
   AccountCircleOutlined,
   BusinessOutlined,
   HistoryOutlined,
+  DescriptionOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -42,18 +43,67 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useAuth } from "./auth/useAuth";
-import { LoginPage } from "./pages/LoginPage";
-import { InventoryPage } from "./pages/InventoryPage";
-import { UsersPage } from "./pages/UsersPage";
-import { RisksPage } from "./pages/RisksPage";
-import { RiskMatrixPage } from "./pages/RiskMatrixPage";
-import { ActionsPage } from "./pages/ActionsPage";
-import { NotificationsPage } from "./pages/NotificationsPage";
-import { CompliancePage } from "./pages/CompliancePage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { OrganizationsPage } from "./pages/OrganizationsPage";
-import { AuditLogsPage } from "./pages/AuditLogsPage";
+import { lazy, Suspense } from "react";
+
+const LoginPage = lazy(() =>
+  import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
+);
+const InventoryPage = lazy(() =>
+  import("./pages/InventoryPage").then((module) => ({
+    default: module.InventoryPage,
+  })),
+);
+const UsersPage = lazy(() =>
+  import("./pages/UsersPage").then((module) => ({ default: module.UsersPage })),
+);
+const RisksPage = lazy(() =>
+  import("./pages/RisksPage").then((module) => ({ default: module.RisksPage })),
+);
+const RiskMatrixPage = lazy(() =>
+  import("./pages/RiskMatrixPage").then((module) => ({
+    default: module.RiskMatrixPage,
+  })),
+);
+const ActionsPage = lazy(() =>
+  import("./pages/ActionsPage").then((module) => ({
+    default: module.ActionsPage,
+  })),
+);
+const NotificationsPage = lazy(() =>
+  import("./pages/NotificationsPage").then((module) => ({
+    default: module.NotificationsPage,
+  })),
+);
+const CompliancePage = lazy(() =>
+  import("./pages/CompliancePage").then((module) => ({
+    default: module.CompliancePage,
+  })),
+);
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((module) => ({
+    default: module.DashboardPage,
+  })),
+);
+const ProfilePage = lazy(() =>
+  import("./pages/ProfilePage").then((module) => ({
+    default: module.ProfilePage,
+  })),
+);
+const OrganizationsPage = lazy(() =>
+  import("./pages/OrganizationsPage").then((module) => ({
+    default: module.OrganizationsPage,
+  })),
+);
+const AuditLogsPage = lazy(() =>
+  import("./pages/AuditLogsPage").then((module) => ({
+    default: module.AuditLogsPage,
+  })),
+);
+const ExecutiveReportPage = lazy(() =>
+  import("./pages/ExecutiveReportPage").then((module) => ({
+    default: module.ExecutiveReportPage,
+  })),
+);
 
 const drawerWidth = 250;
 
@@ -266,6 +316,15 @@ function Layout() {
             </ListItemIcon>
             <ListItemText primary="Notifications" />
           </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/reports/executive"}
+            onClick={() => navigate("/reports/executive")}
+          >
+            <ListItemIcon>
+              <DescriptionOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Rapport exécutif" />
+          </ListItemButton>
         </List>
         <Box sx={{ mt: "auto", p: 2 }}>
           <Button
@@ -289,37 +348,49 @@ function Layout() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="risks" element={<RisksPage />} />
-          <Route path="actions" element={<ActionsPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="compliance" element={<CompliancePage />} />
-          <Route path="risk-matrix" element={<RiskMatrixPage />} />
-          <Route path="scopes" element={<InventoryPage kind="scopes" />} />
-          <Route path="assets" element={<InventoryPage kind="assets" />} />
-          <Route path="threats" element={<InventoryPage kind="threats" />} />
-          <Route
-            path="vulnerabilities"
-            element={<InventoryPage kind="vulnerabilities" />}
-          />
-          <Route
-            path="security-controls"
-            element={<InventoryPage kind="security-controls" />}
-          />
-          <Route path="administration/users" element={<UsersPage />} />
-          <Route
-            path="administration/organizations"
-            element={<OrganizationsPage />}
-          />
-          <Route path="administration/audit-logs" element={<AuditLogsPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+    <Suspense
+      fallback={
+        <Stack minHeight="50vh" alignItems="center" justifyContent="center">
+          <CircularProgress aria-label="Chargement de la page" />
+        </Stack>
+      }
+    >
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="risks" element={<RisksPage />} />
+            <Route path="actions" element={<ActionsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="compliance" element={<CompliancePage />} />
+            <Route path="risk-matrix" element={<RiskMatrixPage />} />
+            <Route path="scopes" element={<InventoryPage kind="scopes" />} />
+            <Route path="assets" element={<InventoryPage kind="assets" />} />
+            <Route path="threats" element={<InventoryPage kind="threats" />} />
+            <Route
+              path="vulnerabilities"
+              element={<InventoryPage kind="vulnerabilities" />}
+            />
+            <Route
+              path="security-controls"
+              element={<InventoryPage kind="security-controls" />}
+            />
+            <Route path="administration/users" element={<UsersPage />} />
+            <Route
+              path="administration/organizations"
+              element={<OrganizationsPage />}
+            />
+            <Route
+              path="administration/audit-logs"
+              element={<AuditLogsPage />}
+            />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="reports/executive" element={<ExecutiveReportPage />} />
+          </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
