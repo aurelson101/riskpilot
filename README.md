@@ -152,6 +152,6 @@ Le fichier autonome [nginx.conf.example](nginx.conf.example) redirige HTTP vers 
 
 ## Limitations connues
 
-Le renouvellement/révocation centralisée des sessions JWT, la récupération de compte, le stockage externe chiffré des pièces jointes, l’audit probant, les sauvegardes automatisées et l’observabilité de production restent à intégrer avant une exploitation critique. La [roadmap](docs/roadmap.md) détaille également les écarts fonctionnels GRC : acceptation des risques, SoA, tiers, incidents, continuité et programme d’audit.
+Les sessions JWT sont révocables et renouvelées par rotation, et la récupération de compte invalide les sessions existantes. Le journal d’audit est append-only, chaîné par empreintes, corrélé par requête et exportable avec signature HMAC. Les versions documentaires conservent leurs binaires ; contrôles MIME/signature, quota et antivirus ClamAV optionnel protègent les dépôts. Les sauvegardes PostgreSQL, Redis et fichiers sont décrites dans le [guide de sauvegarde et restauration](docs/backup-restore.md). La [roadmap](docs/roadmap.md) détaille les étapes GRC suivantes : acceptation des risques, SoA, tiers, incidents, continuité et programme d’audit.
 
 Licence : AGPL-3.0-or-later.

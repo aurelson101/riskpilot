@@ -18,6 +18,9 @@ class IsmsDocumentVersion
     #[ORM\Column(type: 'text')] private string $content;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $comment;
     #[ORM\Column(length: 255, nullable: true)] private ?string $fileName;
+    #[ORM\Column(length: 255, nullable: true)] private ?string $fileStorageName;
+    #[ORM\Column(length: 150, nullable: true)] private ?string $fileMimeType;
+    #[ORM\Column(nullable: true)] private ?int $fileSize;
     #[ORM\Column(length: 64, nullable: true)] private ?string $fileChecksum;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     public function __construct(IsmsDocument $document, User $author, int $versionNumber, string $content, ?string $comment)
@@ -28,6 +31,9 @@ class IsmsDocumentVersion
         $this->content = $content;
         $this->comment = null === $comment || '' === trim($comment) ? null : trim($comment);
         $this->fileName = $document->getFileName();
+        $this->fileStorageName = $document->getFileStorageName();
+        $this->fileMimeType = $document->getFileMimeType();
+        $this->fileSize = $document->getFileSize();
         $this->fileChecksum = $document->getFileChecksum();
         $this->createdAt = new \DateTimeImmutable();
     }
@@ -65,6 +71,26 @@ class IsmsDocumentVersion
     public function getFileChecksum(): ?string
     {
         return $this->fileChecksum;
+    }
+
+    public function getFileStorageName(): ?string
+    {
+        return $this->fileStorageName;
+    }
+
+    public function getFileMimeType(): ?string
+    {
+        return $this->fileMimeType;
+    }
+
+    public function getFileSize(): ?int
+    {
+        return $this->fileSize;
+    }
+
+    public function hasFile(): bool
+    {
+        return null !== $this->fileStorageName;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

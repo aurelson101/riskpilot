@@ -32,6 +32,8 @@ Chaque étape doit inclure : migrations réversibles, isolation par organisation
 
 ## Étape 2 — sécurité opérationnelle et preuves
 
+**État : réalisé.** Sauvegardes réellement vérifiées, stockage local ou S3/MinIO, antivirus facultatif sans imposer le MFA, versions binaires, observabilité et audit probant sont opérationnels.
+
 - sauvegarde automatisée PostgreSQL et objets, rétention, chiffrement et tests de restauration RPO/RTO ;
 - stockage S3/MinIO, antivirus, quotas, contrôle MIME/signature et versions binaires ;
 - observabilité : logs JSON corrélés, métriques, erreurs, alertes et workers ;

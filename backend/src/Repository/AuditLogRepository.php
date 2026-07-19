@@ -27,4 +27,23 @@ final class AuditLogRepository extends ServiceEntityRepository
 
         return $query->getQuery()->getResult();
     }
+
+    public function latestHashFor(User $actor): ?string
+    {
+        $log = $this->findOneBy(['organization' => $actor->getOrganization()], ['createdAt' => 'DESC', 'id' => 'DESC']);
+
+        return $log?->getEventHash();
+    }
+
+    /** @return list<AuditLog> */
+    public function findSealedFor(User $actor): array
+    {
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.organization = :organization')
+            ->andWhere('a.eventHash IS NOT NULL')
+            ->setParameter('organization', $actor->getOrganization())
+            ->orderBy('a.createdAt', 'ASC')
+            ->addOrderBy('a.id', 'ASC')
+            ->getQuery()->getResult();
+    }
 }

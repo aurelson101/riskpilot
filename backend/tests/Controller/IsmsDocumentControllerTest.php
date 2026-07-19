@@ -66,8 +66,16 @@ final class IsmsDocumentControllerTest extends WebTestCase
         $this->authenticate($this->admin);
         $this->client->request('POST', '/api/isms-documents/'.$document['id'].'/file', files: ['file' => $uploaded]);
         self::assertResponseIsSuccessful();
-        self::assertSame('politique.docx', $this->payload()['file']['name']);
-        self::assertSame(2, $this->payload()['currentVersion']);
+        $uploadedDocument = $this->payload();
+        self::assertSame('politique.docx', $uploadedDocument['file']['name']);
+        self::assertSame(2, $uploadedDocument['currentVersion']);
+        $binaryVersion = $uploadedDocument['versions'][0];
+        self::assertTrue($binaryVersion['hasFile']);
+
+        $this->authenticate($this->admin);
+        $this->client->request('GET', '/api/isms-documents/'.$document['id'].'/versions/'.$binaryVersion['id'].'/file');
+        self::assertResponseIsSuccessful();
+        self::assertSame('attachment; filename=politique.docx', $this->client->getResponse()->headers->get('content-disposition'));
 
         $this->authenticate($this->admin);
         $this->client->request('GET', '/api/isms-documents/'.$document['id'].'/file');

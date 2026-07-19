@@ -7,10 +7,10 @@ namespace App\Controller;
 use App\Application\IsmsDocumentStorage;
 use App\Repository\IsmsDocumentShareRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -47,7 +47,7 @@ final readonly class PublicIsmsDocumentController
     }
 
     #[Route('/api/public/documents/{token}/file', methods: ['GET', 'POST'])]
-    public function file(string $token, Request $request): JsonResponse|BinaryFileResponse
+    public function file(string $token, Request $request): JsonResponse|StreamedResponse
     {
         $limit = $this->shareLimiter->create(($request->getClientIp() ?? 'unknown').'|'.hash('sha256', $token))->consume();
         if (!$limit->isAccepted()) {
@@ -66,15 +66,21 @@ final readonly class PublicIsmsDocumentController
             return new JsonResponse(['code' => 'INVALID_PASSWORD', 'message' => 'Mot de passe incorrect.'], 403);
         }
         $document = $share->getDocument();
-        $path = $this->storage->path((string) $document->getFileStorageName());
-        if (!is_file($path)) {
+        $storageName = (string) $document->getFileStorageName();
+        if (!$this->storage->exists($storageName)) {
             return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Fichier introuvable.'], 404);
         }
         $share->recordAccess();
         $this->entityManager->flush();
-        $response = new BinaryFileResponse($path);
+        $response = new StreamedResponse(function () use ($storageName): void {
+            $stream = $this->storage->open($storageName);
+            if (is_resource($stream)) {
+                fpassthru($stream);
+                fclose($stream);
+            }
+        });
         $response->headers->set('Content-Type', (string) $document->getFileMimeType());
-        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, (string) $document->getFileName());
+        $response->headers->set('Content-Disposition', $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, (string) $document->getFileName()));
 
         return $response;
     }

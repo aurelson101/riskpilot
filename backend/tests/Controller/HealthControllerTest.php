@@ -15,9 +15,10 @@ final class HealthControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertResponseFormatSame('json');
-        self::assertJsonStringEqualsJsonString(
-            '{"status":"ok","service":"riskpilot-api"}',
-            (string) $client->getResponse()->getContent(),
-        );
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('ok', $payload['status']);
+        self::assertSame('riskpilot-api', $payload['service']);
+        self::assertSame(['database' => 'ok', 'redis' => 'ok'], $payload['checks']);
+        self::assertNotEmpty($payload['checkedAt']);
     }
 }

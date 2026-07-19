@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application;
 
+use Aws\S3\S3Client;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final readonly class IsmsDocumentStorage
@@ -14,8 +15,11 @@ final readonly class IsmsDocumentStorage
     private const EXTENSIONS = ['doc', 'docx'];
     private const MIME_TYPES = ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/octet-stream', 'application/x-ole-storage'];
 
-    public function __construct(private string $directory)
+    private ?S3Client $s3;
+
+    public function __construct(private string $directory, private DocumentAntivirus $antivirus, private int $quotaBytes, private string $s3Endpoint, private string $s3Bucket, private string $s3Region, private string $s3AccessKey, private string $s3SecretKey)
     {
+        $this->s3 = '' === trim($this->s3Bucket) ? null : new S3Client(['version' => 'latest', 'region' => $this->s3Region, 'endpoint' => '' === trim($this->s3Endpoint) ? null : $this->s3Endpoint, 'use_path_style_endpoint' => '' !== trim($this->s3Endpoint), 'credentials' => ['key' => $this->s3AccessKey, 'secret' => $this->s3SecretKey]]);
     }
 
     /** @return array{storageName: string, mimeType: string, size: int, checksum: string} */
@@ -28,19 +32,56 @@ final readonly class IsmsDocumentStorage
             throw new \InvalidArgumentException('Seuls les fichiers Word .doc ou .docx de 10 Mo maximum sont acceptés.');
         }
         $this->assertWordFormat($file, $extension);
+        $this->antivirus->scan($file->getPathname());
         if (!is_dir($this->directory) && !mkdir($concurrentDirectory = $this->directory, 0750, true) && !is_dir($concurrentDirectory)) {
             throw new \RuntimeException('Le stockage documentaire est indisponible.');
         }
+        if ($this->usedBytes() + $size > $this->quotaBytes) {
+            throw new \InvalidArgumentException('Le quota de stockage documentaire est atteint.');
+        }
         $storageName = bin2hex(random_bytes(24)).'.'.$extension;
-        $file->move($this->directory, $storageName);
-        $path = $this->path($storageName);
-        $checksum = hash_file('sha256', $path);
+        $checksum = hash_file('sha256', $file->getPathname());
         if (false === $checksum) {
-            $this->delete($storageName);
             throw new \RuntimeException('Impossible de calculer l’empreinte du document.');
+        }
+        if (null === $this->s3) {
+            $file->move($this->directory, $storageName);
+        } else {
+            $arguments = ['Bucket' => $this->s3Bucket, 'Key' => $storageName, 'SourceFile' => $file->getPathname(), 'ContentType' => $mimeType];
+            if ('' === trim($this->s3Endpoint)) {
+                $arguments['ServerSideEncryption'] = 'AES256';
+            }
+            $this->s3->putObject($arguments);
         }
 
         return ['storageName' => $storageName, 'mimeType' => $mimeType, 'size' => $size, 'checksum' => $checksum];
+    }
+
+    private function usedBytes(): int
+    {
+        if (null !== $this->s3) {
+            $bytes = 0;
+            $token = null;
+            do {
+                $arguments = ['Bucket' => $this->s3Bucket];
+                if (null !== $token) {
+                    $arguments['ContinuationToken'] = $token;
+                }
+                $result = $this->s3->listObjectsV2($arguments);
+                foreach ($result['Contents'] ?? [] as $object) {
+                    $bytes += (int) ($object['Size'] ?? 0);
+                }
+                $token = true === ($result['IsTruncated'] ?? false) ? (string) ($result['NextContinuationToken'] ?? '') : null;
+            } while (null !== $token && '' !== $token);
+
+            return $bytes;
+        }
+        $bytes = 0;
+        foreach (glob($this->directory.DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
+            $bytes += is_file($path) ? (int) filesize($path) : 0;
+        }
+
+        return $bytes;
     }
 
     public function path(string $storageName): string
@@ -48,9 +89,39 @@ final readonly class IsmsDocumentStorage
         return $this->directory.DIRECTORY_SEPARATOR.basename($storageName);
     }
 
+    public function exists(string $storageName): bool
+    {
+        if (null === $this->s3) {
+            return is_file($this->path($storageName));
+        }
+        try {
+            return $this->s3->doesObjectExistV2($this->s3Bucket, basename($storageName));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** @return resource|false */
+    public function open(string $storageName)
+    {
+        if (null === $this->s3) {
+            return fopen($this->path($storageName), 'rb');
+        }
+        try {
+            return $this->s3->getObject(['Bucket' => $this->s3Bucket, 'Key' => basename($storageName)])['Body']->detach();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function delete(?string $storageName): void
     {
         if (null === $storageName) {
+            return;
+        }
+        if (null !== $this->s3) {
+            $this->s3->deleteObject(['Bucket' => $this->s3Bucket, 'Key' => basename($storageName)]);
+
             return;
         }
         $path = $this->path($storageName);

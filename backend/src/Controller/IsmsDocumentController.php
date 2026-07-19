@@ -15,10 +15,10 @@ use App\Repository\IsmsDocumentRepository;
 use App\Repository\UserRepository;
 use App\Security\IsmsDocumentAccess;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/isms-documents')]
@@ -131,10 +131,12 @@ final readonly class IsmsDocumentController
         if (null === $document || !$this->access->canManage($document, $user)) {
             return $this->notFound();
         }
-        $storageName = $document->getFileStorageName();
+        $storageNames = array_filter(array_merge([$document->getFileStorageName()], array_map(static fn (IsmsDocumentVersion $version): ?string => $version->getFileStorageName(), $document->getVersions()->toArray())));
         $this->entityManager->remove($document);
         $this->entityManager->flush();
-        $this->storage->delete($storageName);
+        foreach (array_unique($storageNames) as $storageName) {
+            $this->storage->delete($storageName);
+        }
 
         return new JsonResponse(null, 204);
     }
@@ -160,28 +162,20 @@ final readonly class IsmsDocumentController
         $document->attachFile($file->getClientOriginalName(), $stored['storageName'], $stored['mimeType'], $stored['size'], $stored['checksum']);
         $document->recordRevision($user, null === $previous ? 'Ajout du fichier Word' : 'Remplacement du fichier Word');
         $this->entityManager->flush();
-        $this->storage->delete($previous);
 
         return new JsonResponse($this->serialize($document, $user, true));
     }
 
     #[Route('/{id<\d+>}/file', methods: ['GET'])]
-    public function downloadFile(int $id): JsonResponse|BinaryFileResponse
+    public function downloadFile(int $id): JsonResponse|StreamedResponse
     {
         $user = $this->currentUser->get();
         $document = $this->find($id, $user);
         if (null === $document || !$this->access->canRead($document, $user) || !$document->hasFile()) {
             return $this->notFound();
         }
-        $path = $this->storage->path((string) $document->getFileStorageName());
-        if (!is_file($path)) {
-            return $this->notFound();
-        }
-        $response = new BinaryFileResponse($path);
-        $response->headers->set('Content-Type', (string) $document->getFileMimeType());
-        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, (string) $document->getFileName());
 
-        return $response;
+        return $this->download((string) $document->getFileStorageName(), (string) $document->getFileMimeType(), (string) $document->getFileName());
     }
 
     #[Route('/{id<\d+>}/file', methods: ['DELETE'])]
@@ -199,9 +193,24 @@ final readonly class IsmsDocumentController
         $document->detachFile();
         $document->recordRevision($user, 'Retrait du fichier Word');
         $this->entityManager->flush();
-        $this->storage->delete($storageName);
 
         return new JsonResponse(null, 204);
+    }
+
+    #[Route('/{id<\d+>}/versions/{versionId<\d+>}/file', methods: ['GET'])]
+    public function downloadVersionFile(int $id, int $versionId): JsonResponse|StreamedResponse
+    {
+        $user = $this->currentUser->get();
+        $document = $this->find($id, $user);
+        if (null === $document || !$this->access->canRead($document, $user)) {
+            return $this->notFound();
+        }
+        $version = $document->getVersions()->filter(fn (IsmsDocumentVersion $item): bool => $item->getId() === $versionId)->first();
+        if (!$version instanceof IsmsDocumentVersion || !$version->hasFile()) {
+            return $this->notFound();
+        }
+
+        return $this->download((string) $version->getFileStorageName(), (string) $version->getFileMimeType(), (string) $version->getFileName());
     }
 
     #[Route('/{id<\d+>}/versions/{versionId<\d+>}/restore', methods: ['POST'])]
@@ -394,12 +403,30 @@ final readonly class IsmsDocumentController
         $data = ['id' => $document->getId(), 'title' => $document->getTitle(), 'category' => $document->getCategory(), 'status' => $document->getStatus(), 'classification' => $document->getClassification(), 'visibility' => $document->getVisibility(), 'excerpt' => $this->excerpt($document), 'owner' => $this->user($document->getOwner()), 'approval' => ['approvedBy' => null === $document->getApprovedBy() ? null : $this->user($document->getApprovedBy()), 'approvedAt' => $document->getApprovedAt()?->format(DATE_ATOM), 'nextReviewAt' => $document->getNextReviewAt()?->format(DATE_ATOM), 'reviewOverdue' => $document->isReviewOverdue()], 'currentVersion' => $document->getCurrentVersion(), 'file' => $document->hasFile() ? ['name' => $document->getFileName(), 'mimeType' => $document->getFileMimeType(), 'size' => $document->getFileSize(), 'checksum' => $document->getFileChecksum()] : null, 'createdAt' => $document->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $document->getUpdatedAt()->format(DATE_ATOM), 'permissions' => ['read' => $this->access->canRead($document, $user), 'edit' => $this->access->canEdit($document, $user), 'manage' => $this->access->canManage($document, $user)]];
         if ($detail) {
             $data['content'] = $document->getContent();
-            $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'fileName' => $version->getFileName(), 'fileChecksum' => $version->getFileChecksum(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());
+            $data['versions'] = array_map(fn (IsmsDocumentVersion $version): array => ['id' => $version->getId(), 'versionNumber' => $version->getVersionNumber(), 'comment' => $version->getComment(), 'fileName' => $version->getFileName(), 'fileSize' => $version->getFileSize(), 'fileChecksum' => $version->getFileChecksum(), 'hasFile' => $version->hasFile(), 'author' => $this->user($version->getAuthor()), 'createdAt' => $version->getCreatedAt()->format(DATE_ATOM)], $document->getVersions()->toArray());
             $data['acl'] = array_map(fn (IsmsDocumentAcl $acl): array => ['id' => $acl->getId(), 'permission' => $acl->getPermission(), 'user' => $this->user($acl->getUser())], $document->getAclEntries()->toArray());
             $data['shares'] = $this->access->canManage($document, $user) ? array_map($this->share(...), $document->getShares()->toArray()) : [];
         }
 
         return $data;
+    }
+
+    private function download(string $storageName, string $mimeType, string $fileName): JsonResponse|StreamedResponse
+    {
+        if (!$this->storage->exists($storageName)) {
+            return $this->notFound();
+        }
+        $response = new StreamedResponse(function () use ($storageName): void {
+            $stream = $this->storage->open($storageName);
+            if (is_resource($stream)) {
+                fpassthru($stream);
+                fclose($stream);
+            }
+        });
+        $response->headers->set('Content-Type', $mimeType);
+        $response->headers->set('Content-Disposition', $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $fileName));
+
+        return $response;
     }
 
     /** @return array<string, mixed> */

@@ -9,6 +9,10 @@
 parameters:
     app.secret: '%env(APP_SECRET)%'
     app.url: '%env(APP_URL)%'
+    document_antivirus_host: ''
+    document_storage_quota_bytes: '1073741824'
+    document_s3_empty: ''
+    document_s3_region: 'eu-west-1'
 
 services:
     # default configuration for services in *this* file
@@ -28,6 +32,16 @@ services:
     App\Application\IsmsDocumentStorage:
         arguments:
             $directory: '%kernel.project_dir%/var/isms-documents'
+            $quotaBytes: '%env(int:default:document_storage_quota_bytes:DOCUMENT_STORAGE_QUOTA_BYTES)%'
+            $s3Endpoint: '%env(default:document_s3_empty:DOCUMENT_S3_ENDPOINT)%'
+            $s3Bucket: '%env(default:document_s3_empty:DOCUMENT_S3_BUCKET)%'
+            $s3Region: '%env(default:document_s3_region:DOCUMENT_S3_REGION)%'
+            $s3AccessKey: '%env(default:document_s3_empty:DOCUMENT_S3_ACCESS_KEY)%'
+            $s3SecretKey: '%env(default:document_s3_empty:DOCUMENT_S3_SECRET_KEY)%'
+
+    App\Application\DocumentAntivirus:
+        arguments:
+            $host: '%env(default:document_antivirus_host:CLAMAV_HOST)%'
 
     App\Controller\AuthController:
         arguments:
@@ -49,6 +63,14 @@ services:
     App\Controller\SessionController:
         arguments:
             $appUrl: '%app.url%'
+
+    App\Controller\AuditLogController:
+        arguments:
+            $appSecret: '%app.secret%'
+
+    App\Controller\HealthController:
+        arguments:
+            $redisUrl: '%env(REDIS_URL)%'
 
     App\Controller\PublicIsmsDocumentController:
         arguments:

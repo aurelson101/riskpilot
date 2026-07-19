@@ -6,6 +6,7 @@ namespace App\EventSubscriber;
 
 use App\Entity\AuditLog;
 use App\Entity\User;
+use App\Repository\AuditLogRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -14,7 +15,7 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 #[AsEventListener(event: 'kernel.response')]
 final readonly class AuditSubscriber
 {
-    public function __construct(private Security $security, private EntityManagerInterface $entityManager)
+    public function __construct(private Security $security, private EntityManagerInterface $entityManager, private AuditLogRepository $logs)
     {
     }
 
@@ -38,9 +39,24 @@ final readonly class AuditSubscriber
             }
         }
         $segments = array_values(array_filter(explode('/', $request->getPathInfo())));
-        $log = new AuditLog($actor->getOrganization(), $actor, $request->getMethod(), $segments[1] ?? 'api', isset($segments[2]) && ctype_digit($segments[2]) ? $segments[2] : null, $payload, $request->getClientIp(), $request->headers->get('User-Agent'));
-        $this->entityManager->persist($log);
-        $this->entityManager->flush();
+        $changesAfter = $request->attributes->get('_audit_after', []);
+        $changesBefore = $request->attributes->get('_audit_before', []);
+        $newValues = [] === $changesAfter ? $payload : ['request' => $payload, 'entities' => $changesAfter];
+        $log = new AuditLog($actor->getOrganization(), $actor, $request->getMethod(), $segments[1] ?? 'api', isset($segments[2]) && ctype_digit($segments[2]) ? $segments[2] : null, $newValues, $request->getClientIp(), $request->headers->get('User-Agent'), [] === $changesBefore ? null : $changesBefore);
+        $requestId = (string) ($request->headers->get('X-Request-ID') ?: bin2hex(random_bytes(16)));
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $connection->executeQuery('SELECT pg_advisory_xact_lock(:organization)', ['organization' => (int) $actor->getOrganization()->getId()]);
+            $log->seal($this->logs->latestHashFor($actor), mb_substr($requestId, 0, 36));
+            $this->entityManager->persist($log);
+            $this->entityManager->flush();
+            $connection->commit();
+            $event->getResponse()->headers->set('X-Request-ID', $requestId);
+        } catch (\Throwable $error) {
+            $connection->rollBack();
+            throw $error;
+        }
     }
 
     /**
