@@ -121,6 +121,24 @@ class ContinuityProcess
         return $this->exercises;
     }
 
+    /** @param list<string> $dependencies */
+    public function update(Scope $scope, User $owner, string $name, string $criticality, int $mtpdHours, int $rtoHours, int $rpoHours, array $dependencies, string $businessImpact): void
+    {
+        if ('' === trim($name) || !in_array($criticality, ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], true) || $mtpdHours < 1 || $rtoHours < 0 || $rpoHours < 0 || $rtoHours > $mtpdHours || '' === trim($businessImpact)) {
+            throw new \InvalidArgumentException('BIA invalide : le RTO doit notamment rester inférieur au MTPD.');
+        }
+        $this->scope = $scope;
+        $this->owner = $owner;
+        $this->name = trim($name);
+        $this->criticality = $criticality;
+        $this->mtpdHours = $mtpdHours;
+        $this->rtoHours = $rtoHours;
+        $this->rpoHours = $rpoHours;
+        $this->dependencies = $dependencies;
+        $this->businessImpact = trim($businessImpact);
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function setPlans(?string $bcp, ?string $drp, ?\DateTimeImmutable $nextExerciseAt): void
     {
         $this->bcpProcedure = null === $bcp || '' === trim($bcp) ? null : trim($bcp);

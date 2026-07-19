@@ -63,6 +63,10 @@ final readonly class ResilienceController
             return null === $incident ? $this->notFound() : $this->forbidden();
         } $data = $request->toArray();
         $actor = $this->currentUser->get();
+        $owner = $this->users->findOneVisibleTo((int) ($data['ownerId'] ?? $incident->getOwner()->getId()), $actor);
+        if (null === $owner) {
+            return $this->invalid('Responsable invalide.');
+        }
         $assets = $this->relations((array) ($data['assetIds'] ?? []), fn (int $relationId): mixed => $this->assets->findOneVisibleTo($relationId, $actor));
         $thirdParties = $this->relations((array) ($data['thirdPartyIds'] ?? []), fn (int $relationId): mixed => $this->thirdParties->findOneVisibleTo($relationId, $actor));
         $risks = $this->relations((array) ($data['riskIds'] ?? []), fn (int $relationId): mixed => $this->risks->findOneVisibleTo($relationId, $actor));
@@ -70,6 +74,7 @@ final readonly class ResilienceController
         if (null === $assets || null === $thirdParties || null === $risks || null === $actions) {
             return $this->invalid('Relation étrangère ou invalide.');
         } try {
+            $incident->revise((string) ($data['title'] ?? $incident->getTitle()), (string) ($data['description'] ?? $incident->getDescription()), (string) ($data['severity'] ?? $incident->getSeverity()), $owner);
             $incident->update((string) ($data['status'] ?? 'DETECTED'), (array) ($data['impacts'] ?? []), $this->strings((array) ($data['evidence'] ?? [])), (bool) ($data['regulatoryNotificationRequired'] ?? false), empty($data['notifiedAt']) ? null : new \DateTimeImmutable((string) $data['notifiedAt']), isset($data['lessonsLearned']) ? (string) $data['lessonsLearned'] : null, $assets, $thirdParties, $risks, $actions);
             $this->entityManager->flush();
         } catch (\InvalidArgumentException $exception) {
@@ -77,6 +82,19 @@ final readonly class ResilienceController
         }
 
         return new JsonResponse($this->incidentResponse($incident));
+    }
+
+    #[Route('/incidents/{id<\d+>}', methods: ['DELETE'])]
+    public function deleteIncident(int $id): JsonResponse
+    {
+        $incident = $this->incidents->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $incident || !$this->canManage()) {
+            return null === $incident ? $this->notFound() : $this->forbidden();
+        }
+        $this->entityManager->remove($incident);
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
     }
 
     #[Route('/incidents/{id<\d+>}/timeline', methods: ['POST'])]
@@ -122,6 +140,44 @@ final readonly class ResilienceController
         }
 
         return new JsonResponse($this->processResponse($process), 201);
+    }
+
+    #[Route('/continuity-processes/{id<\d+>}', methods: ['PUT'])]
+    public function updateProcess(int $id, Request $request): JsonResponse
+    {
+        $process = $this->processes->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $process || !$this->canManage()) {
+            return null === $process ? $this->notFound() : $this->forbidden();
+        }
+        $data = $request->toArray();
+        $actor = $this->currentUser->get();
+        $scope = $this->scopes->findOneVisibleTo((int) ($data['scopeId'] ?? $process->getScope()->getId()), $actor);
+        $owner = $this->users->findOneVisibleTo((int) ($data['ownerId'] ?? $process->getOwner()->getId()), $actor);
+        if (null === $scope || null === $owner) {
+            return $this->invalid('Périmètre ou responsable invalide.');
+        }
+        try {
+            $process->update($scope, $owner, (string) ($data['name'] ?? $process->getName()), (string) ($data['criticality'] ?? $process->getCriticality()), (int) ($data['mtpdHours'] ?? $process->getMtpdHours()), (int) ($data['rtoHours'] ?? $process->getRtoHours()), (int) ($data['rpoHours'] ?? $process->getRpoHours()), $this->strings((array) ($data['dependencies'] ?? $process->getDependencies())), (string) ($data['businessImpact'] ?? $process->getBusinessImpact()));
+            $process->setPlans(isset($data['bcpProcedure']) ? (string) $data['bcpProcedure'] : $process->getBcpProcedure(), isset($data['drpProcedure']) ? (string) $data['drpProcedure'] : $process->getDrpProcedure(), array_key_exists('nextExerciseAt', $data) ? (empty($data['nextExerciseAt']) ? null : new \DateTimeImmutable((string) $data['nextExerciseAt'])) : $process->getNextExerciseAt());
+            $this->entityManager->flush();
+        } catch (\InvalidArgumentException $exception) {
+            return $this->invalid($exception->getMessage());
+        }
+
+        return new JsonResponse($this->processResponse($process));
+    }
+
+    #[Route('/continuity-processes/{id<\d+>}', methods: ['DELETE'])]
+    public function deleteProcess(int $id): JsonResponse
+    {
+        $process = $this->processes->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $process || !$this->canManage()) {
+            return null === $process ? $this->notFound() : $this->forbidden();
+        }
+        $this->entityManager->remove($process);
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
     }
 
     #[Route('/continuity-processes/{id<\d+>}/exercises', methods: ['POST'])]

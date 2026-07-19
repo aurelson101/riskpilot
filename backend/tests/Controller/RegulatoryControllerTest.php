@@ -51,6 +51,8 @@ final class RegulatoryControllerTest extends WebTestCase
         $this->client->jsonRequest('POST', '/api/regulatory-records/'.$exception['id'].'/approve');
         self::assertResponseIsSuccessful();
         self::assertSame('APPROVED', $this->payload()['status']);
+        $this->client->request('DELETE', '/api/regulatory-records/'.$exception['id']);
+        self::assertResponseStatusCodeSame(204);
     }
 
     public function testRequiredPrivacyFieldsAreEnforced(): void

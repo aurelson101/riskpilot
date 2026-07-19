@@ -86,7 +86,7 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 7 — incidents et continuité
 
-**État : réalisé.** Le registre d’incidents trace qualification, chronologie, impacts, preuves, notification et retour d’expérience avec liens aux actifs, tiers, risques et actions. Le module BIA contrôle la cohérence MTPD/RTO/RPO et conserve PCA, PRA et exercices d’amélioration.
+**État : réalisé.** Le registre d’incidents trace qualification, chronologie, impacts, preuves, notification et retour d’expérience avec liens aux actifs, tiers, risques et actions. Le module BIA contrôle la cohérence MTPD/RTO/RPO et conserve PCA, PRA et exercices d’amélioration. L’interface permet désormais création, modification, suppression, chronologie, planification et compte rendu d’exercice selon les rôles.
 
 - incidents : qualification, chronologie, impacts, preuves, notifications et retour d’expérience ;
 - processus métier, dépendances et analyse d’impact BIA ;
@@ -96,7 +96,7 @@ Les bibliothèques existantes de référentiels/exigences, mesures, menaces et a
 
 ## Étape 8 — vie privée, obligations et dérogations
 
-**État : réalisé.** Un registre réglementaire typé applique des champs obligatoires propres aux traitements, AIPD, violations, obligations et dérogations. Les exceptions exigent compensation, risque, expiration et approbation indépendante.
+**État : réalisé.** Un registre réglementaire typé applique des champs obligatoires propres aux traitements, AIPD, violations, obligations et dérogations. Les exceptions exigent compensation, risque, expiration et approbation indépendante. L’interface fournit les formulaires adaptés à chaque registre, les filtres, la modification, la suppression et l’approbation réservée aux administrateurs.
 
 - registre des traitements, finalités, données, bases légales, durées et destinataires ;
 - DPIA/AIPD, DPA, transferts, violations et notifications RGPD ;

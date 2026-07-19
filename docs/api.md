@@ -62,6 +62,22 @@ Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralis
 
 Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports contiennent les libellés français et les codes métier bruts afin de rester à la fois lisibles et exploitables. Les graphiques et styles ne faisant pas partie du format CSV, `/reports/executive` fournit le rapport visuel imprimable ou enregistrable en PDF depuis le navigateur.
 
+## Résilience et continuité
+
+- `GET|POST /api/resilience/incidents` et `PUT|DELETE /api/resilience/incidents/{id}` : cycle complet des incidents ;
+- `POST /api/resilience/incidents/{id}/timeline` : événement horodaté et nominatif ;
+- `GET|POST /api/resilience/continuity-processes` et `PUT|DELETE /api/resilience/continuity-processes/{id}` : BIA, objectifs et PCA/PRA ;
+- `POST /api/resilience/continuity-processes/{id}/exercises` : exercice, participants, résultat, écarts et améliorations.
+
+Les relations reçues lors de la qualification d’un incident sont toutes résolues dans le tenant courant. Une clôture exige une date de notification lorsqu’une notification réglementaire est requise, et un BIA refuse un RTO supérieur au MTPD.
+
+## Vie privée et obligations
+
+- `GET|POST /api/regulatory-records` et `PUT|DELETE /api/regulatory-records/{id}` ;
+- `POST /api/regulatory-records/{id}/approve` : approbation indépendante d’une dérogation par un administrateur.
+
+Les schémas obligatoires varient selon le type : traitement RGPD, AIPD, violation de données, obligation ou dérogation. Les dérogations doivent expirer et ne peuvent pas être approuvées par leur responsable.
+
 ## Documents ISMS
 
 - `GET|POST /api/isms-documents` : registre visible et création ;

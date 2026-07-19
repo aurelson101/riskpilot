@@ -64,6 +64,11 @@ final class ResilienceControllerTest extends WebTestCase
         $this->client->jsonRequest('POST', '/api/resilience/continuity-processes/'.$process['id'].'/exercises', ['date' => '2026-11-01', 'scenario' => 'Perte du site A', 'participants' => ['DSI', 'Métiers'], 'result' => 'RTO atteint', 'gaps' => ['Communication'], 'improvements' => ['Annuaire de crise']]);
         self::assertResponseIsSuccessful();
         self::assertCount(1, $this->payload()['exercises']);
+        $this->client->jsonRequest('PUT', '/api/resilience/continuity-processes/'.$process['id'], ['scopeId' => $this->scope->getId(), 'ownerId' => $this->manager->getId(), 'name' => 'Commande client prioritaire', 'criticality' => 'CRITICAL', 'mtpdHours' => 12, 'rtoHours' => 2, 'rpoHours' => 1, 'dependencies' => ['ERP'], 'businessImpact' => 'Arrêt des ventes', 'bcpProcedure' => 'Mode manuel', 'drpProcedure' => 'Bascule cloud', 'nextExerciseAt' => '2027-01-15']);
+        self::assertResponseIsSuccessful();
+        self::assertSame(2, $this->payload()['rtoHours']);
+        $this->client->request('DELETE', '/api/resilience/continuity-processes/'.$process['id']);
+        self::assertResponseStatusCodeSame(204);
     }
 
     /** @return array<mixed> */

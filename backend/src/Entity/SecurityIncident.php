@@ -154,6 +154,18 @@ class SecurityIncident
         return $this->actions;
     }
 
+    public function revise(string $title, string $description, string $severity, User $owner): void
+    {
+        if ('' === trim($title) || '' === trim($description) || !in_array($severity, self::SEVERITIES, true)) {
+            throw new \InvalidArgumentException('Incident invalide.');
+        }
+        $this->title = trim($title);
+        $this->description = trim($description);
+        $this->severity = $severity;
+        $this->owner = $owner;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     /**
      * @param array<string, mixed> $impacts
      * @param list<string>         $evidence

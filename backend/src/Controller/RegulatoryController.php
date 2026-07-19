@@ -83,6 +83,19 @@ use Symfony\Component\Routing\Attribute\Route;
         return new JsonResponse($this->response($record));
     }
 
+    #[Route('/{id<\d+>}', methods: ['DELETE'])]
+    public function delete(int $id): JsonResponse
+    {
+        $record = $this->records->findOneVisibleTo($id, $this->currentUser->get());
+        if (null === $record || !$this->canManage()) {
+            return null === $record ? $this->notFound() : $this->forbidden();
+        }
+        $this->entityManager->remove($record);
+        $this->entityManager->flush();
+
+        return new JsonResponse(null, 204);
+    }
+
     /** @return array<string, mixed> */
     private function response(RegulatoryRecord $item): array
     {
