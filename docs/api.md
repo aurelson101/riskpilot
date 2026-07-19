@@ -16,3 +16,12 @@ Le point `GET /api/health` permet de vérifier le service sans authentification.
 - `GET|POST /api/organizations` et `GET|PUT /api/organizations/{id}`.
 
 Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié au niveau du repository. Une ressource d’une autre organisation est renvoyée comme inexistante.
+
+## Inventaire et contexte de risque
+
+- `GET|POST /api/scopes` et `GET|PUT /api/scopes/{id}` ;
+- `GET|POST /api/assets` et `GET|PUT /api/assets/{id}` ;
+- `GET|POST /api/threats` et `GET|PUT /api/threats/{id}` ;
+- `GET|POST /api/vulnerabilities` et `GET|PUT /api/vulnerabilities/{id}`.
+
+La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le rôle Risk Manager ou un rôle supérieur. Les relations vers un parent, un responsable, un périmètre ou un actif sont résolues exclusivement dans l’organisation courante.

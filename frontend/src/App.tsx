@@ -1,5 +1,9 @@
 import {
   AdminPanelSettingsOutlined,
+  AccountTreeOutlined,
+  Inventory2Outlined,
+  BugReportOutlined,
+  GppMaybeOutlined,
   DashboardOutlined,
   Logout,
   ShieldOutlined,
@@ -30,6 +34,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "./auth/useAuth";
 import { LoginPage } from "./pages/LoginPage";
+import { InventoryPage } from "./pages/InventoryPage";
 import { UsersPage } from "./pages/UsersPage";
 
 const drawerWidth = 250;
@@ -111,6 +116,42 @@ function Layout() {
             </ListItemIcon>
             <ListItemText primary="Tableau de bord" />
           </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/scopes"}
+            onClick={() => navigate("/scopes")}
+          >
+            <ListItemIcon>
+              <AccountTreeOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Périmètres" />
+          </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/assets"}
+            onClick={() => navigate("/assets")}
+          >
+            <ListItemIcon>
+              <Inventory2Outlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Actifs" />
+          </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/threats"}
+            onClick={() => navigate("/threats")}
+          >
+            <ListItemIcon>
+              <GppMaybeOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Menaces" />
+          </ListItemButton>
+          <ListItemButton
+            selected={location.pathname === "/vulnerabilities"}
+            onClick={() => navigate("/vulnerabilities")}
+          >
+            <ListItemIcon>
+              <BugReportOutlined sx={{ color: "inherit" }} />
+            </ListItemIcon>
+            <ListItemText primary="Vulnérabilités" />
+          </ListItemButton>
           {isAdmin && (
             <ListItemButton
               selected={location.pathname === "/administration/users"}
@@ -164,6 +205,13 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="scopes" element={<InventoryPage kind="scopes" />} />
+          <Route path="assets" element={<InventoryPage kind="assets" />} />
+          <Route path="threats" element={<InventoryPage kind="threats" />} />
+          <Route
+            path="vulnerabilities"
+            element={<InventoryPage kind="vulnerabilities" />}
+          />
           <Route path="administration/users" element={<UsersPage />} />
         </Route>
       </Route>

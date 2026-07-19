@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Api;
 
+use App\Entity\Asset;
 use App\Entity\Organization;
+use App\Entity\Scope;
+use App\Entity\Threat;
 use App\Entity\User;
+use App\Entity\Vulnerability;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
@@ -53,5 +57,35 @@ final class ApiResponseFactory
             'updatedAt' => $user->getUpdatedAt()->format(DATE_ATOM),
             'lastLoginAt' => $user->getLastLoginAt()?->format(DATE_ATOM),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function scope(Scope $scope): array
+    {
+        return ['id' => $scope->getId(), 'name' => $scope->getName(), 'description' => $scope->getDescription(), 'type' => $scope->getType(), 'parentScopeId' => $scope->getParentScope()?->getId(), 'owner' => null === $scope->getOwner() ? null : $this->userSummary($scope->getOwner()), 'status' => $scope->getStatus()];
+    }
+
+    /** @return array<string, mixed> */
+    public function asset(Asset $asset): array
+    {
+        return ['id' => $asset->getId(), 'name' => $asset->getName(), 'description' => $asset->getDescription(), 'type' => $asset->getType(), 'criticality' => $asset->getCriticality(), 'confidentiality' => $asset->getConfidentiality(), 'integrity' => $asset->getIntegrity(), 'availability' => $asset->getAvailability(), 'owner' => null === $asset->getOwner() ? null : $this->userSummary($asset->getOwner()), 'scope' => ['id' => $asset->getScope()->getId(), 'name' => $asset->getScope()->getName()], 'relatedAssets' => array_map(fn (Asset $related): array => ['id' => $related->getId(), 'name' => $related->getName()], $asset->getRelatedAssets()->toArray()), 'status' => $asset->getStatus(), 'createdAt' => $asset->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $asset->getUpdatedAt()->format(DATE_ATOM)];
+    }
+
+    /** @return array<string, mixed> */
+    public function threat(Threat $threat): array
+    {
+        return ['id' => $threat->getId(), 'name' => $threat->getName(), 'description' => $threat->getDescription(), 'category' => $threat->getCategory(), 'source' => $threat->getSource(), 'status' => $threat->getStatus()];
+    }
+
+    /** @return array<string, mixed> */
+    public function vulnerability(Vulnerability $vulnerability): array
+    {
+        return ['id' => $vulnerability->getId(), 'name' => $vulnerability->getName(), 'description' => $vulnerability->getDescription(), 'category' => $vulnerability->getCategory(), 'severity' => $vulnerability->getSeverity(), 'affectedAssets' => array_map(fn (Asset $asset): array => ['id' => $asset->getId(), 'name' => $asset->getName()], $vulnerability->getAffectedAssets()->toArray()), 'status' => $vulnerability->getStatus()];
+    }
+
+    /** @return array{id: int|null, email: string, firstName: string, lastName: string} */
+    private function userSummary(User $user): array
+    {
+        return ['id' => $user->getId(), 'email' => $user->getEmail(), 'firstName' => $user->getFirstName(), 'lastName' => $user->getLastName()];
     }
 }

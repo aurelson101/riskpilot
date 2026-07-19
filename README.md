@@ -42,6 +42,8 @@ docker compose exec backend php bin/console app:user:create-admin \
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes. `GET /api/me` retourne le profil courant. Les administrateurs gèrent les utilisateurs de leur propre organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
 
+Les écrans `/scopes`, `/assets`, `/threats` et `/vulnerabilities` donnent accès à l’inventaire de l’organisation. Les API associées permettent la création et la modification aux Risk Managers et administrateurs, avec contrôle systématique des relations entre tenants.
+
 Le compte de développement `admin@riskpilot.local` / `ChangeMe123!` n’est créé que dans la base locale utilisée pendant le développement. Les fixtures reproductibles seront ajoutées à l’étape 7.
 
 ## Tests
@@ -56,6 +58,6 @@ curl http://localhost:8080/api/health
 
 ## Limitations connues
 
-Les étapes 1 et 2 fournissent l’environnement, l’authentification JWT, les organisations, les utilisateurs, le RBAC et l’isolation multi-tenant. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les notifications et les données de démonstration.
+Les étapes 1 à 3 fournissent l’environnement, l’authentification, l’isolation multi-tenant et les catalogues de contexte du risque. Les formulaires avancés, la pagination et les relations graphiques entre actifs seront enrichis avec les modules de risque. Les refresh tokens, la réinitialisation par email et les fixtures reproductibles seront intégrés avec les notifications et les données de démonstration.
 
 Licence : AGPL-3.0-or-later.
