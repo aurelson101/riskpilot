@@ -27,7 +27,12 @@ type LoginForm = z.infer<typeof schema>;
 export function LoginPage() {
   const { token, login } = useAuth();
   const navigate = useNavigate();
-  const isDemo = import.meta.env.VITE_DEMO_MODE === "true";
+  // The build flag keeps local demo images explicit, while the hostname
+  // fallback prevents a stale/cached production build from hiding the public
+  // demo credentials on the dedicated demo instance.
+  const isDemo =
+    import.meta.env.VITE_DEMO_MODE === "true" ||
+    window.location.hostname === "demo.aurelson.com";
   const [error, setError] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
   const {
