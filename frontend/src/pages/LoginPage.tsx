@@ -27,6 +27,7 @@ type LoginForm = z.infer<typeof schema>;
 export function LoginPage() {
   const { token, login } = useAuth();
   const navigate = useNavigate();
+  const isDemo = import.meta.env.VITE_DEMO_MODE === "true";
   const [error, setError] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
   const {
@@ -74,69 +75,88 @@ export function LoginPage() {
         p: 2,
       }}
     >
-      <Card sx={{ width: "100%", maxWidth: 440, borderRadius: 3 }}>
-        <CardContent sx={{ p: 5 }}>
-          <Stack direction="row" spacing={1.5} alignItems="center" mb={4}>
-            <ShieldOutlined sx={{ fontSize: 46, color: "#1769e0" }} />
-            <Box>
-              <Typography variant="h4" component="h1" fontWeight={750}>
-                RiskPilot
-              </Typography>
-              <Typography color="text.secondary">
-                Connexion à votre espace GRC
-              </Typography>
-            </Box>
-          </Stack>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <Stack
-            component="form"
-            spacing={2.5}
-            onSubmit={handleSubmit(onSubmit)}
-            noValidate
-          >
-            <TextField
-              label="Adresse email"
-              type="email"
-              autoComplete="email"
-              error={Boolean(errors.email)}
-              helperText={errors.email?.message}
-              {...register("email")}
-            />
-            <TextField
-              label="Mot de passe"
-              type="password"
-              autoComplete="current-password"
-              error={Boolean(errors.password)}
-              helperText={errors.password?.message}
-              {...register("password")}
-            />
-            {mfaRequired && (
-              <TextField
-                label="Code MFA ou code de secours"
-                autoComplete="one-time-code"
-                autoFocus
-                helperText="Saisissez le code à 6 chiffres de votre application d’authentification."
-                {...register("mfaCode")}
-              />
+      <Stack spacing={2} sx={{ width: "100%", maxWidth: 440 }}>
+        <Card sx={{ width: "100%", borderRadius: 3 }}>
+          <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" mb={4}>
+              <ShieldOutlined sx={{ fontSize: 46, color: "#1769e0" }} />
+              <Box>
+                <Typography variant="h4" component="h1" fontWeight={750}>
+                  RiskPilot
+                </Typography>
+                <Typography color="text.secondary">
+                  Connexion à votre espace GRC
+                </Typography>
+              </Box>
+            </Stack>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
             )}
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={isSubmitting}
+            <Stack
+              component="form"
+              spacing={2.5}
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
             >
-              {isSubmitting ? "Connexion…" : "Se connecter"}
-            </Button>
-            <Button type="button" onClick={() => navigate("/reset-password")}>
-              Mot de passe oublié ?
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+              <TextField
+                label="Adresse email"
+                type="email"
+                autoComplete="email"
+                error={Boolean(errors.email)}
+                helperText={errors.email?.message}
+                {...register("email")}
+              />
+              <TextField
+                label="Mot de passe"
+                type="password"
+                autoComplete="current-password"
+                error={Boolean(errors.password)}
+                helperText={errors.password?.message}
+                {...register("password")}
+              />
+              {mfaRequired && (
+                <TextField
+                  label="Code MFA ou code de secours"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  helperText="Saisissez le code à 6 chiffres de votre application d’authentification."
+                  {...register("mfaCode")}
+                />
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Connexion…" : "Se connecter"}
+              </Button>
+              <Button type="button" onClick={() => navigate("/reset-password")}>
+                Mot de passe oublié ?
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+        {isDemo && (
+          <Alert severity="info" variant="outlined">
+            <Typography fontWeight={700} gutterBottom>
+              Accès à la démonstration
+            </Typography>
+            <Typography variant="body2">
+              Email : <strong>admin@riskpilot.local</strong>
+            </Typography>
+            <Typography variant="body2">
+              Mot de passe : <strong>ChangeMe123!</strong>
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Les données de démonstration sont réinitialisées toutes les deux
+              heures.
+            </Typography>
+          </Alert>
+        )}
+      </Stack>
     </Box>
   );
 }

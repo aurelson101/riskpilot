@@ -13,6 +13,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install || (sleep 2 && npm install)
 COPY . .
+ARG VITE_DEMO_MODE=false
+ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 RUN npm run build
 
 FROM nginx:1.27-alpine AS production
