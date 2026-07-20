@@ -15,7 +15,11 @@ docker compose -f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.
 deploy/demo/reset-demo.sh
 ```
 
-Identifiants rechargés à chaque reset : `admin@riskpilot.local` / `ChangeMe123!`.
+Identifiants rechargés à chaque reset, avec le mot de passe commun `ChangeMe123!` :
+
+- `admin@riskpilot.local` (super administrateur) ;
+- `risk.manager@riskpilot.local` (gestionnaire des risques) ;
+- `action.owner@riskpilot.local` (responsable d'action).
 
 ## VPS 1 vCPU / 1 Gio
 

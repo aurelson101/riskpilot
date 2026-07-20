@@ -145,10 +145,17 @@ export function LoginPage() {
               Accès à la démonstration
             </Typography>
             <Typography variant="body2">
-              Email : <strong>admin@riskpilot.local</strong>
+              Administrateur : <strong>admin@riskpilot.local</strong>
             </Typography>
             <Typography variant="body2">
-              Mot de passe : <strong>ChangeMe123!</strong>
+              Risk manager : <strong>risk.manager@riskpilot.local</strong>
+            </Typography>
+            <Typography variant="body2">
+              Responsable d’action :{" "}
+              <strong>action.owner@riskpilot.local</strong>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Mot de passe commun : <strong>ChangeMe123!</strong>
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Les données de démonstration sont réinitialisées toutes les deux
