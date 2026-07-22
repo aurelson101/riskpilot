@@ -1,131 +1,94 @@
-# Roadmap d’exécution RiskPilot
+# Roadmap RiskPilot
 
-Cette roadmap remplace les versions précédentes. Elle ordonne les travaux nécessaires pour faire évoluer RiskPilot d’un socle GRC opérationnel vers une plateforme Cyber GRC industrialisée. Le MFA TOTP individuel reste disponible, mais **l’obligation MFA par rôle ou organisation est volontairement exclue du périmètre**.
+Cette roadmap unique remplace toutes les roadmaps précédentes. Elle décrit uniquement les évolutions restant à réaliser. L’ordre tient compte des dépendances de données : la taxonomie des actifs est stabilisée avant d’enrichir les traitements, puis les non-conformités sont reliées au plan d’action avant d’ouvrir l’alimentation automatisée des indicateurs.
 
-La cible a été confrontée aux capacités publiques d’EGERIE : modélisation bottom-up/top-down, bibliothèques d’objets liés, analyses multi-méthodes, formulaires collaboratifs, Vision 360°, traitements priorisés par coût/charge/réduction, quantification financière et reporting direction. RiskPilot conserve sa propre architecture, son modèle de sécurité multi-tenant et son identité fonctionnelle.
+## Règles communes de livraison
 
-## Socle déjà livré
+Chaque étape comprend : migration réversible et reprise des données existantes, isolation stricte par organisation, RBAC, journal d’audit, validations côté serveur, interface responsive, exports, tests automatisés backend/frontend, documentation API, analyse statique, contrôle du code mort, rebuild Docker et smoke tests.
 
-- organisations, utilisateurs, rôles, JWT et MFA TOTP facultatif ;
-- périmètres, actifs, menaces, vulnérabilités et mesures ;
-- risques brut, actuel et résiduel, matrice et plans d’action ;
-- tableaux, Kanban, calendrier et abonnement iCalendar privé ;
-- référentiels, exigences, évaluations et scores de conformité ;
-- documents ISMS Markdown/Word, versions, approbation, ACL et partages ;
-- tableaux de bord, exports CSV, rapport exécutif et journal d’audit ;
-- SMTP et envoi OAuth 2.0 Google Workspace/Microsoft 365.
+## Étape 1 — séparer les familles d’actifs
 
-## Règle de livraison
+Créer trois entrées distinctes dans le menu **Actifs** :
 
-Chaque étape doit inclure : migrations réversibles, isolation par organisation, RBAC, audit, notifications utiles, validations serveur, interface responsive, tests automatisés, analyse statique, contrôle du code mort, rebuild Docker, smoke tests et publication sur `main`.
+- **Actifs Matériel** : serveurs, postes de travail, équipements réseau, équipements mobiles, supports et autres matériels ;
+- **Actifs Logiciel** : applications, systèmes, services cloud, composants, licences et autres logiciels ;
+- **Actifs Informationnel** : données, documents, bases, flux d’information, archives et autres informations.
 
-## Étape 1 — identité, sessions et récupération
+Le modèle conserve un registre d’actifs commun afin de préserver les relations existantes avec risques, incidents, continuité et dépendances. Une propriété de famille explicite (`HARDWARE`, `SOFTWARE`, `INFORMATION`) remplace toute déduction fragile faite depuis le libellé. Les types deviennent configurables par organisation au sein de chaque famille.
 
-**État : réalisé.** Les codes de secours MFA à usage unique assurent la récupération du second facteur sans politique MFA obligatoire.
+Livrables et critères d’acceptation :
 
-- refresh tokens rotatifs stockés sous forme d’empreinte ;
-- registre des sessions/appareils, révocation unitaire et déconnexion globale ;
-- déconnexion serveur et invalidation lors d’une désactivation de compte ;
-- mot de passe oublié avec jeton à usage unique, expiration et email ;
-- verrouillage progressif et audit des événements d’authentification ;
-- récupération MFA encadrée, sans rendre le MFA obligatoire.
+1. migrer et classer les actifs existants sans perte, avec rapport des types ambigus à corriger ;
+2. afficher les trois sous-menus, compteurs, listes, filtres et formulaires spécialisés ;
+3. permettre création, modification, import/export et archivage dans chaque famille selon les droits ;
+4. conserver une recherche transversale et les relations entre actifs de familles différentes ;
+5. adapter tableaux de bord, API, fixtures et documentation sans dupliquer les actifs.
 
-## Étape 2 — sécurité opérationnelle et preuves
+## Étape 2 — personnaliser et enrichir le plan d’action
 
-**État : réalisé.** Sauvegardes réellement vérifiées, stockage local ou S3/MinIO, antivirus facultatif sans imposer le MFA, versions binaires, observabilité et audit probant sont opérationnels.
+Étendre le plan d’action avec des colonnes configurables et des champs GRC structurés :
 
-- sauvegarde automatisée PostgreSQL et objets, rétention, chiffrement et tests de restauration RPO/RTO ;
-- stockage S3/MinIO, antivirus, quotas, contrôle MIME/signature et versions binaires ;
-- observabilité : logs JSON corrélés, métriques, erreurs, alertes et workers ;
-- audit probant : diff avant/après, export signé, chaînage d’empreintes et stockage append-only/WORM ;
-- gestion et rotation des secrets, durcissement CSP et scans des images.
+- numéro du ticket de suivi et URL du ticket ;
+- origine de l’action : audit, analyse de risques, non-conformité, incident, contrôle, revue de direction, demande réglementaire ou autre ;
+- type de l’action : technique, organisationnelle, humaine, physique, contractuelle ou autre ;
+- liens vers un ou plusieurs référentiels et, si nécessaire, leurs exigences ;
+- colonnes personnalisées définies par l’administrateur : texte, nombre, date, booléen, liste ou URL, avec ordre, visibilité et caractère obligatoire ;
+- affichage et filtrage de ces champs dans la liste, le Kanban, le calendrier et les exports.
 
-## Étape 3 — gouvernance et analyse des risques
+Le risque lié, actuellement obligatoire, devient facultatif. Une action doit toutefois posséder au moins une source métier valide : risque, non-conformité, audit, incident, exigence, contrôle ou origine documentée.
 
-**État : réalisé.** Les politiques d’appétence/tolérance/capacité, méthodes ISO 27005/EBIOS RM, acceptations formelles expirables, campagnes déléguées, consolidation du portefeuille et priorisation coût/charge/réduction sont opérationnelles.
+Livrables et critères d’acceptation :
 
-- appétence, capacité et tolérance par organisation, domaine et famille ;
-- acceptation formelle : décideur, justification, autorité, preuve et expiration ;
-- campagnes de revue, délégation, relances et comparaison historique ;
-- familles de risques stratégiques et consolidation bottom-up/top-down ;
-- méthodes configurables ISO 27005, EBIOS RM et analyse simplifiée ;
-- recommandations de traitement selon score, coût, charge et réduction attendue.
+1. valider les URL de ticket et empêcher les références vers une autre organisation ;
+2. proposer des valeurs d’origine et de type administrables sans casser les valeurs historiques ;
+3. gérer les relations multinormes sans dupliquer les référentiels ni les exigences ;
+4. permettre à chaque utilisateur de choisir les colonnes visibles, tout en réservant leur définition aux administrateurs ;
+5. inclure les nouveaux champs dans l’API, les recherches, les exports CSV et le rapport d’avancement.
 
-## Étape 4 — SoA, contrôles et conformité continue
+## Étape 3 — relier les actions aux non-conformités
 
-**État : réalisé.** La SoA ISO 27001 dispose désormais d’un cycle versionné et approuvé, les contrôles ont des tests probants et planifiés, et les correspondances multinormes réutilisent les preuves avec leur taux de couverture et leur provenance.
+Unifier le suivi correctif en reliant explicitement un plan d’action à une ou plusieurs non-conformités issues :
 
-- déclaration d’applicabilité ISO 27001 versionnée et exportable ;
-- liens exigences ↔ mesures ↔ risques ↔ actions ↔ preuves ;
-- tests de conception et d’efficacité opérationnelle des contrôles ;
-- propriétaire, fréquence, échantillon, résultat, preuve et prochaine revue ;
-- bibliothèques réutilisables d’exigences, mesures, menaces et actifs ;
-- conformité multinorme avec héritage et réutilisation des preuves.
+- des constats d’audit internes ou externes ;
+- des résultats d’évaluation de conformité ;
+- des contrôles ou tests d’efficacité en échec ;
+- des écarts réglementaires enregistrés.
 
-Les bibliothèques existantes de référentiels/exigences, mesures, menaces et actifs sont réutilisables dans les périmètres autorisés. Les relations et l’héritage n’effectuent jamais de copie opaque : la source, l’évaluation et le pourcentage de couverture restent exposés.
+La relation est bidirectionnelle : une non-conformité présente ses actions, responsables, échéances, preuves et avancement ; une action présente toutes les non-conformités qu’elle traite. La CAPA reste le workflow de la non-conformité, tandis que le plan d’action porte l’exécution opérationnelle.
 
-## Étape 5 — audits, non-conformités et CAPA
+Livrables et critères d’acceptation :
 
-**État : réalisé.** RiskPilot distingue maintenant le journal technique du programme d’assurance : plans annuels, missions avec déclaration d’indépendance, équipes, constats classifiés et CAPA soumises à une validation d’efficacité indépendante.
+1. créer une action depuis une non-conformité en préremplissant origine, responsable, échéance et contexte ;
+2. autoriser plusieurs actions par non-conformité et une action mutualisée entre plusieurs écarts ;
+3. interdire la clôture d’une non-conformité tant que ses actions obligatoires ne sont pas terminées et que l’efficacité n’est pas validée indépendamment ;
+4. synchroniser l’avancement sans clôture automatique irréversible et conserver l’historique des décisions ;
+5. afficher les liens dans conformité, audits, plans d’action, tableaux de bord et exports.
 
-- programme annuel, missions, périmètre, équipe et indépendance ;
-- constats, observations et non-conformités majeures/mineures ;
-- analyse de cause, correction, action corrective/préventive et validation d’efficacité ;
-- dossiers de preuve, rapport final, suivi des échéances et escalades ;
-- plan d’audit et tableaux de bord de couverture.
+## Étape 4 — API de saisie des valeurs d’indicateurs
 
-## Étape 6 — tiers et collaboration
+Le type `INDICATOR` existe déjà dans la gouvernance exécutive, avec une valeur courante, une cible, des seuils et une période. Il manque un modèle de séries temporelles et une API dédiée pour enregistrer des mesures successives sans écraser l’historique.
 
-**État : réalisé.** Le registre tiers couvre criticité, services, données, dépendances, contrat/SLA, réévaluation et sortie. Les questionnaires sont versionnés, expirables, accessibles par un portail public à jeton opaque, revus en interne et consolidés en cyberscore.
+Créer une API versionnée pour :
 
-- registre des tiers, services, données, criticité, dépendances, contrats, SLA et plans de sortie ;
-- questionnaires/formulaires versionnés, campagnes, relances et pièces justificatives ;
-- préqualification, cyberscore, attestations, certifications et réévaluations ;
-- risques tiers, mesures compensatoires et traitements ;
-- portail externe à accès limité et consolidation multi-fournisseurs.
+- définir un indicateur KPI ou KRI, son unité, sa fréquence, sa formule, sa source, sa cible et ses seuils ;
+- enregistrer une valeur horodatée avec période, commentaire, preuve, source et clé d’idempotence ;
+- saisir une valeur manuellement ou via une clé de service limitée à des indicateurs autorisés ;
+- importer des valeurs par lot et retourner les erreurs ligne par ligne ;
+- consulter l’historique, la tendance, le respect des seuils et les valeurs agrégées ;
+- corriger une mesure par version/audit, sans effacement silencieux de l’historique ;
+- déclencher les alertes et notifications lors d’un franchissement de seuil.
 
-## Étape 7 — incidents et continuité
+Livrables et critères d’acceptation :
 
-**État : réalisé.** Le registre d’incidents trace qualification, chronologie, impacts, preuves, notification et retour d’expérience avec liens aux actifs, tiers, risques et actions. Le module BIA contrôle la cohérence MTPD/RTO/RPO et conserve PCA, PRA et exercices d’amélioration. L’interface permet désormais création, modification, suppression, chronologie, planification et compte rendu d’exercice selon les rôles.
+1. endpoints sous `/api/v1/indicators` et `/api/v1/indicators/{id}/values`, documentés avec exemples ;
+2. idempotence, pagination, filtres temporels, fuseaux horaires, unités et précision décimale maîtrisés ;
+3. portées de clés de service séparant lecture, saisie et administration ;
+4. tableaux et graphiques accessibles avec export CSV des séries ;
+5. tests de concurrence, doublons, valeurs tardives, franchissements de seuil et isolation tenant.
 
-- incidents : qualification, chronologie, impacts, preuves, notifications et retour d’expérience ;
-- processus métier, dépendances et analyse d’impact BIA ;
-- MTPD, RTO, RPO, PCA, PRA et procédures de crise ;
-- scénarios d’exercice, participants, résultats, écarts et amélioration ;
-- liens incidents ↔ actifs ↔ tiers ↔ risques ↔ actions.
+## Ordre d’exécution
 
-## Étape 8 — vie privée, obligations et dérogations
-
-**État : réalisé.** Un registre réglementaire typé applique des champs obligatoires propres aux traitements, AIPD, violations, obligations et dérogations. Les exceptions exigent compensation, risque, expiration et approbation indépendante. L’interface fournit les formulaires adaptés à chaque registre, les filtres, la modification, la suppression et l’approbation réservée aux administrateurs.
-
-- registre des traitements, finalités, données, bases légales, durées et destinataires ;
-- DPIA/AIPD, DPA, transferts, violations et notifications RGPD ;
-- registre des obligations légales, réglementaires et contractuelles ;
-- veille, responsables, échéances, preuves et conformité NIS2/DORA/RGPD ;
-- dérogations/exceptions : justification, risque, compensation, approbation et expiration.
-
-## Étape 9 — pilotage direction et quantification
-
-**État : réalisé.** Objectifs, KPI/KRI, revues de direction, fourchettes de pertes et dossiers d’investissement sont structurés et validés. La Vision 360° agrège en temps réel risques, contrôles, conformité, tiers, actions et scénarios financiers.
-
-- objectifs SMSI, indicateurs KPI/KRI, seuils, tendances et alertes ;
-- revues de direction, décisions, participants, entrées, sorties et suivi ;
-- quantification financière : fréquence, pertes, fourchettes et simulations ;
-- coût/charge/ROI des traitements et scénarios d’investissement ;
-- Vision 360° filtrable risques, contrôles, conformité, tiers et plans ;
-- rapports direction configurables et consolidation multi-entités.
-
-## Étape 10 — écosystème et industrialisation
-
-- SSO OIDC/SAML Google/Microsoft et fédération d’identité ;
-- SCIM, groupes et rôles automatiques ;
-- API versionnée, clés de service limitées, webhooks signés et intégrations SIEM/ticketing ;
-- pagination, recherche serveur, indexation et objectifs de performance ;
-- tests E2E, IDOR, fuzz, ZAP, charge, accessibilité WCAG 2.2 AA et i18n ;
-- CI/CD, migrations à blanc, SBOM, signature d’images et déploiement progressif.
-
-**Réalisé :** catalogue administrable OIDC/SAML (Google Workspace, Microsoft Entra et fournisseur générique), mappings groupes/rôles, préparation SCIM avec validation à blanc, API `/api/v1`, clés de service à portées dont le secret n’est affiché qu’une fois et webhooks HTTPS signés. La CI reconstruit les images, valide les migrations à blanc, exécute tests/analyse statique/lint, produit un SBOM et analyse dépôt et conteneurs. La signature d’images et le déploiement progressif restent des contrôles d’exploitation à brancher sur le registre et l’orchestrateur de la cible.
-
-## Critères de sortie
-
-Une version destinée à une production critique exige : aucune vulnérabilité critique/haute connue, restauration testée, migrations validées avec retour arrière, matrice RBAC/tenant automatisée, preuves et secrets protégés, audit probant, supervision active et documentation d’exploitation approuvée.
+1. Actifs Matériel, Logiciel et Informationnel.
+2. Champs GRC et colonnes personnalisées du plan d’action.
+3. Plans d’action liés aux non-conformités.
+4. API et historique des valeurs d’indicateurs.

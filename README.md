@@ -110,7 +110,7 @@ Un gestionnaire peut créer un lien externe révocable et expirable. Les documen
 
 Les ACL nominatives appliquent strictement `READ`, `EDIT` et `MANAGE`. Seuls les comptes actifs de l’organisation peuvent être propriétaires ou recevoir une ACL. Un partage public n’est possible que sur une version approuvée ; toute modification révoque définitivement les liens existants afin qu’une approbation ultérieure ne les réactive pas.
 
-Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo, protégés contre les archives décompressées excessives et conservés dans un volume Docker privé. Chaque changement crée une version et enregistre l’empreinte SHA-256 de la pièce jointe. Le stockage chiffré S3/MinIO et l’antivirus restent planifiés dans la [roadmap documentaire](docs/isms-documents-roadmap.md).
+Un document peut contenir du Markdown, un fichier Word `.doc`/`.docx`, ou les deux. Les fichiers Word sont contrôlés côté serveur, limités à 10 Mo, protégés contre les archives décompressées excessives et conservés dans un volume Docker privé. Chaque changement crée une version et enregistre l’empreinte SHA-256 de la pièce jointe. Le stockage chiffré S3/MinIO et l’antivirus facultatif sont pris en charge par la configuration documentaire.
 
 ## Tableau de bord, exports et démonstration
 
@@ -166,6 +166,6 @@ Le fichier autonome [nginx.conf.example](nginx.conf.example) redirige HTTP vers 
 
 ## Limitations connues
 
-Les sessions JWT sont révocables et renouvelées par rotation, et la récupération de compte invalide les sessions existantes. Le journal d’audit est append-only, chaîné par empreintes, corrélé par requête et exportable avec signature HMAC. Les versions documentaires conservent leurs binaires ; contrôles MIME/signature, quota et antivirus ClamAV optionnel protègent les dépôts. Les sauvegardes PostgreSQL, Redis et fichiers sont décrites dans le [guide de sauvegarde et restauration](docs/backup-restore.md). La [roadmap](docs/roadmap.md) détaille les étapes GRC suivantes : acceptation des risques, SoA, tiers, incidents, continuité et programme d’audit.
+Les sessions JWT sont révocables et renouvelées par rotation, et la récupération de compte invalide les sessions existantes. Le journal d’audit est append-only, chaîné par empreintes, corrélé par requête et exportable avec signature HMAC. Les versions documentaires conservent leurs binaires ; contrôles MIME/signature, quota et antivirus ClamAV optionnel protègent les dépôts. Les sauvegardes PostgreSQL, Redis et fichiers sont décrites dans le [guide de sauvegarde et restauration](docs/backup-restore.md). La [roadmap unique](docs/roadmap.md) détaille les prochaines évolutions des actifs, plans d’action, non-conformités et indicateurs.
 
 Licence : AGPL-3.0-or-later.
