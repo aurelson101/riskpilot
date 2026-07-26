@@ -1,4 +1,4 @@
-# Démonstration `demo.aurelson.com`
+# Démonstration `demo.riskpilot.site`
 
 Cette superposition démarre une instance isolée sous le nom Docker `riskpilot_demo`, accessible localement sur `127.0.0.1:18081`. Les données PostgreSQL, Redis, JWT et documentaires ne sont jamais partagées avec une autre installation RiskPilot.
 
@@ -8,7 +8,7 @@ Depuis la racine du dépôt :
 
 ```bash
 cp .env.example .env
-# Remplacer tous les secrets et définir APP_URL=https://demo.aurelson.com
+# Remplacer tous les secrets et définir APP_URL=https://demo.riskpilot.site
 docker compose -f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.yaml build
 docker compose -f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.yaml run --rm backend php bin/console doctrine:migrations:migrate --no-interaction
 docker compose -f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.yaml up -d
@@ -43,4 +43,4 @@ Le service `demo-reset-scheduler` attend deux heures, puis recharge les fixtures
 
 ## HTTPS
 
-Docker reste exclusivement en HTTP et n’écoute que sur la boucle locale. Installer `deploy/demo/nginx.demo.conf` sur le reverse proxy hôte, obtenir le certificat Let's Encrypt de `demo.aurelson.com`, puis vérifier la configuration avec `nginx -t` avant rechargement.
+Docker reste exclusivement en HTTP et n’écoute que sur la boucle locale. Installer `deploy/demo/nginx.demo.conf` sur le reverse proxy hôte, obtenir le certificat Let's Encrypt de `demo.riskpilot.site`, puis vérifier la configuration avec `nginx -t` avant rechargement.

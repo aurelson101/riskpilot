@@ -32,7 +32,7 @@ export function LoginPage() {
   // demo credentials on the dedicated demo instance.
   const isDemo =
     import.meta.env.VITE_DEMO_MODE === "true" ||
-    window.location.hostname === "demo.aurelson.com";
+    window.location.hostname === "demo.riskpilot.site";
   const [error, setError] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
   const {
