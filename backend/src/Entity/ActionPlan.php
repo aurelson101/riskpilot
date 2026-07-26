@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Repository\ActionPlanRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use App\Repository\ActionPlanRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ActionPlanRepository::class)]
@@ -285,22 +285,62 @@ class ActionPlan
         return $this;
     }
 
-    public function getTicketNumber(): ?string { return $this->ticketNumber; }
-    public function getTicketUrl(): ?string { return $this->ticketUrl; }
-    public function getOrigin(): string { return $this->origin; }
-    public function getActionType(): string { return $this->actionType; }
-    /** @return list<int> */ public function getFrameworkIds(): array { return $this->frameworkIds; }
-    /** @return list<int> */ public function getRequirementIds(): array { return $this->requirementIds; }
-    /** @return array<string, scalar|null> */ public function getCustomFields(): array { return $this->customFields; }
-    /** @return Collection<int, AuditFinding> */ public function getAuditFindings(): Collection { return $this->auditFindings; }
-    /** @return Collection<int, ComplianceResult> */ public function getComplianceResults(): Collection { return $this->complianceResults; }
+    public function getTicketNumber(): ?string
+    {
+        return $this->ticketNumber;
+    }
+
+    public function getTicketUrl(): ?string
+    {
+        return $this->ticketUrl;
+    }
+
+    public function getOrigin(): string
+    {
+        return $this->origin;
+    }
+
+    public function getActionType(): string
+    {
+        return $this->actionType;
+    }
+
+    /** @return list<int> */
+    public function getFrameworkIds(): array
+    {
+        return $this->frameworkIds;
+    }
+
+    /** @return list<int> */
+    public function getRequirementIds(): array
+    {
+        return $this->requirementIds;
+    }
+
+    /** @return array<string, scalar|null> */
+    public function getCustomFields(): array
+    {
+        return $this->customFields;
+    }
+
+    /** @return Collection<int, AuditFinding> */
+    public function getAuditFindings(): Collection
+    {
+        return $this->auditFindings;
+    }
+
+    /** @return Collection<int, ComplianceResult> */
+    public function getComplianceResults(): Collection
+    {
+        return $this->complianceResults;
+    }
 
     /**
-     * @param list<int>                            $frameworkIds
-     * @param list<int>                            $requirementIds
-     * @param array<string, scalar|null>            $customFields
-     * @param list<AuditFinding>                    $auditFindings
-     * @param list<ComplianceResult>                $complianceResults
+     * @param list<int>                  $frameworkIds
+     * @param list<int>                  $requirementIds
+     * @param array<string, scalar|null> $customFields
+     * @param list<AuditFinding>         $auditFindings
+     * @param list<ComplianceResult>     $complianceResults
      */
     public function configureGrc(?string $ticketNumber, ?string $ticketUrl, string $origin, string $actionType, array $frameworkIds, array $requirementIds, array $customFields, array $auditFindings, array $complianceResults): self
     {
@@ -312,9 +352,13 @@ class ActionPlan
         $this->requirementIds = $requirementIds;
         $this->customFields = $customFields;
         $this->auditFindings->clear();
-        foreach ($auditFindings as $finding) $this->auditFindings->add($finding);
+        foreach ($auditFindings as $finding) {
+            $this->auditFindings->add($finding);
+        }
         $this->complianceResults->clear();
-        foreach ($complianceResults as $result) $this->complianceResults->add($result);
+        foreach ($complianceResults as $result) {
+            $this->complianceResults->add($result);
+        }
 
         return $this;
     }

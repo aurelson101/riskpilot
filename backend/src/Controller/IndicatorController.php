@@ -20,7 +20,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/v1/indicators')]
 final readonly class IndicatorController
 {
-    public function __construct(private IndicatorRepository $indicators, private IndicatorValueRepository $values, private CurrentUser $currentUser, private EntityManagerInterface $entityManager) {}
+    public function __construct(private IndicatorRepository $indicators, private IndicatorValueRepository $values, private CurrentUser $currentUser, private EntityManagerInterface $entityManager)
+    {
+    }
 
     #[Route('', methods: ['GET'])]
     public function index(): JsonResponse
@@ -56,7 +58,9 @@ final readonly class IndicatorController
     public function history(int $id, Request $request): JsonResponse
     {
         $indicator = $this->findIndicator($id);
-        if (null === $indicator) return $this->notFound();
+        if (null === $indicator) {
+            return $this->notFound();
+        }
         $criteria = ['indicator' => $indicator];
         $items = $this->values->findBy($criteria, ['measuredAt' => 'DESC'], max(1, min(500, $request->query->getInt('limit', 100))));
 
@@ -67,14 +71,18 @@ final readonly class IndicatorController
     public function record(int $id, Request $request): JsonResponse
     {
         $indicator = $this->findIndicator($id);
-        if (null === $indicator) return $this->notFound();
+        if (null === $indicator) {
+            return $this->notFound();
+        }
         $data = $request->toArray();
         if (!isset($data['value']) || !is_numeric($data['value']) || empty($data['measuredAt']) || empty($data['idempotencyKey'])) {
             return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'Value, measuredAt and idempotencyKey are required.'], 422);
         }
         $key = trim((string) $data['idempotencyKey']);
         $existing = $this->values->findOneBy(['indicator' => $indicator, 'idempotencyKey' => $key]);
-        if (null !== $existing) return new JsonResponse($this->serializeValue($existing));
+        if (null !== $existing) {
+            return new JsonResponse($this->serializeValue($existing));
+        }
         try {
             $measuredAt = new \DateTimeImmutable((string) $data['measuredAt']);
         } catch (\Exception) {
@@ -95,7 +103,9 @@ final readonly class IndicatorController
     public function export(int $id): Response
     {
         $indicator = $this->findIndicator($id);
-        if (null === $indicator) return $this->notFound();
+        if (null === $indicator) {
+            return $this->notFound();
+        }
         $stream = fopen('php://temp', 'r+');
         fputcsv($stream, ['id', 'value', 'unit', 'measuredAt', 'period', 'source', 'comment', 'version']);
         foreach ($this->values->findBy(['indicator' => $indicator], ['measuredAt' => 'ASC']) as $value) {
@@ -111,7 +121,9 @@ final readonly class IndicatorController
     #[Route('/{id<\d+>}/values/batch', methods: ['POST'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
     public function batch(int $id, Request $request): JsonResponse
     {
-        if (null === $this->findIndicator($id)) return $this->notFound();
+        if (null === $this->findIndicator($id)) {
+            return $this->notFound();
+        }
         $rows = $request->toArray()['values'] ?? null;
         if (!is_array($rows) || count($rows) > 1000) {
             return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'values must contain at most 1000 rows.'], 422);
@@ -129,10 +141,25 @@ final readonly class IndicatorController
         return new JsonResponse(['results' => $results], 207);
     }
 
-    private function findIndicator(int $id): ?Indicator { return $this->indicators->findOneForOrganization($id, $this->currentUser->get()->getOrganization()); }
-    private function notFound(): JsonResponse { return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Indicator not found.'], 404); }
+    private function findIndicator(int $id): ?Indicator
+    {
+        return $this->indicators->findOneForOrganization($id, $this->currentUser->get()->getOrganization());
+    }
+
+    private function notFound(): JsonResponse
+    {
+        return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Indicator not found.'], 404);
+    }
+
     /** @return array<string, mixed> */
-    private function serializeIndicator(Indicator $item): array { return ['id' => $item->getId(), 'code' => $item->getCode(), 'name' => $item->getName(), 'kind' => $item->getKind(), 'unit' => $item->getUnit(), 'frequency' => $item->getFrequency(), 'formula' => $item->getFormula(), 'source' => $item->getSource(), 'target' => $item->getTarget(), 'thresholds' => $item->getThresholds(), 'active' => $item->isActive(), 'createdAt' => $item->getCreatedAt()->format(DATE_ATOM)]; }
+    private function serializeIndicator(Indicator $item): array
+    {
+        return ['id' => $item->getId(), 'code' => $item->getCode(), 'name' => $item->getName(), 'kind' => $item->getKind(), 'unit' => $item->getUnit(), 'frequency' => $item->getFrequency(), 'formula' => $item->getFormula(), 'source' => $item->getSource(), 'target' => $item->getTarget(), 'thresholds' => $item->getThresholds(), 'active' => $item->isActive(), 'createdAt' => $item->getCreatedAt()->format(DATE_ATOM)];
+    }
+
     /** @return array<string, mixed> */
-    private function serializeValue(IndicatorValue $item): array { return ['id' => $item->getId(), 'value' => $item->getValue(), 'measuredAt' => $item->getMeasuredAt()->format(DATE_ATOM), 'period' => $item->getPeriod(), 'comment' => $item->getComment(), 'evidence' => $item->getEvidence(), 'source' => $item->getSource(), 'idempotencyKey' => $item->getIdempotencyKey(), 'version' => $item->getVersion(), 'createdAt' => $item->getCreatedAt()->format(DATE_ATOM)]; }
+    private function serializeValue(IndicatorValue $item): array
+    {
+        return ['id' => $item->getId(), 'value' => $item->getValue(), 'measuredAt' => $item->getMeasuredAt()->format(DATE_ATOM), 'period' => $item->getPeriod(), 'comment' => $item->getComment(), 'evidence' => $item->getEvidence(), 'source' => $item->getSource(), 'idempotencyKey' => $item->getIdempotencyKey(), 'version' => $item->getVersion(), 'createdAt' => $item->getCreatedAt()->format(DATE_ATOM)];
+    }
 }

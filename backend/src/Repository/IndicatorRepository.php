@@ -12,7 +12,19 @@ use Doctrine\Persistence\ManagerRegistry;
 /** @extends ServiceEntityRepository<Indicator> */
 final class IndicatorRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry) { parent::__construct($registry, Indicator::class); }
-    /** @return list<Indicator> */ public function findForOrganization(Organization $organization): array { return $this->findBy(['organization' => $organization], ['name' => 'ASC']); }
-    public function findOneForOrganization(int $id, Organization $organization): ?Indicator { return $this->findOneBy(['id' => $id, 'organization' => $organization]); }
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, Indicator::class);
+    }
+
+    /** @return list<Indicator> */
+    public function findForOrganization(Organization $organization): array
+    {
+        return $this->findBy(['organization' => $organization], ['name' => 'ASC']);
+    }
+
+    public function findOneForOrganization(int $id, Organization $organization): ?Indicator
+    {
+        return $this->findOneBy(['id' => $id, 'organization' => $organization]);
+    }
 }

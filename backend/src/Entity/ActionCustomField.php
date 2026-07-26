@@ -21,16 +21,70 @@ class ActionCustomField
     #[ORM\Column(name: 'display_order')] private int $order = 0;
     #[ORM\Column] private bool $visible = true;
     #[ORM\Column] private bool $required = false;
-    public function __construct(Organization $organization, string $key, string $label, string $type) { $this->organization = $organization; $this->key = $key; $this->label = $label; $this->type = $type; }
-    public function getId(): ?int { return $this->id; }
-    public function getOrganization(): Organization { return $this->organization; }
-    public function getKey(): string { return $this->key; }
-    public function getLabel(): string { return $this->label; }
-    public function getType(): string { return $this->type; }
-    /** @return list<string> */ public function getOptions(): array { return $this->options; }
-    public function getOrder(): int { return $this->order; }
-    public function isVisible(): bool { return $this->visible; }
-    public function isRequired(): bool { return $this->required; }
+    public function __construct(Organization $organization, string $key, string $label, string $type)
+    {
+        $this->organization = $organization;
+        $this->key = $key;
+        $this->label = $label;
+        $this->type = $type;
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getOrganization(): Organization
+    {
+        return $this->organization;
+    }
+
+    public function getKey(): string
+    {
+        return $this->key;
+    }
+
+    public function getLabel(): string
+    {
+        return $this->label;
+    }
+
+    public function getType(): string
+    {
+        return $this->type;
+    }
+
+    /** @return list<string> */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
+    public function getOrder(): int
+    {
+        return $this->order;
+    }
+
+    public function isVisible(): bool
+    {
+        return $this->visible;
+    }
+
+    public function isRequired(): bool
+    {
+        return $this->required;
+    }
+
     /** @param list<string> $options */
-    public function configure(string $label, string $type, array $options, int $order, bool $visible, bool $required): self { $this->label = $label; $this->type = $type; $this->options = $options; $this->order = $order; $this->visible = $visible; $this->required = $required; return $this; }
+    public function configure(string $label, string $type, array $options, int $order, bool $visible, bool $required): self
+    {
+        $this->label = $label;
+        $this->type = $type;
+        $this->options = $options;
+        $this->order = $order;
+        $this->visible = $visible;
+        $this->required = $required;
+
+        return $this;
+    }
 }

@@ -23,7 +23,6 @@ class IndicatorValue
     #[ORM\Column(length: 120)] private string $idempotencyKey;
     #[ORM\Column] private int $version = 1;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
-
     public function __construct(Indicator $indicator, string $value, \DateTimeImmutable $measuredAt, string $idempotencyKey)
     {
         $this->indicator = $indicator;
@@ -33,20 +32,68 @@ class IndicatorValue
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?int { return $this->id; }
-    public function getIndicator(): Indicator { return $this->indicator; }
-    public function getValue(): string { return $this->value; }
-    public function getMeasuredAt(): \DateTimeImmutable { return $this->measuredAt; }
-    public function getPeriod(): ?string { return $this->period; }
-    public function getComment(): ?string { return $this->comment; }
-    public function getEvidence(): ?string { return $this->evidence; }
-    public function getSource(): ?string { return $this->source; }
-    public function getIdempotencyKey(): string { return $this->idempotencyKey; }
-    public function getVersion(): int { return $this->version; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getIndicator(): Indicator
+    {
+        return $this->indicator;
+    }
+
+    public function getValue(): string
+    {
+        return $this->value;
+    }
+
+    public function getMeasuredAt(): \DateTimeImmutable
+    {
+        return $this->measuredAt;
+    }
+
+    public function getPeriod(): ?string
+    {
+        return $this->period;
+    }
+
+    public function getComment(): ?string
+    {
+        return $this->comment;
+    }
+
+    public function getEvidence(): ?string
+    {
+        return $this->evidence;
+    }
+
+    public function getSource(): ?string
+    {
+        return $this->source;
+    }
+
+    public function getIdempotencyKey(): string
+    {
+        return $this->idempotencyKey;
+    }
+
+    public function getVersion(): int
+    {
+        return $this->version;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
     public function describe(?string $period, ?string $comment, ?string $evidence, ?string $source): self
     {
-        $this->period = $period; $this->comment = $comment; $this->evidence = $evidence; $this->source = $source;
+        $this->period = $period;
+        $this->comment = $comment;
+        $this->evidence = $evidence;
+        $this->source = $source;
+
         return $this;
     }
 }

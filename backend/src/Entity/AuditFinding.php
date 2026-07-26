@@ -48,7 +48,12 @@ class AuditFinding
         $this->actions = new ArrayCollection();
         $engagement->addFinding($this);
     }
-    /** @return Collection<int, ActionPlan> */ public function getActions(): Collection { return $this->actions; }
+
+    /** @return Collection<int, ActionPlan> */
+    public function getActions(): Collection
+    {
+        return $this->actions;
+    }
 
     public function getId(): ?int
     {

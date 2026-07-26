@@ -47,21 +47,77 @@ class Indicator
         $this->values = new ArrayCollection();
     }
 
-    public function getId(): ?int { return $this->id; }
-    public function getOrganization(): Organization { return $this->organization; }
-    public function getCode(): string { return $this->code; }
-    public function getName(): string { return $this->name; }
-    public function getKind(): string { return $this->kind; }
-    public function getUnit(): string { return $this->unit; }
-    public function getFrequency(): string { return $this->frequency; }
-    public function getFormula(): ?string { return $this->formula; }
-    public function getSource(): ?string { return $this->source; }
-    public function getTarget(): ?string { return $this->target; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getOrganization(): Organization
+    {
+        return $this->organization;
+    }
+
+    public function getCode(): string
+    {
+        return $this->code;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getKind(): string
+    {
+        return $this->kind;
+    }
+
+    public function getUnit(): string
+    {
+        return $this->unit;
+    }
+
+    public function getFrequency(): string
+    {
+        return $this->frequency;
+    }
+
+    public function getFormula(): ?string
+    {
+        return $this->formula;
+    }
+
+    public function getSource(): ?string
+    {
+        return $this->source;
+    }
+
+    public function getTarget(): ?string
+    {
+        return $this->target;
+    }
+
     /** @return array<string, int|float|string> */
-    public function getThresholds(): array { return $this->thresholds; }
-    public function isActive(): bool { return $this->active; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    /** @return Collection<int, IndicatorValue> */ public function getValues(): Collection { return $this->values; }
+    public function getThresholds(): array
+    {
+        return $this->thresholds;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->active;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    /** @return Collection<int, IndicatorValue> */
+    public function getValues(): Collection
+    {
+        return $this->values;
+    }
 
     /** @param array<string, int|float|string> $thresholds */
     public function configure(?string $formula, ?string $source, ?string $target, array $thresholds, bool $active): self
