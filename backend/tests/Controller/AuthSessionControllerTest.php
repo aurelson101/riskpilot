@@ -39,6 +39,9 @@ final class AuthSessionControllerTest extends WebTestCase
 
     public function testLoginRefreshAndLogoutRevokeServerSession(): void
     {
+        $this->client->setServerParameter('REMOTE_ADDR', '172.18.0.1');
+        $this->client->setServerParameter('HTTP_X_FORWARDED_FOR', '198.51.100.42');
+        $this->client->setServerParameter('HTTP_X_FORWARDED_PROTO', 'https');
         $this->json('POST', '/api/auth/login', ['email' => 'session@example.test', 'password' => 'StrongPassword123!']);
         self::assertResponseIsSuccessful();
         $firstToken = $this->payload()['token'];
@@ -47,6 +50,7 @@ final class AuthSessionControllerTest extends WebTestCase
         $this->client->request('GET', '/api/me/sessions');
         self::assertResponseIsSuccessful();
         self::assertTrue($this->payloadList()[0]['current']);
+        self::assertSame('198.51.100.42', $this->payloadList()[0]['ipAddress']);
 
         $this->json('POST', '/api/auth/refresh');
         self::assertResponseIsSuccessful();

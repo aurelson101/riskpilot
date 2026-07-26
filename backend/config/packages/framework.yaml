@@ -1,6 +1,10 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
 framework:
     secret: '%env(APP_SECRET)%'
+    # PHP-FPM is reachable only from the internal Compose network. The public
+    # edge overwrites forwarded headers before they reach these trusted ranges.
+    trusted_proxies: '127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true
