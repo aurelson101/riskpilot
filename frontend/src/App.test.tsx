@@ -137,8 +137,11 @@ describe("App", () => {
     );
 
     expect(await screen.findByText("Mon profil et MFA")).toBeInTheDocument();
+    expect(screen.getByText("Indicateurs")).toBeInTheDocument();
+    expect(screen.getByText("Actifs matériels")).toBeInTheDocument();
+    expect(screen.getByText("Colonnes des actions")).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
-    fireEvent.click(await screen.findByRole("option", { name: "English" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Anglais" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Enregistrer les modifications" }),
     );
@@ -150,14 +153,17 @@ describe("App", () => {
         locale: "en",
       }),
     );
-    expect(screen.getByText("Messagerie")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Documents ISMS"));
+    expect(await screen.findByText("My profile and MFA")).toBeInTheDocument();
+    expect(screen.getByText("Email")).toBeInTheDocument();
+    expect(screen.getByText("Indicators")).toBeInTheDocument();
+    expect(screen.getByText("Hardware assets")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("ISMS documents"));
     expect(await screen.findByText("Politique interne")).toBeInTheDocument();
-    expect(screen.getAllByText("Publications récentes")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: /Réduire/ }));
+    expect(screen.getAllByText("Recent publications")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
     await waitFor(() =>
-      expect(screen.queryByText("Mon profil et MFA")).not.toBeInTheDocument(),
+      expect(screen.queryByText("My profile and MFA")).not.toBeInTheDocument(),
     );
-    expect(screen.queryByLabelText("Ouvrir le menu")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });
 });

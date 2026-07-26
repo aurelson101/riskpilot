@@ -59,6 +59,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth/useAuth";
 import { api } from "./api/client";
 import type { IsmsDocument } from "./api/types";
+import { LanguageBoundary } from "./i18n/LanguageBoundary";
 import {
   lazy,
   Suspense,
@@ -646,97 +647,99 @@ function Layout() {
   );
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        minHeight: "100vh",
-        bgcolor: "#f4f7fb",
-        width: "100%",
-      }}
-    >
-      <AppBar
-        position="fixed"
-        color="inherit"
-        elevation={0}
-        sx={{
-          ml: { md: `${currentDrawerWidth}px` },
-          width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
-          transition: theme.transitions.create(["margin", "width"]),
-        }}
-      >
-        <Toolbar
-          sx={{ borderBottom: "1px solid #e5eaf1", px: { xs: 1.5, sm: 3 } }}
-        >
-          {mobile && (
-            <IconButton
-              edge="start"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Ouvrir le menu"
-              sx={{ mr: 1 }}
-            >
-              <MenuOutlined />
-            </IconButton>
-          )}
-          <Typography
-            variant="h6"
-            noWrap
-            sx={{ flexGrow: 1, fontSize: { xs: "1rem", sm: "1.25rem" } }}
-          >
-            {location.pathname === "/isms-documents" && location.search
-              ? `Documents ISMS — ${new URLSearchParams(location.search).get("category") ?? "Vue d’ensemble"}`
-              : (titleByPath[location.pathname] ?? "RiskPilot")}
-          </Typography>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
-              {user.firstName[0]}
-              {user.lastName[0]}
-            </Avatar>
-            <Box sx={{ display: { xs: "none", sm: "block" } }}>
-              <Typography variant="body2" fontWeight={700}>
-                {user.firstName} {user.lastName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user.organization.name}
-              </Typography>
-            </Box>
-          </Stack>
-        </Toolbar>
-      </AppBar>
-      <Drawer
-        variant={mobile ? "temporary" : "permanent"}
-        open={mobile ? mobileOpen : true}
-        onClose={() => setMobileOpen(false)}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          width: mobile ? drawerWidth : currentDrawerWidth,
-          flexShrink: 0,
-          "& .MuiDrawer-paper": {
-            width: mobile ? drawerWidth : currentDrawerWidth,
-            bgcolor: "#062b4b",
-            color: "white",
-            border: 0,
-            transition: theme.transitions.create("width"),
-          },
-        }}
-      >
-        {drawerContent}
-      </Drawer>
+    <LanguageBoundary locale={user.locale ?? "fr"}>
       <Box
-        component="main"
         sx={{
-          flexGrow: 1,
-          minWidth: 0,
-          pt: { xs: 9, sm: 10 },
-          pb: { xs: 3, sm: 5 },
-          width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
-          transition: theme.transitions.create("width"),
+          display: "flex",
+          minHeight: "100vh",
+          bgcolor: "#f4f7fb",
+          width: "100%",
         }}
       >
-        <Container maxWidth="xl" sx={{ px: { xs: 1.5, sm: 3 } }}>
-          <Outlet />
-        </Container>
+        <AppBar
+          position="fixed"
+          color="inherit"
+          elevation={0}
+          sx={{
+            ml: { md: `${currentDrawerWidth}px` },
+            width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
+            transition: theme.transitions.create(["margin", "width"]),
+          }}
+        >
+          <Toolbar
+            sx={{ borderBottom: "1px solid #e5eaf1", px: { xs: 1.5, sm: 3 } }}
+          >
+            {mobile && (
+              <IconButton
+                edge="start"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Ouvrir le menu"
+                sx={{ mr: 1 }}
+              >
+                <MenuOutlined />
+              </IconButton>
+            )}
+            <Typography
+              variant="h6"
+              noWrap
+              sx={{ flexGrow: 1, fontSize: { xs: "1rem", sm: "1.25rem" } }}
+            >
+              {location.pathname === "/isms-documents" && location.search
+                ? `Documents ISMS — ${new URLSearchParams(location.search).get("category") ?? "Vue d’ensemble"}`
+                : (titleByPath[location.pathname] ?? "RiskPilot")}
+            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
+                {user.firstName[0]}
+                {user.lastName[0]}
+              </Avatar>
+              <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                <Typography variant="body2" fontWeight={700}>
+                  {user.firstName} {user.lastName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {user.organization.name}
+                </Typography>
+              </Box>
+            </Stack>
+          </Toolbar>
+        </AppBar>
+        <Drawer
+          variant={mobile ? "temporary" : "permanent"}
+          open={mobile ? mobileOpen : true}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            width: mobile ? drawerWidth : currentDrawerWidth,
+            flexShrink: 0,
+            "& .MuiDrawer-paper": {
+              width: mobile ? drawerWidth : currentDrawerWidth,
+              bgcolor: "#062b4b",
+              color: "white",
+              border: 0,
+              transition: theme.transitions.create("width"),
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            minWidth: 0,
+            pt: { xs: 9, sm: 10 },
+            pb: { xs: 3, sm: 5 },
+            width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
+            transition: theme.transitions.create("width"),
+          }}
+        >
+          <Container maxWidth="xl" sx={{ px: { xs: 1.5, sm: 3 } }}>
+            <Outlet />
+          </Container>
+        </Box>
       </Box>
-    </Box>
+    </LanguageBoundary>
   );
 }
 
