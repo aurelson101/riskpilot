@@ -20,5 +20,8 @@ docker compose $compose_files build demo-reset-scheduler
 
 docker compose $compose_files run --rm backend php bin/console doctrine:migrations:migrate --no-interaction
 docker compose $compose_files up -d
+# Nginx resolves Compose service names when it starts. Recreate it after the
+# backend/frontend so its upstream addresses cannot point to replaced containers.
+docker compose $compose_files up -d --force-recreate nginx
 
 docker compose $compose_files ps
