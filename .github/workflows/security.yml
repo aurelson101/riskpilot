@@ -21,6 +21,7 @@ jobs:
       - run: docker compose run --rm backend composer validate --strict
       - run: docker compose run --rm backend php bin/console doctrine:migrations:migrate --dry-run --no-interaction
       - run: docker compose exec -T postgres sh -lc 'createdb -U "$POSTGRES_USER" "${POSTGRES_DB}_test"'
+      - run: docker compose run --rm backend php bin/console lexik:jwt:generate-keypair --no-interaction
       - run: docker compose run --rm -e APP_ENV=test backend php bin/phpunit
       - run: docker compose run --rm backend vendor/bin/phpstan analyse src tests --memory-limit=512M
       - run: docker compose run --rm backend vendor/bin/php-cs-fixer check --diff
