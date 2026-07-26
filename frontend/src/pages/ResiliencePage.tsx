@@ -30,7 +30,7 @@ import { api } from "../api/client";
 import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
-import { confirmLocalized } from "../i18n/confirm";
+import { useConfirmation } from "../components/confirmation-context";
 import type { Scope, User } from "../api/types";
 
 type TimelineEvent = { at: string; event: string; actor: string };
@@ -98,6 +98,7 @@ const dateTimeLocal = (value: string | null) =>
 
 export function ResiliencePage() {
   const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user } = useAuth();
   const cache = useQueryClient();
   const incidents = useQuery({
@@ -310,13 +311,7 @@ export function ResiliencePage() {
     setKind("process");
   };
   const deleteItem = async (type: "incident" | "process", id: number) => {
-    if (
-      !confirmLocalized(locale, {
-        fr: "Supprimer définitivement cet enregistrement ?",
-        en: "Permanently delete this record?",
-      })
-    )
-      return;
+    if (!(await confirm({ message: "confirmation.deleteRecord" }))) return;
     await api.delete(
       type === "incident"
         ? `/resilience/incidents/${id}`

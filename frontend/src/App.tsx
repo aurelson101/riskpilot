@@ -60,6 +60,7 @@ import { useAuth } from "./auth/useAuth";
 import { api } from "./api/client";
 import type { IsmsDocument } from "./api/types";
 import { LanguageBoundary } from "./i18n/LanguageBoundary";
+import { ConfirmationProvider } from "./components/ConfirmationProvider";
 import {
   lazy,
   Suspense,
@@ -359,7 +360,11 @@ function Layout() {
           </Typography>
         )}
       </Toolbar>
-      <List sx={{ px: 1, py: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <List
+        component="nav"
+        aria-label="Navigation principale"
+        sx={{ px: 1, py: 1, overflowY: "auto", overflowX: "hidden" }}
+      >
         <NavItem
           path="/"
           label="Tableau de bord"
@@ -438,6 +443,7 @@ function Layout() {
           placement="right"
         >
           <ListItemButton
+            aria-label="Documents ISMS"
             selected={ismsActive}
             onClick={() => {
               if (collapsed) {
@@ -474,7 +480,7 @@ function Layout() {
         </Tooltip>
         {!collapsed && (
           <Collapse in={ismsOpen} timeout="auto" unmountOnExit>
-            <List disablePadding>
+            <List component="div" disablePadding>
               <NavItem
                 nested
                 path="/isms-documents"
@@ -509,6 +515,7 @@ function Layout() {
           placement="right"
         >
           <ListItemButton
+            aria-label="Paramètres"
             selected={settingsActive}
             onClick={() => {
               if (collapsed) {
@@ -544,7 +551,7 @@ function Layout() {
         </Tooltip>
         {!collapsed && (
           <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
-            <List disablePadding>
+            <List component="div" disablePadding>
               <NavItem
                 nested
                 path="/profile"
@@ -762,92 +769,104 @@ export default function App() {
 
   return (
     <LanguageBoundary locale={locale}>
-      <Suspense
-        fallback={
-          <Stack minHeight="50vh" alignItems="center" justifyContent="center">
-            <CircularProgress aria-label="Chargement de la page" />
-          </Stack>
-        }
-      >
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route
-            path="/shared/documents/:token"
-            element={<PublicDocumentPage />}
-          />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="risks" element={<RisksPage />} />
-              <Route path="actions" element={<ActionsPage />} />
-              <Route path="indicators" element={<IndicatorsPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="compliance" element={<CompliancePage />} />
-              <Route path="third-parties" element={<ThirdPartiesPage />} />
-              <Route path="resilience" element={<ResiliencePage />} />
-              <Route path="regulatory" element={<RegulatoryPage />} />
-              <Route path="risk-matrix" element={<RiskMatrixPage />} />
-              <Route path="scopes" element={<InventoryPage kind="scopes" />} />
-              <Route path="assets" element={<InventoryPage kind="assets" />} />
-              <Route
-                path="assets/hardware"
-                element={<InventoryPage kind="assets" assetFamily="HARDWARE" />}
-              />
-              <Route
-                path="assets/software"
-                element={<InventoryPage kind="assets" assetFamily="SOFTWARE" />}
-              />
-              <Route
-                path="assets/information"
-                element={
-                  <InventoryPage kind="assets" assetFamily="INFORMATION" />
-                }
-              />
-              <Route
-                path="threats"
-                element={<InventoryPage kind="threats" />}
-              />
-              <Route
-                path="vulnerabilities"
-                element={<InventoryPage kind="vulnerabilities" />}
-              />
-              <Route
-                path="security-controls"
-                element={<InventoryPage kind="security-controls" />}
-              />
-              <Route path="administration/users" element={<UsersPage />} />
-              <Route
-                path="administration/organizations"
-                element={<OrganizationsPage />}
-              />
-              <Route
-                path="administration/audit-logs"
-                element={<AuditLogsPage />}
-              />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route
-                path="administration/email-settings"
-                element={<EmailSettingsPage />}
-              />
-              <Route
-                path="administration/integrations"
-                element={<IntegrationSettingsPage />}
-              />
-              <Route
-                path="administration/action-fields"
-                element={<ActionFieldsPage />}
-              />
-              <Route
-                path="reports/executive"
-                element={<ExecutiveReportPage />}
-              />
-              <Route path="isms-documents" element={<IsmsDocumentsPage />} />
+      <ConfirmationProvider>
+        <Suspense
+          fallback={
+            <Stack minHeight="50vh" alignItems="center" justifyContent="center">
+              <CircularProgress aria-label="Chargement de la page" />
+            </Stack>
+          }
+        >
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route
+              path="/shared/documents/:token"
+              element={<PublicDocumentPage />}
+            />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="risks" element={<RisksPage />} />
+                <Route path="actions" element={<ActionsPage />} />
+                <Route path="indicators" element={<IndicatorsPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="compliance" element={<CompliancePage />} />
+                <Route path="third-parties" element={<ThirdPartiesPage />} />
+                <Route path="resilience" element={<ResiliencePage />} />
+                <Route path="regulatory" element={<RegulatoryPage />} />
+                <Route path="risk-matrix" element={<RiskMatrixPage />} />
+                <Route
+                  path="scopes"
+                  element={<InventoryPage kind="scopes" />}
+                />
+                <Route
+                  path="assets"
+                  element={<InventoryPage kind="assets" />}
+                />
+                <Route
+                  path="assets/hardware"
+                  element={
+                    <InventoryPage kind="assets" assetFamily="HARDWARE" />
+                  }
+                />
+                <Route
+                  path="assets/software"
+                  element={
+                    <InventoryPage kind="assets" assetFamily="SOFTWARE" />
+                  }
+                />
+                <Route
+                  path="assets/information"
+                  element={
+                    <InventoryPage kind="assets" assetFamily="INFORMATION" />
+                  }
+                />
+                <Route
+                  path="threats"
+                  element={<InventoryPage kind="threats" />}
+                />
+                <Route
+                  path="vulnerabilities"
+                  element={<InventoryPage kind="vulnerabilities" />}
+                />
+                <Route
+                  path="security-controls"
+                  element={<InventoryPage kind="security-controls" />}
+                />
+                <Route path="administration/users" element={<UsersPage />} />
+                <Route
+                  path="administration/organizations"
+                  element={<OrganizationsPage />}
+                />
+                <Route
+                  path="administration/audit-logs"
+                  element={<AuditLogsPage />}
+                />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route
+                  path="administration/email-settings"
+                  element={<EmailSettingsPage />}
+                />
+                <Route
+                  path="administration/integrations"
+                  element={<IntegrationSettingsPage />}
+                />
+                <Route
+                  path="administration/action-fields"
+                  element={<ActionFieldsPage />}
+                />
+                <Route
+                  path="reports/executive"
+                  element={<ExecutiveReportPage />}
+                />
+                <Route path="isms-documents" element={<IsmsDocumentsPage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </ConfirmationProvider>
     </LanguageBoundary>
   );
 }

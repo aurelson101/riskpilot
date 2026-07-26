@@ -29,8 +29,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Asset, Scope, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
-import { confirmLocalized } from "../i18n/confirm";
-import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { useConfirmation } from "../components/confirmation-context";
 
 type InventoryKind =
   "scopes" | "assets" | "threats" | "vulnerabilities" | "security-controls";
@@ -206,7 +205,7 @@ export function InventoryPage({
   kind: InventoryKind;
   assetFamily?: Asset["family"];
 }) {
-  const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user } = useAuth();
   const canManage = user?.roles.some((role) =>
     ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
@@ -394,12 +393,15 @@ export function InventoryPage({
                       <IconButton
                         aria-label="Supprimer"
                         color="error"
-                        onClick={() =>
-                          confirmLocalized(locale, {
-                            fr: `Supprimer « ${item.name} » ?`,
-                            en: `Delete “${item.name}”?`,
-                          }) && remove.mutate(item.id)
-                        }
+                        onClick={async () => {
+                          if (
+                            await confirm({
+                              message: "confirmation.deleteNamed",
+                              values: { name: item.name },
+                            })
+                          )
+                            remove.mutate(item.id);
+                        }}
                       >
                         <DeleteOutline />
                       </IconButton>

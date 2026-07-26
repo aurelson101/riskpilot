@@ -286,6 +286,7 @@ export function DashboardPage() {
                         <Typography fontWeight={700}>{score}%</Typography>
                       </Stack>
                       <LinearProgress
+                        aria-label={`Progression ${framework} : ${score}%`}
                         variant="determinate"
                         value={score}
                         color={

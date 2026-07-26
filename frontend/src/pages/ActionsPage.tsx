@@ -52,7 +52,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
-import { confirmLocalized } from "../i18n/confirm";
+import { useConfirmation } from "../components/confirmation-context";
 import axios from "axios";
 
 const statuses = [
@@ -235,7 +235,11 @@ function ActionCard({
               {action.owner.firstName} {action.owner.lastName}
             </Typography>
           </Stack>
-          <LinearProgress variant="determinate" value={action.progress} />
+          <LinearProgress
+            aria-label={`Progression ${action.title} : ${action.progress}%`}
+            variant="determinate"
+            value={action.progress}
+          />
           <Typography variant="caption">
             {action.progress}% · échéance{" "}
             {toLocalDate(action.dueDate).toLocaleDateString(locale)}
@@ -248,6 +252,7 @@ function ActionCard({
 
 export function ActionsPage() {
   const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table");
@@ -575,6 +580,7 @@ export function ActionsPage() {
                     </TableCell>
                     <TableCell sx={{ minWidth: 130 }}>
                       <LinearProgress
+                        aria-label={`Progression ${action.title} : ${action.progress}%`}
                         variant="determinate"
                         value={action.progress}
                       />
@@ -612,12 +618,15 @@ export function ActionsPage() {
                           aria-label="Annuler"
                           color="error"
                           disabled={action.status === "CANCELLED"}
-                          onClick={() =>
-                            confirmLocalized(locale, {
-                              fr: `Annuler « ${action.title} » ?`,
-                              en: `Cancel “${action.title}”?`,
-                            }) && remove.mutate(action.id)
-                          }
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                message: "confirmation.cancelAction",
+                                values: { name: action.title },
+                              })
+                            )
+                              remove.mutate(action.id);
+                          }}
                         >
                           <DeleteOutline />
                         </IconButton>

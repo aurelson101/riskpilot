@@ -33,6 +33,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Journal d’audit", "Audit log"],
   ["Déconnexion", "Sign out"],
   ["Réduire le menu", "Collapse menu"],
+  ["Navigation principale", "Main navigation"],
   ["Développer le menu", "Expand menu"],
   ["Ouvrir le menu", "Open menu"],
   ["Chargement du profil", "Loading profile"],

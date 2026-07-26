@@ -360,6 +360,14 @@ export function RiskGovernancePanel({ risks }: { risks: RiskScenario[] }) {
                         <Chip size="small" label={campaign.status} />
                       </Stack>
                       <LinearProgress
+                        aria-label={`Progression ${campaign.title} : ${
+                          campaign.progress.total
+                            ? Math.round(
+                                (campaign.progress.completed * 100) /
+                                  campaign.progress.total,
+                              )
+                            : 0
+                        }%`}
                         variant="determinate"
                         value={
                           campaign.progress.total

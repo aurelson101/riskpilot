@@ -329,6 +329,7 @@ export function ExecutiveReportPage() {
                       <Typography fontWeight={750}>{score}%</Typography>
                     </Stack>
                     <LinearProgress
+                      aria-label={`Progression ${framework} : ${score}%`}
                       variant="determinate"
                       value={score}
                       color={

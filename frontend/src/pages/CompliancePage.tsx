@@ -272,6 +272,7 @@ export function CompliancePage() {
                       {assessment.assessor.lastName}
                     </Typography>
                     <LinearProgress
+                      aria-label={`Progression ${assessment.framework.name} : ${assessment.globalScore}%`}
                       variant="determinate"
                       value={assessment.globalScore}
                       color={

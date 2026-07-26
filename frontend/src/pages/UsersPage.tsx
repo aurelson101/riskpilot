@@ -29,8 +29,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
-import { confirmLocalized } from "../i18n/confirm";
-import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { useConfirmation } from "../components/confirmation-context";
 
 const roleLabels: Record<string, string> = {
   ROLE_SUPER_ADMIN: "Super administrateur",
@@ -65,7 +64,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function UsersPage() {
-  const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user: actor } = useAuth();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<User | null>(null);
@@ -218,12 +217,17 @@ export function UsersPage() {
                       disabled={
                         user.id === actor?.id || user.status === "INACTIVE"
                       }
-                      onClick={() =>
-                        confirmLocalized(locale, {
-                          fr: `Désactiver ${user.firstName} ${user.lastName} ?`,
-                          en: `Disable ${user.firstName} ${user.lastName}?`,
-                        }) && remove.mutate(user.id)
-                      }
+                      onClick={async () => {
+                        if (
+                          await confirm({
+                            message: "confirmation.disableUser",
+                            values: {
+                              name: `${user.firstName} ${user.lastName}`,
+                            },
+                          })
+                        )
+                          remove.mutate(user.id);
+                      }}
                     >
                       <DeleteOutline />
                     </IconButton>

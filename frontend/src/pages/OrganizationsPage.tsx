@@ -25,8 +25,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Organization } from "../api/types";
 import { useAuth } from "../auth/useAuth";
-import { confirmLocalized } from "../i18n/confirm";
-import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { useConfirmation } from "../components/confirmation-context";
 
 type Form = {
   name: string;
@@ -50,7 +49,7 @@ const errorMessage = (error: unknown) =>
     : "L’opération a échoué.";
 
 export function OrganizationsPage() {
-  const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -171,12 +170,15 @@ export function OrganizationsPage() {
                         item.id === user?.organization.id ||
                         item.status === "INACTIVE"
                       }
-                      onClick={() =>
-                        confirmLocalized(locale, {
-                          fr: `Désactiver « ${item.name} » ?`,
-                          en: `Disable “${item.name}”?`,
-                        }) && remove.mutate(item.id)
-                      }
+                      onClick={async () => {
+                        if (
+                          await confirm({
+                            message: "confirmation.disableOrganization",
+                            values: { name: item.name },
+                          })
+                        )
+                          remove.mutate(item.id);
+                      }}
                     >
                       <DeleteOutline />
                     </IconButton>

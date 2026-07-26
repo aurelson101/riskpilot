@@ -26,8 +26,7 @@ import {
 import { api } from "../api/client";
 import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
-import { confirmLocalized } from "../i18n/confirm";
-import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { useConfirmation } from "../components/confirmation-context";
 import type { User } from "../api/types";
 
 type RecordItem = {
@@ -118,7 +117,7 @@ const split = (value: string) =>
     .filter(Boolean);
 
 export function RegulatoryPage() {
-  const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user } = useAuth();
   const cache = useQueryClient();
   const records = useQuery({
@@ -212,10 +211,10 @@ export function RegulatoryPage() {
   };
   const remove = async (item: RecordItem) => {
     if (
-      !confirmLocalized(locale, {
-        fr: `Supprimer « ${item.title} » ?`,
-        en: `Delete “${item.title}”?`,
-      })
+      !(await confirm({
+        message: "confirmation.deleteNamed",
+        values: { name: item.title },
+      }))
     )
       return;
     await api.delete(`/regulatory-records/${item.id}`);

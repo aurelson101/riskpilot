@@ -47,7 +47,7 @@ import { api } from "../api/client";
 import type { IsmsDocument, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
-import { confirmLocalized } from "../i18n/confirm";
+import { useConfirmation } from "../components/confirmation-context";
 
 const categories = [
   "Politique",
@@ -90,6 +90,7 @@ function date(value: string | null, locale: "fr" | "en") {
 
 export function IsmsDocumentsPage() {
   const locale = useInterfaceLocale();
+  const confirm = useConfirmation();
   const { user } = useAuth();
   const client = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -786,11 +787,11 @@ export function IsmsDocumentsPage() {
               <Button
                 color="error"
                 startIcon={<DeleteOutline />}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    confirmLocalized(locale, {
-                      fr: "Supprimer définitivement ce document et son historique ?",
-                      en: "Permanently delete this document and its history?",
+                    await confirm({
+                      message: "confirmation.deleteDocument",
+                      values: { name: current.title },
                     })
                   )
                     remove.mutate(current.id);

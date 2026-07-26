@@ -27,7 +27,30 @@ jobs:
       - run: docker compose run --rm backend vendor/bin/php-cs-fixer check --diff
       - run: docker compose run --rm frontend npm run lint
       - run: docker compose run --rm frontend npm run test
+      - run: docker compose run --rm frontend npm run i18n:audit
+      - run: docker compose run --rm frontend npm run security:react-router
       - run: docker compose run --rm frontend npm run build
+      - run: docker compose run --rm backend php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate
+      - run: docker compose up -d --wait nginx
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:8080
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
       - uses: anchore/sbom-action@v0
         with:
           path: .
