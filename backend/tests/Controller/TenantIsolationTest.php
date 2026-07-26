@@ -200,6 +200,7 @@ final class TenantIsolationTest extends WebTestCase
             'firstName' => 'Alicia',
             'lastName' => 'Administratrice',
             'email' => 'alicia@example.test',
+            'locale' => 'en',
         ], JSON_THROW_ON_ERROR));
 
         self::assertResponseIsSuccessful();
@@ -207,6 +208,7 @@ final class TenantIsolationTest extends WebTestCase
         self::assertSame('Alicia', $payload['firstName']);
         self::assertSame('Administratrice', $payload['lastName']);
         self::assertSame('alicia@example.test', $payload['email']);
+        self::assertSame('en', $payload['locale']);
     }
 
     public function testProfileEmailMustBeUnique(): void

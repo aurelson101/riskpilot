@@ -20,4 +20,7 @@ final class UpdateProfileInput
     #[Assert\Email]
     #[Assert\Length(max: 180)]
     public string $email = '';
+
+    #[Assert\Choice(choices: ['fr', 'en'])]
+    public string $locale = 'fr';
 }

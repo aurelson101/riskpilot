@@ -119,6 +119,7 @@ final class ApiResponseFactory
             'lastName' => $user->getLastName(),
             'roles' => $user->getAssignedRoles(),
             'status' => $user->getStatus(),
+            'locale' => $user->getLocale(),
             'organization' => $this->organization($user->getOrganization()),
             'createdAt' => $user->getCreatedAt()->format(DATE_ATOM),
             'updatedAt' => $user->getUpdatedAt()->format(DATE_ATOM),

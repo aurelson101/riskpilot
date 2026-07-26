@@ -56,7 +56,8 @@ final readonly class ProfileController
         $user
             ->setFirstName(trim($input->firstName))
             ->setLastName(trim($input->lastName))
-            ->setEmail(trim($input->email));
+            ->setEmail(trim($input->email))
+            ->setLocale($input->locale);
         $this->entityManager->flush();
 
         return new JsonResponse($this->responses->user($user));

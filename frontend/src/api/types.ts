@@ -321,6 +321,7 @@ export interface User {
   lastName: string;
   roles: string[];
   status: string;
+  locale: "fr" | "en";
   organization: Organization;
   lastLoginAt: string | null;
   mfaEnabled: boolean;

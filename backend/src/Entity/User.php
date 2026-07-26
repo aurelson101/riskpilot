@@ -28,6 +28,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public const STATUS_ACTIVE = 'ACTIVE';
     public const STATUS_INACTIVE = 'INACTIVE';
     public const STATUS_LOCKED = 'LOCKED';
+    public const LOCALE_FR = 'fr';
+    public const LOCALE_EN = 'en';
 
     /** @var list<string> */
     public const ASSIGNABLE_ROLES = [
@@ -61,6 +63,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 20)]
     private string $status = self::STATUS_ACTIVE;
+
+    #[ORM\Column(length: 2)]
+    private string $locale = self::LOCALE_FR;
 
     #[ORM\ManyToOne(inversedBy: 'users')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -195,6 +200,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
+        return $this;
+    }
+
+    public function getLocale(): string
+    {
+        return $this->locale;
+    }
+
+    public function setLocale(string $locale): self
+    {
+        if (!\in_array($locale, [self::LOCALE_FR, self::LOCALE_EN], true)) {
+            throw new \InvalidArgumentException('Unsupported user locale.');
+        }
+
+        $this->locale = $locale;
 
         return $this;
     }

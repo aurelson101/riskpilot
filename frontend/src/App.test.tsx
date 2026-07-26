@@ -84,6 +84,7 @@ describe("App", () => {
                 lastName: "Admin",
                 roles: ["ROLE_ADMIN"],
                 status: "ACTIVE",
+                locale: "fr",
                 mfaEnabled: false,
                 lastLoginAt: null,
                 organization: {
@@ -100,6 +101,31 @@ describe("App", () => {
                 },
               },
     }));
+    const updateProfile = vi.spyOn(api, "put").mockResolvedValue({
+      data: {
+        id: 1,
+        email: "admin@example.test",
+        firstName: "Alice",
+        lastName: "Admin",
+        roles: ["ROLE_ADMIN"],
+        status: "ACTIVE",
+        locale: "en",
+        mfaEnabled: false,
+        lastLoginAt: null,
+        organization: {
+          id: 1,
+          name: "Demo",
+          description: null,
+          status: "ACTIVE",
+          riskThresholds: {
+            lowMax: 4,
+            moderateMax: 9,
+            highMax: 16,
+            criticalMax: 25,
+          },
+        },
+      },
+    });
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/profile"]}>
@@ -111,6 +137,19 @@ describe("App", () => {
     );
 
     expect(await screen.findByText("Mon profil et MFA")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
+    fireEvent.click(await screen.findByRole("option", { name: "English" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enregistrer les modifications" }),
+    );
+    await waitFor(() =>
+      expect(updateProfile).toHaveBeenCalledWith("/me", {
+        firstName: "Alice",
+        lastName: "Admin",
+        email: "admin@example.test",
+        locale: "en",
+      }),
+    );
     expect(screen.getByText("Messagerie")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Documents ISMS"));
     expect(await screen.findByText("Politique interne")).toBeInTheDocument();

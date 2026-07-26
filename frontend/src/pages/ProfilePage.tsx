@@ -7,6 +7,10 @@ import {
   Card,
   CardContent,
   Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -23,6 +27,7 @@ export function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [locale, setLocale] = useState<"fr" | "en">("fr");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -62,6 +67,7 @@ export function ProfilePage() {
     setFirstName(user.firstName);
     setLastName(user.lastName);
     setEmail(user.email);
+    setLocale(user.locale ?? "fr");
   }, [user]);
 
   useEffect(() => {
@@ -85,6 +91,7 @@ export function ProfilePage() {
         firstName,
         lastName,
         email,
+        locale,
       });
       queryClient.setQueryData(["me"], data);
       setSuccess(true);
@@ -202,6 +209,28 @@ export function ProfilePage() {
               fullWidth
               inputProps={{ maxLength: 180 }}
             />
+            <FormControl fullWidth>
+              <InputLabel id="profile-language-label">
+                {locale === "en"
+                  ? "Interface language"
+                  : "Langue de l’interface"}
+              </InputLabel>
+              <Select
+                labelId="profile-language-label"
+                label={
+                  locale === "en"
+                    ? "Interface language"
+                    : "Langue de l’interface"
+                }
+                value={locale}
+                onChange={(event) =>
+                  setLocale(event.target.value as "fr" | "en")
+                }
+              >
+                <MenuItem value="fr">Français</MenuItem>
+                <MenuItem value="en">English</MenuItem>
+              </Select>
+            </FormControl>
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? "Enregistrement…" : "Enregistrer les modifications"}
             </Button>
