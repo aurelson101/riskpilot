@@ -5,7 +5,6 @@ COPY package*.json ./
 # Une seconde installation propre rend le build reproductible sur ces hôtes.
 RUN npm install || (sleep 2 && npm install)
 COPY . .
-USER node
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
@@ -18,7 +17,7 @@ ARG VITE_DEMO_MODE=false
 ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 RUN npm run build
 
-FROM nginx:1.27-alpine AS production
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS production
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-HEALTHCHECK CMD wget -qO- http://localhost/ >/dev/null || exit 1
+HEALTHCHECK CMD wget -qO- http://localhost:8080/ >/dev/null || exit 1
