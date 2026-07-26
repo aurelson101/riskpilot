@@ -34,6 +34,7 @@ import type {
   User,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 function errorMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -44,6 +45,7 @@ function errorMessage(error: unknown) {
 type DialogKind = "policy" | "acceptance" | "campaign" | "review" | null;
 
 export function RiskGovernancePanel({ risks }: { risks: RiskScenario[] }) {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const cache = useQueryClient();
   const [tab, setTab] = useState(0);
@@ -192,7 +194,7 @@ export function RiskGovernancePanel({ risks }: { risks: RiskScenario[] }) {
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Traitements :{" "}
-                          {item.treatment.estimatedCost.toLocaleString("fr-FR")}{" "}
+                          {item.treatment.estimatedCost.toLocaleString(locale)}{" "}
                           € · {item.treatment.estimatedEffortDays} j · réduction{" "}
                           {item.treatment.expectedReduction} · écart{" "}
                           {item.treatment.coverageGap}
@@ -281,7 +283,7 @@ export function RiskGovernancePanel({ risks }: { risks: RiskScenario[] }) {
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Autorité : {item.authority} · échéance{" "}
-                          {new Date(item.expiresAt).toLocaleDateString("fr-FR")}
+                          {new Date(item.expiresAt).toLocaleDateString(locale)}
                         </Typography>
                       </Box>
                       <Stack direction="row" gap={1} alignItems="center">
@@ -369,7 +371,7 @@ export function RiskGovernancePanel({ risks }: { risks: RiskScenario[] }) {
                       <Typography variant="caption" color="text.secondary">
                         {campaign.progress.completed}/{campaign.progress.total}{" "}
                         revues · échéance{" "}
-                        {new Date(campaign.dueAt).toLocaleDateString("fr-FR")}
+                        {new Date(campaign.dueAt).toLocaleDateString(locale)}
                       </Typography>
                       {campaign.reviews.map((review) => (
                         <Stack

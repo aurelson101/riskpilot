@@ -51,6 +51,7 @@ import type {
   User,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import axios from "axios";
 
 const statuses = [
@@ -198,6 +199,7 @@ function ActionCard({
   canManage: boolean;
   onEdit: (action: ActionPlan) => void;
 }) {
+  const locale = useInterfaceLocale();
   return (
     <Card
       variant="outlined"
@@ -235,7 +237,7 @@ function ActionCard({
           <LinearProgress variant="determinate" value={action.progress} />
           <Typography variant="caption">
             {action.progress}% · échéance{" "}
-            {toLocalDate(action.dueDate).toLocaleDateString("fr-FR")}
+            {toLocalDate(action.dueDate).toLocaleDateString(locale)}
           </Typography>
         </Stack>
       </CardContent>
@@ -244,6 +246,7 @@ function ActionCard({
 }
 
 export function ActionsPage() {
+  const locale = useInterfaceLocale();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table");
@@ -391,15 +394,15 @@ export function ActionsPage() {
     );
   const actions = query.data ?? [];
   const filteredActions = actions.filter((action) => {
-    const term = search.trim().toLocaleLowerCase("fr");
+    const term = search.trim().toLocaleLowerCase(locale);
     const matchesSearch =
       !term ||
-      action.title.toLocaleLowerCase("fr").includes(term) ||
+      action.title.toLocaleLowerCase(locale).includes(term) ||
       (action.relatedRisk?.title ?? "")
-        .toLocaleLowerCase("fr")
+        .toLocaleLowerCase(locale)
         .includes(term) ||
       `${action.owner.firstName} ${action.owner.lastName}`
-        .toLocaleLowerCase("fr")
+        .toLocaleLowerCase(locale)
         .includes(term);
     return (
       matchesSearch &&
@@ -581,7 +584,7 @@ export function ActionsPage() {
                     <TableCell>
                       {new Date(
                         `${action.dueDate}T00:00:00`,
-                      ).toLocaleDateString("fr-FR")}
+                      ).toLocaleDateString(locale)}
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -720,7 +723,7 @@ export function ActionsPage() {
                 fontWeight={750}
                 textTransform="capitalize"
               >
-                {calendarMonth.toLocaleDateString("fr-FR", {
+                {calendarMonth.toLocaleDateString(locale, {
                   month: "long",
                   year: "numeric",
                 })}
@@ -894,7 +897,7 @@ export function ActionsPage() {
                 {calendarSubscription.data.createdAt
                   ? new Date(
                       calendarSubscription.data.createdAt,
-                    ).toLocaleDateString("fr-FR")
+                    ).toLocaleDateString(locale)
                   : "une date inconnue"}
                 . Pour des raisons de sécurité, son adresse n’est affichée qu’à
                 sa création. Régénérez-la pour obtenir un nouveau lien.

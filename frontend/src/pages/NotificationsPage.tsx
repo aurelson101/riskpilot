@@ -10,8 +10,10 @@ import {
 } from "@mui/material";
 import { api } from "../api/client";
 import type { Notification } from "../api/types";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 export function NotificationsPage() {
+  const locale = useInterfaceLocale();
   const client = useQueryClient();
   const query = useQuery({
     queryKey: ["notifications"],
@@ -53,7 +55,7 @@ export function NotificationsPage() {
                   <Typography fontWeight={700}>{item.title}</Typography>
                   <Typography>{item.message}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(item.createdAt).toLocaleString("fr-FR")}
+                    {new Date(item.createdAt).toLocaleString(locale)}
                   </Typography>
                 </Stack>
                 {!item.isRead && (

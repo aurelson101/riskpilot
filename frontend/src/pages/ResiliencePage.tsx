@@ -29,6 +29,7 @@ import {
 import { api } from "../api/client";
 import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import type { Scope, User } from "../api/types";
 
 type TimelineEvent = { at: string; event: string; actor: string };
@@ -95,6 +96,7 @@ const dateTimeLocal = (value: string | null) =>
   value ? value.slice(0, 16) : "";
 
 export function ResiliencePage() {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const cache = useQueryClient();
   const incidents = useQuery({
@@ -434,7 +436,7 @@ export function ResiliencePage() {
                     {item.timeline.length} événement(s) · {item.evidence.length}{" "}
                     preuve(s)
                     {item.closedAt
-                      ? ` · Clos le ${new Date(item.closedAt).toLocaleDateString("fr")}`
+                      ? ` · Clos le ${new Date(item.closedAt).toLocaleDateString(locale)}`
                       : ""}
                   </Typography>
                 </Stack>

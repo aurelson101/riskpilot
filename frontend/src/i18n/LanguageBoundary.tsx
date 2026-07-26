@@ -1,4 +1,5 @@
 import { useLayoutEffect, type PropsWithChildren } from "react";
+import { InterfaceLocaleContext } from "./InterfaceLocaleContext";
 import { enToFr, frToEn, phrasePairs, type Locale } from "./translations";
 
 const originalText = new WeakMap<Text, string>();
@@ -100,5 +101,9 @@ export function LanguageBoundary({
     return () => observer.disconnect();
   }, [locale]);
 
-  return children;
+  return (
+    <InterfaceLocaleContext.Provider value={locale}>
+      {children}
+    </InterfaceLocaleContext.Provider>
+  );
 }

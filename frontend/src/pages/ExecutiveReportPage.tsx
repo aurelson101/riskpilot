@@ -26,6 +26,7 @@ import {
 import { api } from "../api/client";
 import type { Dashboard, RiskLevel } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 const riskColors: Record<RiskLevel, string> = {
   LOW: "#43a047",
@@ -99,6 +100,7 @@ function ChartCard({
 }
 
 export function ExecutiveReportPage() {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const query = useQuery({
     queryKey: ["dashboard"],
@@ -155,7 +157,7 @@ export function ExecutiveReportPage() {
           </Typography>
           <Typography color="text.secondary">
             Situation au{" "}
-            {new Date().toLocaleDateString("fr-FR", { dateStyle: "long" })}
+            {new Date().toLocaleDateString(locale, { dateStyle: "long" })}
           </Typography>
         </Stack>
         <Button
@@ -305,7 +307,7 @@ export function ExecutiveReportPage() {
                     <TableCell align="right">
                       {new Date(
                         `${action.dueDate}T00:00:00`,
-                      ).toLocaleDateString("fr-FR")}
+                      ).toLocaleDateString(locale)}
                     </TableCell>
                   </TableRow>
                 ))}

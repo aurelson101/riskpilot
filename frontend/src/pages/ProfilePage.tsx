@@ -20,8 +20,10 @@ import QRCode from "qrcode";
 import { api } from "../api/client";
 import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 export function ProfilePage() {
+  const interfaceLocale = useInterfaceLocale();
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState("");
@@ -291,7 +293,9 @@ export function ProfilePage() {
                   </Stack>
                   <Typography variant="caption" color="text.secondary">
                     IP {session.ipAddress} · dernière activité{" "}
-                    {new Date(session.lastUsedAt).toLocaleString("fr-FR")}
+                    {new Date(session.lastUsedAt).toLocaleString(
+                      interfaceLocale,
+                    )}
                   </Typography>
                 </Stack>
                 {session.active && (

@@ -19,6 +19,7 @@ import axios from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 interface SharedDocument {
   title: string;
@@ -32,6 +33,7 @@ interface SharedDocument {
 }
 
 export function PublicDocumentPage() {
+  const locale = useInterfaceLocale();
   const { token } = useParams();
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState("");
@@ -142,7 +144,7 @@ export function PublicDocumentPage() {
               </Stack>
               <Typography variant="caption" color="text.secondary">
                 Mis à jour le{" "}
-                {new Date(document.updatedAt).toLocaleString("fr-FR")}
+                {new Date(document.updatedAt).toLocaleString(locale)}
               </Typography>
               {document.file && (
                 <Alert

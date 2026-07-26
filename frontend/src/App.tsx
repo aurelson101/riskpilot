@@ -212,11 +212,11 @@ function Layout() {
         .filter(
           (category) =>
             Boolean(category) &&
-            category.trim().toLocaleLowerCase("fr") !==
-              "publications récentes".toLocaleLowerCase("fr"),
+            category.trim().toLocaleLowerCase(user?.locale ?? "fr") !==
+              "publications récentes".toLocaleLowerCase(user?.locale ?? "fr"),
         )
         .sort((left, right) => left.localeCompare(right, "fr")),
-    [ismsDocuments.data],
+    [ismsDocuments.data, user?.locale],
   );
   const isAdmin = user?.roles.some((role) =>
     ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),

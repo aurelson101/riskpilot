@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "i18n:audit": "node scripts/check-i18n.mjs",
     "lint": "oxlint && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",

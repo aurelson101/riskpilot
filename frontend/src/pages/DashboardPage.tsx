@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import type { Dashboard, RiskLevel } from "../api/types";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 const levelColors: Record<RiskLevel, string> = {
   LOW: "#43a047",
@@ -57,6 +58,7 @@ function download(path: string) {
 }
 
 export function DashboardPage() {
+  const locale = useInterfaceLocale();
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
@@ -251,7 +253,7 @@ export function DashboardPage() {
                       <Typography variant="caption">
                         {new Date(
                           `${action.dueDate}T00:00:00`,
-                        ).toLocaleDateString("fr-FR")}
+                        ).toLocaleDateString(locale)}
                       </Typography>
                     </Stack>
                     <Chip

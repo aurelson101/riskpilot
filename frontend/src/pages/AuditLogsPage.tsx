@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { api } from "../api/client";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import { AuditManagementPanel } from "../components/audit/AuditManagementPanel";
 
 type AuditLog = {
@@ -29,6 +30,7 @@ type AuditLog = {
 };
 
 export function AuditLogsPage() {
+  const locale = useInterfaceLocale();
   const [tab, setTab] = useState(0);
   const query = useQuery({
     queryKey: ["audit-logs"],
@@ -71,7 +73,7 @@ export function AuditLogsPage() {
                 {query.data?.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell>
-                      {new Date(log.createdAt).toLocaleString("fr-FR")}
+                      {new Date(log.createdAt).toLocaleString(locale)}
                     </TableCell>
                     <TableCell>
                       {log.user?.name ?? "Compte supprimé"}

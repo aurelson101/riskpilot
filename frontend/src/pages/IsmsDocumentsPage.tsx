@@ -46,6 +46,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { IsmsDocument, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 const categories = [
   "Politique",
@@ -77,9 +78,9 @@ function message(error: unknown) {
 function person(user: Pick<User, "firstName" | "lastName">) {
   return `${user.firstName} ${user.lastName}`;
 }
-function date(value: string | null) {
+function date(value: string | null, locale: "fr" | "en") {
   return value
-    ? new Intl.DateTimeFormat("fr-FR", {
+    ? new Intl.DateTimeFormat(locale, {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(new Date(value))
@@ -87,6 +88,7 @@ function date(value: string | null) {
 }
 
 export function IsmsDocumentsPage() {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const client = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -358,7 +360,7 @@ export function IsmsDocumentsPage() {
                   Propriétaire : {person(document.owner)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Mis à jour {date(document.updatedAt)}
+                  Mis à jour {date(document.updatedAt, locale)}
                 </Typography>
               </CardContent>
               <CardActions>
@@ -472,8 +474,8 @@ export function IsmsDocumentsPage() {
                   icon={<TaskAltOutlined />}
                 >
                   Approuvé par {person(current.approval.approvedBy)} le{" "}
-                  {date(current.approval.approvedAt)}. Prochaine revue :{" "}
-                  {date(current.approval.nextReviewAt)}.
+                  {date(current.approval.approvedAt, locale)}. Prochaine revue :{" "}
+                  {date(current.approval.nextReviewAt, locale)}.
                 </Alert>
               )}
               {current.permissions.manage && current.status !== "APPROVED" && (
@@ -558,7 +560,8 @@ export function IsmsDocumentsPage() {
                       {version.comment ?? "Sans commentaire"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {person(version.author)} · {date(version.createdAt)}
+                      {person(version.author)} ·{" "}
+                      {date(version.createdAt, locale)}
                     </Typography>
                     {version.fileName && (
                       <Typography
@@ -759,8 +762,8 @@ export function IsmsDocumentsPage() {
                       )}
                     </Stack>
                     <Typography variant="body2" mt={1}>
-                      Expiration : {date(share.expiresAt)} · {share.accessCount}{" "}
-                      consultation(s)
+                      Expiration : {date(share.expiresAt, locale)} ·{" "}
+                      {share.accessCount} consultation(s)
                     </Typography>
                   </Box>
                   {share.available && current.permissions.manage && (
