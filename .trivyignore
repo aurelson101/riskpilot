@@ -1,0 +1,4 @@
+# Trivy currently reports 8.3.0 as the fix, but npm's latest published
+# react-router-dom release is 7.18.1. Remove this exception as soon as a
+# patched release is actually available.
+GHSA-qwww-vcr4-c8h2

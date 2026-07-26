@@ -172,6 +172,11 @@ const IntegrationSettingsPage = lazy(() =>
     default: module.IntegrationSettingsPage,
   })),
 );
+const ActionFieldsPage = lazy(() =>
+  import("./pages/ActionFieldsPage").then((module) => ({
+    default: module.ActionFieldsPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -541,6 +546,14 @@ function Layout() {
               {isAdmin && (
                 <NavItem
                   nested
+                  path="/administration/action-fields"
+                  label="Action columns"
+                  icon={<GridViewOutlined fontSize="small" />}
+                />
+              )}
+              {isAdmin && (
+                <NavItem
+                  nested
                   path="/administration/integrations"
                   label="Identité et intégrations"
                   icon={<AccountTreeOutlined fontSize="small" />}
@@ -797,6 +810,10 @@ export default function App() {
             <Route
               path="administration/integrations"
               element={<IntegrationSettingsPage />}
+            />
+            <Route
+              path="administration/action-fields"
+              element={<ActionFieldsPage />}
             />
             <Route path="reports/executive" element={<ExecutiveReportPage />} />
             <Route path="isms-documents" element={<IsmsDocumentsPage />} />

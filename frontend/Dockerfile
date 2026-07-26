@@ -5,6 +5,7 @@ COPY package*.json ./
 # Une seconde installation propre rend le build reproductible sur ces hôtes.
 RUN npm install || (sleep 2 && npm install)
 COPY . .
+USER node
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
