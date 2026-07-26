@@ -30,7 +30,7 @@ jobs:
       - run: docker compose run --rm frontend npm run i18n:audit
       - run: docker compose run --rm frontend npm run security:react-router
       - run: docker compose run --rm frontend npm run build
-      - run: docker compose run --rm backend php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate
+      - run: docker compose run --rm backend sh -lc 'php bin/console doctrine:migrations:migrate --no-interaction && php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate'
       - run: docker compose up -d --wait nginx
       - uses: actions/setup-node@v4
         with:
