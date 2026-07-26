@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use App\Repository\ActionPlanRepository;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -14,12 +16,14 @@ class ActionPlan
 {
     public const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
     public const STATUSES = ['OPEN', 'PLANNED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED'];
+    public const ORIGINS = ['AUDIT', 'RISK_ASSESSMENT', 'NON_CONFORMITY', 'INCIDENT', 'CONTROL', 'MANAGEMENT_REVIEW', 'REGULATORY_REQUEST', 'OTHER'];
+    public const ACTION_TYPES = ['TECHNICAL', 'ORGANIZATIONAL', 'HUMAN', 'PHYSICAL', 'CONTRACTUAL', 'OTHER'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
     #[ORM\Column(length: 255)] private string $title;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $description = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
-    #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private RiskScenario $relatedRisk;
+    #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?RiskScenario $relatedRisk;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?SecurityControl $relatedControl = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')] private User $owner;
     #[ORM\Column(length: 20)] private string $priority = 'MEDIUM';
@@ -34,9 +38,24 @@ class ActionPlan
     #[ORM\Column(nullable: true)] private ?int $expectedRiskReduction = null;
     /** @var list<string> */
     #[ORM\Column(type: 'json')] private array $evidence = [];
+    #[ORM\Column(length: 120, nullable: true)] private ?string $ticketNumber = null;
+    #[ORM\Column(length: 2048, nullable: true)] private ?string $ticketUrl = null;
+    #[ORM\Column(length: 30)] private string $origin = 'OTHER';
+    #[ORM\Column(length: 30)] private string $actionType = 'OTHER';
+    /** @var list<int> */ #[ORM\Column(type: 'json')] private array $frameworkIds = [];
+    /** @var list<int> */ #[ORM\Column(type: 'json')] private array $requirementIds = [];
+    /** @var array<string, scalar|null> */ #[ORM\Column(type: 'json')] private array $customFields = [];
+    /** @var Collection<int, AuditFinding> */
+    #[ORM\ManyToMany(targetEntity: AuditFinding::class, inversedBy: 'actions')]
+    #[ORM\JoinTable(name: 'action_audit_findings')]
+    private Collection $auditFindings;
+    /** @var Collection<int, ComplianceResult> */
+    #[ORM\ManyToMany(targetEntity: ComplianceResult::class, inversedBy: 'actions')]
+    #[ORM\JoinTable(name: 'action_compliance_results')]
+    private Collection $complianceResults;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
-    public function __construct(string $title, Organization $organization, RiskScenario $risk, User $owner, \DateTimeImmutable $dueDate)
+    public function __construct(string $title, Organization $organization, ?RiskScenario $risk, User $owner, \DateTimeImmutable $dueDate)
     {
         $this->title = $title;
         $this->organization = $organization;
@@ -45,6 +64,8 @@ class ActionPlan
         $this->dueDate = $dueDate;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+        $this->auditFindings = new ArrayCollection();
+        $this->complianceResults = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -81,12 +102,12 @@ class ActionPlan
         return $this->organization;
     }
 
-    public function getRelatedRisk(): RiskScenario
+    public function getRelatedRisk(): ?RiskScenario
     {
         return $this->relatedRisk;
     }
 
-    public function setRelatedRisk(RiskScenario $value): self
+    public function setRelatedRisk(?RiskScenario $value): self
     {
         $this->relatedRisk = $value;
 
@@ -260,6 +281,40 @@ class ActionPlan
     public function setEvidence(array $value): self
     {
         $this->evidence = $value;
+
+        return $this;
+    }
+
+    public function getTicketNumber(): ?string { return $this->ticketNumber; }
+    public function getTicketUrl(): ?string { return $this->ticketUrl; }
+    public function getOrigin(): string { return $this->origin; }
+    public function getActionType(): string { return $this->actionType; }
+    /** @return list<int> */ public function getFrameworkIds(): array { return $this->frameworkIds; }
+    /** @return list<int> */ public function getRequirementIds(): array { return $this->requirementIds; }
+    /** @return array<string, scalar|null> */ public function getCustomFields(): array { return $this->customFields; }
+    /** @return Collection<int, AuditFinding> */ public function getAuditFindings(): Collection { return $this->auditFindings; }
+    /** @return Collection<int, ComplianceResult> */ public function getComplianceResults(): Collection { return $this->complianceResults; }
+
+    /**
+     * @param list<int>                            $frameworkIds
+     * @param list<int>                            $requirementIds
+     * @param array<string, scalar|null>            $customFields
+     * @param list<AuditFinding>                    $auditFindings
+     * @param list<ComplianceResult>                $complianceResults
+     */
+    public function configureGrc(?string $ticketNumber, ?string $ticketUrl, string $origin, string $actionType, array $frameworkIds, array $requirementIds, array $customFields, array $auditFindings, array $complianceResults): self
+    {
+        $this->ticketNumber = $ticketNumber;
+        $this->ticketUrl = $ticketUrl;
+        $this->origin = $origin;
+        $this->actionType = $actionType;
+        $this->frameworkIds = $frameworkIds;
+        $this->requirementIds = $requirementIds;
+        $this->customFields = $customFields;
+        $this->auditFindings->clear();
+        foreach ($auditFindings as $finding) $this->auditFindings->add($finding);
+        $this->complianceResults->clear();
+        foreach ($complianceResults as $result) $this->complianceResults->add($result);
 
         return $this;
     }

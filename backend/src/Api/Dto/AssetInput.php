@@ -12,6 +12,7 @@ final class AssetInput
     #[Assert\NotBlank] #[Assert\Length(max: 180)] public string $name = '';
     #[Assert\Length(max: 5000)] public ?string $description = null;
     #[Assert\Choice(choices: Asset::TYPES)] public string $type = 'OTHER';
+    #[Assert\Choice(choices: Asset::FAMILIES)] public string $family = 'SOFTWARE';
     #[Assert\Range(min: 1, max: 5)] public int $criticality = 1;
     #[Assert\Range(min: 1, max: 5)] public int $confidentiality = 1;
     #[Assert\Range(min: 1, max: 5)] public int $integrity = 1;

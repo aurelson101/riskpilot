@@ -29,6 +29,8 @@ Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié 
 
 - `GET|POST /api/scopes` et `GET|PUT /api/scopes/{id}` ;
 - `GET|POST /api/assets` et `GET|PUT /api/assets/{id}` ;
+
+`GET /api/assets?family=HARDWARE|SOFTWARE|INFORMATION` filtre le registre commun sans dupliquer les actifs. Les écritures portent une propriété `family` explicite.
 - `GET|POST /api/threats` et `GET|PUT /api/threats/{id}` ;
 - `GET|POST /api/vulnerabilities` et `GET|PUT /api/vulnerabilities/{id}`.
 
@@ -54,6 +56,28 @@ Les référentiels sont partagés, tandis que les évaluations, résultats et ac
 ## Tableau de bord et exports
 
 - `GET /api/dashboard` : indicateurs consolidés, niveaux de risque, actions à échéance, principaux risques et conformité par référentiel ;
+
+## Indicateurs versionnés
+
+- `GET|POST /api/v1/indicators` : liste et création des définitions KPI/KRI de l’organisation ;
+- `GET /api/v1/indicators/{id}/values?limit=100` : historique antéchronologique ;
+- `POST /api/v1/indicators/{id}/values` : enregistrement d’une mesure.
+- `POST /api/v1/indicators/{id}/values/batch` : import de 1 000 mesures maximum avec résultat ligne par ligne ;
+- `GET /api/v1/indicators/{id}/values/export` : export CSV chronologique.
+
+Les administrateurs définissent les colonnes personnalisées du plan d’action avec `GET|POST /api/action-custom-fields`. Les types acceptés sont `TEXT`, `NUMBER`, `DATE`, `BOOLEAN`, `SELECT` et `URL`.
+
+Une mesure exige `value`, `measuredAt` au format ISO 8601 et `idempotencyKey`. Une nouvelle soumission de la même clé pour le même indicateur retourne la mesure existante sans doublon. Les champs optionnels sont `period`, `comment`, `evidence` (URL) et `source`.
+
+```json
+{
+  "value": 98.75,
+  "measuredAt": "2026-07-26T10:00:00+02:00",
+  "period": "2026-07",
+  "source": "SIEM",
+  "idempotencyKey": "siem-availability-2026-07"
+}
+```
 - `GET /api/exports/risks.csv` : registre des risques en CSV ;
 - `GET /api/exports/actions.csv` : plans d’action en CSV ;
 - `GET /api/exports/compliance/{id}.csv` : résultats d’une évaluation en CSV.

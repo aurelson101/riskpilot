@@ -197,20 +197,49 @@ function relationId(value: unknown): number | null {
     : null;
 }
 
-export function InventoryPage({ kind }: { kind: InventoryKind }) {
+export function InventoryPage({
+  kind,
+  assetFamily,
+}: {
+  kind: InventoryKind;
+  assetFamily?: Asset["family"];
+}) {
   const { user } = useAuth();
   const canManage = user?.roles.some((role) =>
     ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
   );
-  const config = configurations[kind];
+  const familyLabels = {
+    HARDWARE: ["Hardware assets", "Servers, workstations and equipment"],
+    SOFTWARE: ["Software assets", "Applications, systems and cloud services"],
+    INFORMATION: [
+      "Information assets",
+      "Data, documents and information flows",
+    ],
+  } as const;
+  const config =
+    kind === "assets" && assetFamily
+      ? {
+          ...configurations.assets,
+          title: familyLabels[assetFamily][0],
+          subtitle: familyLabels[assetFamily][1],
+        }
+      : configurations[kind];
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
-  const [form, setForm] = useState<FormData>({ ...initialForms[kind] });
+  const [form, setForm] = useState<FormData>({
+    ...initialForms[kind],
+    ...(assetFamily ? { family: assetFamily } : {}),
+  });
   const [error, setError] = useState("");
   const query = useQuery({
-    queryKey: [kind],
-    queryFn: async () => (await api.get<InventoryItem[]>(`/${kind}`)).data,
+    queryKey: [kind, assetFamily],
+    queryFn: async () =>
+      (
+        await api.get<InventoryItem[]>(`/${kind}`, {
+          params: assetFamily ? { family: assetFamily } : {},
+        })
+      ).data,
   });
   const users = useQuery({
     queryKey: ["users"],
@@ -245,7 +274,10 @@ export function InventoryPage({ kind }: { kind: InventoryKind }) {
     setForm((current) => ({ ...current, [key]: value }));
   function openCreate() {
     setEditing(null);
-    setForm({ ...initialForms[kind] });
+    setForm({
+      ...initialForms[kind],
+      ...(assetFamily ? { family: assetFamily } : {}),
+    });
     setError("");
     setDialogOpen(true);
   }

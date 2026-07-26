@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\HasLifecycleCallbacks]
 class Asset
 {
+    public const FAMILIES = ['HARDWARE', 'SOFTWARE', 'INFORMATION'];
     public const TYPES = ['BUSINESS_PROCESS', 'DATA', 'APPLICATION', 'SERVER', 'NETWORK', 'WORKSTATION', 'CLOUD_SERVICE', 'SUPPLIER', 'FACILITY', 'OTHER'];
     public const STATUSES = ['ACTIVE', 'INACTIVE', 'ARCHIVED'];
 
@@ -22,6 +23,7 @@ class Asset
     #[ORM\Column(length: 180)] private string $name;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $description = null;
     #[ORM\Column(length: 30)] private string $type;
+    #[ORM\Column(length: 20)] private string $family = 'SOFTWARE';
     #[ORM\Column] private int $criticality = 1;
     #[ORM\Column] private int $confidentiality = 1;
     #[ORM\Column] private int $integrity = 1;
@@ -37,10 +39,11 @@ class Asset
     #[ORM\JoinTable(name: 'asset_relations')]
     private Collection $relatedAssets;
 
-    public function __construct(string $name, string $type, Scope $scope, Organization $organization)
+    public function __construct(string $name, string $type, Scope $scope, Organization $organization, ?string $family = null)
     {
         $this->name = $name;
         $this->type = $type;
+        $this->family = $family ?? self::familyForType($type);
         $this->scope = $scope;
         $this->organization = $organization;
         $this->createdAt = new \DateTimeImmutable();
@@ -87,6 +90,30 @@ class Asset
         $this->type = $type;
 
         return $this;
+    }
+
+    public function getFamily(): string
+    {
+        return $this->family;
+    }
+
+    public function setFamily(string $family): self
+    {
+        if (!in_array($family, self::FAMILIES, true)) {
+            throw new \InvalidArgumentException('Invalid asset family.');
+        }
+        $this->family = $family;
+
+        return $this;
+    }
+
+    public static function familyForType(string $type): string
+    {
+        return match ($type) {
+            'SERVER', 'NETWORK', 'WORKSTATION', 'FACILITY' => 'HARDWARE',
+            'DATA', 'BUSINESS_PROCESS' => 'INFORMATION',
+            default => 'SOFTWARE',
+        };
     }
 
     public function getCriticality(): int

@@ -1,12 +1,12 @@
 # Modèle de données
 
-Les agrégats prévus sont Organization, User, Scope, Asset, Threat, Vulnerability, RiskScenario, SecurityControl, ActionPlan, Framework, Requirement, ComplianceAssessment, ComplianceResult et AuditLog.
+Les agrégats comprennent notamment Organization, User, Scope, Asset, Threat, Vulnerability, RiskScenario, SecurityControl, ActionPlan, Framework, Requirement, ComplianceAssessment, ComplianceResult, Indicator, IndicatorValue et AuditLog.
 
 Toutes les ressources tenant-aware portent une organisation explicite. Les associations et index sont versionnés par des migrations afin de conserver des changements révisables.
 
 ## Étape 3
 
-`Scope` forme une arborescence auto-référencée et possède un responsable optionnel. `Asset` appartient obligatoirement à un périmètre et porte les niveaux de criticité, confidentialité, intégrité et disponibilité de 1 à 5. `Threat` constitue le catalogue de menaces propre à l’organisation. `Vulnerability` référence plusieurs actifs affectés via une table de jointure.
+`Scope` forme une arborescence auto-référencée et possède un responsable optionnel. `Asset` appartient obligatoirement à un périmètre, porte une famille explicite (`HARDWARE`, `SOFTWARE`, `INFORMATION`) et les niveaux de criticité, confidentialité, intégrité et disponibilité de 1 à 5. `Threat` constitue le catalogue de menaces propre à l’organisation. `Vulnerability` référence plusieurs actifs affectés via une table de jointure.
 
 Ces quatre agrégats portent une organisation obligatoire. Les repositories ajoutent cette organisation à chaque lecture et les contrôleurs refusent toute relation pointant vers un autre tenant.
 
@@ -23,3 +23,7 @@ Ces quatre agrégats portent une organisation obligatoire. Les repositories ajou
 Le tableau de bord et les exports ne créent pas de nouvel agrégat : ils constituent des projections des risques, actions et résultats de conformité existants. Les fixtures assemblent un graphe cohérent de ces entités pour le développement et les démonstrations.
 
 `AuditLog` conserve les mutations HTTP réussies, leur auteur, le tenant, la ressource, l’adresse IP et les valeurs d’entrée expurgées de leurs secrets.
+
+## Indicateurs
+
+`Indicator` définit un KPI ou KRI propre à une organisation. `IndicatorValue` conserve chaque mesure horodatée avec période, provenance, preuve et clé d’idempotence unique par indicateur.

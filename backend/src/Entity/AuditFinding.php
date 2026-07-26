@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -29,6 +31,7 @@ class AuditFinding
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?User $effectivenessValidatedBy = null;
     #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $effectivenessValidatedAt = null;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
+    /** @var Collection<int, ActionPlan> */ #[ORM\ManyToMany(targetEntity: ActionPlan::class, mappedBy: 'auditFindings')] private Collection $actions;
     /** @param list<string> $evidence */
     public function __construct(AuditEngagement $engagement, User $owner, string $type, string $title, string $description, array $evidence, \DateTimeImmutable $dueAt)
     {
@@ -42,8 +45,10 @@ class AuditFinding
         $this->evidence = $evidence;
         $this->dueAt = $dueAt;
         $this->createdAt = new \DateTimeImmutable();
+        $this->actions = new ArrayCollection();
         $engagement->addFinding($this);
     }
+    /** @return Collection<int, ActionPlan> */ public function getActions(): Collection { return $this->actions; }
 
     public function getId(): ?int
     {

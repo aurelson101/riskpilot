@@ -27,9 +27,18 @@ final readonly class AssetController
     }
 
     #[Route('', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return new JsonResponse(array_map($this->responses->asset(...), $this->assets->findVisibleTo($this->currentUser->get())));
+        $family = $request->query->getString('family');
+        if ('' !== $family && !in_array($family, Asset::FAMILIES, true)) {
+            return new JsonResponse(['code' => 'INVALID_FAMILY', 'message' => 'Invalid asset family.'], 422);
+        }
+        $items = $this->assets->findVisibleTo($this->currentUser->get());
+        if ('' !== $family) {
+            $items = array_values(array_filter($items, static fn (Asset $asset): bool => $asset->getFamily() === $family));
+        }
+
+        return new JsonResponse(array_map($this->responses->asset(...), $items));
     }
 
     #[Route('/{id<\d+>}', methods: ['GET'])]
@@ -85,11 +94,11 @@ final readonly class AssetController
             return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'Le périmètre, le responsable ou un actif lié est invalide.'], 422);
         }
         $created = null === $asset;
-        $asset ??= new Asset($input->name, $input->type, $scope, $actor->getOrganization());
+        $asset ??= new Asset($input->name, $input->type, $scope, $actor->getOrganization(), $input->family);
         if (in_array($asset, $relatedAssets, true)) {
             return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'Un actif ne peut pas être lié à lui-même.'], 422);
         }
-        $asset->setName($input->name)->setDescription($input->description)->setType($input->type)->setCriticality($input->criticality)->setConfidentiality($input->confidentiality)->setIntegrity($input->integrity)->setAvailability($input->availability)->setOwner($owner)->setScope($scope)->replaceRelatedAssets($relatedAssets)->setStatus($input->status);
+        $asset->setName($input->name)->setDescription($input->description)->setType($input->type)->setFamily($input->family)->setCriticality($input->criticality)->setConfidentiality($input->confidentiality)->setIntegrity($input->integrity)->setAvailability($input->availability)->setOwner($owner)->setScope($scope)->replaceRelatedAssets($relatedAssets)->setStatus($input->status);
         $this->entityManager->persist($asset);
         $this->entityManager->flush();
 

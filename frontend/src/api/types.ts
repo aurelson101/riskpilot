@@ -135,7 +135,7 @@ export interface ActionPlan {
   id: number;
   title: string;
   description: string | null;
-  relatedRisk: { id: number; title: string };
+  relatedRisk: { id: number; title: string } | null;
   relatedControl: { id: number; name: string } | null;
   owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -156,6 +156,17 @@ export interface ActionPlan {
   actualCost: string | null;
   expectedRiskReduction: number | null;
   evidence: string[];
+  ticketNumber: string | null;
+  ticketUrl: string | null;
+  origin: string;
+  actionType: string;
+  frameworkIds: number[];
+  requirementIds: number[];
+  customFields: Record<string, string | number | boolean | null>;
+  nonConformities: Array<{
+    type: "AUDIT_FINDING" | "COMPLIANCE_RESULT";
+    id: number;
+  }>;
 }
 
 export interface Notification {
@@ -166,6 +177,33 @@ export interface Notification {
   link: string | null;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface Indicator {
+  id: number;
+  code: string;
+  name: string;
+  kind: "KPI" | "KRI";
+  unit: string;
+  frequency: string;
+  formula: string | null;
+  source: string | null;
+  target: string | null;
+  thresholds: Record<string, number>;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface IndicatorValue {
+  id: number;
+  value: string;
+  measuredAt: string;
+  period: string | null;
+  comment: string | null;
+  evidence: string | null;
+  source: string | null;
+  idempotencyKey: string;
+  version: number;
 }
 
 export interface Framework {
@@ -302,6 +340,7 @@ export interface Asset {
   name: string;
   description: string | null;
   type: string;
+  family: "HARDWARE" | "SOFTWARE" | "INFORMATION";
   criticality: number;
   confidentiality: number;
   integrity: number;

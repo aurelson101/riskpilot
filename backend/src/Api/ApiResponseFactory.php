@@ -53,12 +53,18 @@ final class ApiResponseFactory
     {
         return [
             'id' => $action->getId(), 'title' => $action->getTitle(), 'description' => $action->getDescription(),
-            'relatedRisk' => ['id' => $action->getRelatedRisk()->getId(), 'title' => $action->getRelatedRisk()->getTitle()],
+            'relatedRisk' => null === $action->getRelatedRisk() ? null : ['id' => $action->getRelatedRisk()->getId(), 'title' => $action->getRelatedRisk()->getTitle()],
             'relatedControl' => null === $action->getRelatedControl() ? null : ['id' => $action->getRelatedControl()->getId(), 'name' => $action->getRelatedControl()->getName()],
             'owner' => $this->userSummary($action->getOwner()), 'priority' => $action->getPriority(), 'status' => $action->getStatus(),
             'startDate' => $action->getStartDate()?->format('Y-m-d'), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'completionDate' => $action->getCompletionDate()?->format('Y-m-d'),
             'progress' => $action->getProgress(), 'estimatedCost' => $action->getEstimatedCost(), 'estimatedEffortDays' => $action->getEstimatedEffortDays(), 'actualCost' => $action->getActualCost(),
             'expectedRiskReduction' => $action->getExpectedRiskReduction(), 'evidence' => $action->getEvidence(),
+            'ticketNumber' => $action->getTicketNumber(), 'ticketUrl' => $action->getTicketUrl(), 'origin' => $action->getOrigin(), 'actionType' => $action->getActionType(),
+            'frameworkIds' => $action->getFrameworkIds(), 'requirementIds' => $action->getRequirementIds(), 'customFields' => $action->getCustomFields(),
+            'nonConformities' => [
+                ...array_map(static fn (\App\Entity\AuditFinding $item): array => ['type' => 'AUDIT_FINDING', 'id' => $item->getId(), 'title' => $item->getTitle()], $action->getAuditFindings()->toArray()),
+                ...array_map(static fn (ComplianceResult $item): array => ['type' => 'COMPLIANCE_RESULT', 'id' => $item->getId(), 'title' => $item->getRequirement()->getTitle()], $action->getComplianceResults()->toArray()),
+            ],
             'createdAt' => $action->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $action->getUpdatedAt()->format(DATE_ATOM),
         ];
     }
@@ -130,7 +136,7 @@ final class ApiResponseFactory
     /** @return array<string, mixed> */
     public function asset(Asset $asset): array
     {
-        return ['id' => $asset->getId(), 'name' => $asset->getName(), 'description' => $asset->getDescription(), 'type' => $asset->getType(), 'criticality' => $asset->getCriticality(), 'confidentiality' => $asset->getConfidentiality(), 'integrity' => $asset->getIntegrity(), 'availability' => $asset->getAvailability(), 'owner' => null === $asset->getOwner() ? null : $this->userSummary($asset->getOwner()), 'scope' => ['id' => $asset->getScope()->getId(), 'name' => $asset->getScope()->getName()], 'relatedAssets' => array_map(fn (Asset $related): array => ['id' => $related->getId(), 'name' => $related->getName()], $asset->getRelatedAssets()->toArray()), 'status' => $asset->getStatus(), 'createdAt' => $asset->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $asset->getUpdatedAt()->format(DATE_ATOM)];
+        return ['id' => $asset->getId(), 'name' => $asset->getName(), 'description' => $asset->getDescription(), 'type' => $asset->getType(), 'family' => $asset->getFamily(), 'criticality' => $asset->getCriticality(), 'confidentiality' => $asset->getConfidentiality(), 'integrity' => $asset->getIntegrity(), 'availability' => $asset->getAvailability(), 'owner' => null === $asset->getOwner() ? null : $this->userSummary($asset->getOwner()), 'scope' => ['id' => $asset->getScope()->getId(), 'name' => $asset->getScope()->getName()], 'relatedAssets' => array_map(fn (Asset $related): array => ['id' => $related->getId(), 'name' => $related->getName()], $asset->getRelatedAssets()->toArray()), 'status' => $asset->getStatus(), 'createdAt' => $asset->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $asset->getUpdatedAt()->format(DATE_ATOM)];
     }
 
     /** @return array<string, mixed> */

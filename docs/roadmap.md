@@ -1,6 +1,15 @@
 # Roadmap RiskPilot
 
-Cette roadmap unique remplace toutes les roadmaps précédentes. Elle décrit uniquement les évolutions restant à réaliser. L’ordre tient compte des dépendances de données : la taxonomie des actifs est stabilisée avant d’enrichir les traitements, puis les non-conformités sont reliées au plan d’action avant d’ouvrir l’alimentation automatisée des indicateurs.
+Cette roadmap unique remplace toutes les roadmaps précédentes. Les fondations des quatre étapes ont été livrées le 2026-07-26. Les compléments avancés restant à industrialiser sont conservés dans les critères détaillés ci-dessous.
+
+## Statut au 2026-07-26
+
+- **Étape 1 — livrée** : famille explicite, migration de reprise, filtre API et trois vues anglaises spécialisées.
+- **Étape 2 — livrée (socle)** : ticket, origine, type, référentiels, exigences et valeurs personnalisées dans le modèle et l’API ; formulaire anglais pour les champs principaux.
+- **Étape 3 — livrée** : relations SQL bidirectionnelles vers constats d’audit et résultats de conformité, avec validation stricte de l’organisation.
+- **Étape 4 — livrée (socle)** : définitions KPI/KRI, historique horodaté, clé d’idempotence, isolation tenant et interface anglaise de saisie.
+
+Restent des incréments d’industrialisation : administration graphique des définitions de colonnes, clés de service à portée fine, alertes et graphiques de tendance.
 
 ## Règles communes de livraison
 

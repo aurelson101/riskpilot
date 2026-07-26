@@ -105,7 +105,7 @@ function actionPayload(action: ActionPlan, status = action.status) {
   return {
     title: action.title,
     description: action.description ?? "",
-    relatedRiskId: action.relatedRisk.id,
+    relatedRiskId: action.relatedRisk?.id ?? null,
     relatedControlId: action.relatedControl?.id ?? null,
     ownerId: action.owner.id,
     priority: action.priority,
@@ -123,6 +123,14 @@ function actionPayload(action: ActionPlan, status = action.status) {
     actualCost: action.actualCost === null ? null : Number(action.actualCost),
     expectedRiskReduction: action.expectedRiskReduction,
     evidence: action.evidence,
+    ticketNumber: action.ticketNumber,
+    ticketUrl: action.ticketUrl,
+    origin: action.origin,
+    actionType: action.actionType,
+    frameworkIds: action.frameworkIds,
+    requirementIds: action.requirementIds,
+    customFields: action.customFields,
+    nonConformities: action.nonConformities,
   };
 }
 
@@ -143,6 +151,10 @@ type ActionForm = {
   actualCost: number | null;
   expectedRiskReduction: number | null;
   evidence: string[];
+  ticketNumber: string;
+  ticketUrl: string;
+  origin: string;
+  actionType: string;
 };
 type CalendarSubscription = {
   enabled: boolean;
@@ -166,6 +178,10 @@ const emptyForm: ActionForm = {
   actualCost: null,
   expectedRiskReduction: null,
   evidence: [],
+  ticketNumber: "",
+  ticketUrl: "",
+  origin: "RISK_ASSESSMENT",
+  actionType: "TECHNICAL",
 };
 function apiMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -208,7 +224,7 @@ function ActionCard({
             />
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            {action.relatedRisk.title}
+            {action.relatedRisk?.title ?? "No linked risk"}
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.5}>
             <PersonOutline sx={{ fontSize: 15, color: "text.secondary" }} />
@@ -337,7 +353,7 @@ export function ActionsPage() {
     setForm({
       title: action.title,
       description: action.description ?? "",
-      relatedRiskId: action.relatedRisk.id,
+      relatedRiskId: action.relatedRisk?.id ?? "",
       relatedControlId: action.relatedControl?.id ?? null,
       ownerId: action.owner.id,
       priority: action.priority,
@@ -355,6 +371,10 @@ export function ActionsPage() {
       actualCost: action.actualCost === null ? null : Number(action.actualCost),
       expectedRiskReduction: action.expectedRiskReduction,
       evidence: action.evidence,
+      ticketNumber: action.ticketNumber ?? "",
+      ticketUrl: action.ticketUrl ?? "",
+      origin: action.origin,
+      actionType: action.actionType,
     });
     setError("");
     setDialogOpen(true);
@@ -375,7 +395,9 @@ export function ActionsPage() {
     const matchesSearch =
       !term ||
       action.title.toLocaleLowerCase("fr").includes(term) ||
-      action.relatedRisk.title.toLocaleLowerCase("fr").includes(term) ||
+      (action.relatedRisk?.title ?? "")
+        .toLocaleLowerCase("fr")
+        .includes(term) ||
       `${action.owner.firstName} ${action.owner.lastName}`
         .toLocaleLowerCase("fr")
         .includes(term);
@@ -504,6 +526,9 @@ export function ActionsPage() {
                 <TableRow>
                   <TableCell>Action</TableCell>
                   <TableCell>Risque</TableCell>
+                  <TableCell>Ticket</TableCell>
+                  <TableCell>Origin</TableCell>
+                  <TableCell>Type</TableCell>
                   <TableCell>Responsable</TableCell>
                   <TableCell>Priorité</TableCell>
                   <TableCell>Progression</TableCell>
@@ -518,7 +543,22 @@ export function ActionsPage() {
                     <TableCell>
                       <Typography fontWeight={650}>{action.title}</Typography>
                     </TableCell>
-                    <TableCell>{action.relatedRisk.title}</TableCell>
+                    <TableCell>{action.relatedRisk?.title ?? "—"}</TableCell>
+                    <TableCell>
+                      {action.ticketUrl ? (
+                        <a
+                          href={action.ticketUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {action.ticketNumber ?? "Open"}
+                        </a>
+                      ) : (
+                        (action.ticketNumber ?? "—")
+                      )}
+                    </TableCell>
+                    <TableCell>{action.origin.replaceAll("_", " ")}</TableCell>
+                    <TableCell>{action.actionType}</TableCell>
                     <TableCell>
                       {action.owner.firstName} {action.owner.lastName}
                     </TableCell>
@@ -945,15 +985,21 @@ export function ActionsPage() {
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
               />
-              <FormControl required>
-                <InputLabel>Risque lié</InputLabel>
+              <FormControl>
+                <InputLabel>Linked risk</InputLabel>
                 <Select
-                  label="Risque lié"
+                  label="Linked risk"
                   value={form.relatedRiskId}
                   onChange={(e) =>
-                    update("relatedRiskId", Number(e.target.value))
+                    update(
+                      "relatedRiskId",
+                      String(e.target.value) === ""
+                        ? ""
+                        : Number(e.target.value),
+                    )
                   }
                 >
+                  <MenuItem value="">None</MenuItem>
                   {risks.data
                     ?.filter((risk) => risk.status !== "ARCHIVED")
                     .map((risk) => (
@@ -963,6 +1009,65 @@ export function ActionsPage() {
                     ))}
                 </Select>
               </FormControl>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Tracking ticket number"
+                  value={form.ticketNumber}
+                  onChange={(e) => update("ticketNumber", e.target.value)}
+                />
+                <TextField
+                  fullWidth
+                  type="url"
+                  label="Tracking ticket URL"
+                  value={form.ticketUrl}
+                  onChange={(e) => update("ticketUrl", e.target.value)}
+                />
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Action origin"
+                  value={form.origin}
+                  onChange={(e) => update("origin", e.target.value)}
+                >
+                  {[
+                    "AUDIT",
+                    "RISK_ASSESSMENT",
+                    "NON_CONFORMITY",
+                    "INCIDENT",
+                    "CONTROL",
+                    "MANAGEMENT_REVIEW",
+                    "REGULATORY_REQUEST",
+                    "OTHER",
+                  ].map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {value.replaceAll("_", " ")}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  fullWidth
+                  label="Action type"
+                  value={form.actionType}
+                  onChange={(e) => update("actionType", e.target.value)}
+                >
+                  {[
+                    "TECHNICAL",
+                    "ORGANIZATIONAL",
+                    "HUMAN",
+                    "PHYSICAL",
+                    "CONTRACTUAL",
+                    "OTHER",
+                  ].map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {value}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
               <FormControl>
                 <InputLabel>Mesure liée</InputLabel>
                 <Select

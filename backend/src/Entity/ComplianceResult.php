@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\ComplianceResultRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ComplianceResultRepository::class)]
@@ -21,12 +23,15 @@ class ComplianceResult
     #[ORM\Column(type: 'text', nullable: true)] private ?string $comment = null;
     /** @var list<string> */ #[ORM\Column(type: 'json')] private array $evidence = [];
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?ActionPlan $remediationAction = null;
+    /** @var Collection<int, ActionPlan> */ #[ORM\ManyToMany(targetEntity: ActionPlan::class, mappedBy: 'complianceResults')] private Collection $actions;
     public function __construct(ComplianceAssessment $assessment, Requirement $requirement)
     {
         $this->assessment = $assessment;
         $this->requirement = $requirement;
         $assessment->addResult($this);
+        $this->actions = new ArrayCollection();
     }
+    /** @return Collection<int, ActionPlan> */ public function getActions(): Collection { return $this->actions; }
 
     public function getId(): ?int
     {

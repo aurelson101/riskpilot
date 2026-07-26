@@ -97,6 +97,11 @@ const ActionsPage = lazy(() =>
     default: module.ActionsPage,
   })),
 );
+const IndicatorsPage = lazy(() =>
+  import("./pages/IndicatorsPage").then((module) => ({
+    default: module.IndicatorsPage,
+  })),
+);
 const NotificationsPage = lazy(() =>
   import("./pages/NotificationsPage").then((module) => ({
     default: module.NotificationsPage,
@@ -236,9 +241,13 @@ function Layout() {
     "/": "Tableau de bord",
     "/risks": "Risques",
     "/actions": "Plans d’action",
+    "/indicators": "Indicators",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
     "/assets": "Actifs",
+    "/assets/hardware": "Hardware assets",
+    "/assets/software": "Software assets",
+    "/assets/information": "Information assets",
     "/threats": "Menaces",
     "/compliance": "Conformité",
     "/security-controls": "Mesures de sécurité",
@@ -350,6 +359,11 @@ function Layout() {
           icon={<TaskAltOutlined />}
         />
         <NavItem
+          path="/indicators"
+          label="Indicators"
+          icon={<AssessmentOutlined />}
+        />
+        <NavItem
           path="/risk-matrix"
           label="Matrice des risques"
           icon={<GridViewOutlined />}
@@ -360,7 +374,21 @@ function Layout() {
           label="Périmètres"
           icon={<AccountTreeOutlined />}
         />
-        <NavItem path="/assets" label="Actifs" icon={<Inventory2Outlined />} />
+        <NavItem
+          path="/assets/hardware"
+          label="Hardware assets"
+          icon={<Inventory2Outlined />}
+        />
+        <NavItem
+          path="/assets/software"
+          label="Software assets"
+          icon={<Inventory2Outlined />}
+        />
+        <NavItem
+          path="/assets/information"
+          label="Information assets"
+          icon={<Inventory2Outlined />}
+        />
         <NavItem path="/threats" label="Menaces" icon={<GppMaybeOutlined />} />
         <NavItem
           path="/vulnerabilities"
@@ -720,6 +748,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="risks" element={<RisksPage />} />
             <Route path="actions" element={<ActionsPage />} />
+            <Route path="indicators" element={<IndicatorsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="compliance" element={<CompliancePage />} />
             <Route path="third-parties" element={<ThirdPartiesPage />} />
@@ -728,6 +757,20 @@ export default function App() {
             <Route path="risk-matrix" element={<RiskMatrixPage />} />
             <Route path="scopes" element={<InventoryPage kind="scopes" />} />
             <Route path="assets" element={<InventoryPage kind="assets" />} />
+            <Route
+              path="assets/hardware"
+              element={<InventoryPage kind="assets" assetFamily="HARDWARE" />}
+            />
+            <Route
+              path="assets/software"
+              element={<InventoryPage kind="assets" assetFamily="SOFTWARE" />}
+            />
+            <Route
+              path="assets/information"
+              element={
+                <InventoryPage kind="assets" assetFamily="INFORMATION" />
+              }
+            />
             <Route path="threats" element={<InventoryPage kind="threats" />} />
             <Route
               path="vulnerabilities"

@@ -11,6 +11,11 @@ use App\Application\CurrentUser;
 use App\Application\NotificationService;
 use App\Entity\ActionComment;
 use App\Entity\ActionPlan;
+use App\Entity\ActionCustomField;
+use App\Entity\AuditFinding;
+use App\Entity\ComplianceResult;
+use App\Entity\Framework;
+use App\Entity\Requirement;
 use App\Entity\User;
 use App\Repository\ActionPlanRepository;
 use App\Repository\RiskScenarioRepository;
@@ -115,8 +120,49 @@ final readonly class ActionPlanController
         $risk = null === $input->relatedRiskId ? null : $this->risks->findOneVisibleTo($input->relatedRiskId, $actor);
         $control = null === $input->relatedControlId ? null : $this->controls->findOneVisibleTo($input->relatedControlId, $actor);
         $owner = null === $input->ownerId ? null : $this->users->findOneVisibleTo($input->ownerId, $actor);
-        if (null === $risk || null === $owner || (null !== $input->relatedControlId && null === $control)) {
+        if ((null !== $input->relatedRiskId && null === $risk) || null === $owner || (null !== $input->relatedControlId && null === $control)) {
             return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'Une ou plusieurs relations sont invalides.'], 422);
+        }
+        $frameworkIds = array_values(array_unique($input->frameworkIds));
+        $requirementIds = array_values(array_unique($input->requirementIds));
+        if (count($this->entityManager->getRepository(Framework::class)->findBy(['id' => $frameworkIds])) !== count($frameworkIds)
+            || count($this->entityManager->getRepository(Requirement::class)->findBy(['id' => $requirementIds])) !== count($requirementIds)) {
+            return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'A framework or requirement is invalid.'], 422);
+        }
+        $auditFindings = [];
+        $complianceResults = [];
+        foreach ($input->nonConformities as $link) {
+            $type = $link['type'];
+            $id = $link['id'];
+            $nonConformity = match ($type) {
+                'AUDIT_FINDING' => $this->entityManager->getRepository(AuditFinding::class)->find($id),
+                'COMPLIANCE_RESULT' => $this->entityManager->getRepository(ComplianceResult::class)->find($id),
+                default => null,
+            };
+            $organization = $nonConformity instanceof AuditFinding
+                ? $nonConformity->getEngagement()->getProgram()->getOrganization()
+                : ($nonConformity instanceof ComplianceResult ? $nonConformity->getAssessment()->getOrganization() : null);
+            if (null === $nonConformity || $organization !== $actor->getOrganization()) {
+                return new JsonResponse(['code' => 'INVALID_RELATION', 'message' => 'A non-conformity is invalid.'], 422);
+            }
+            if ($nonConformity instanceof AuditFinding) {
+                $auditFindings[] = $nonConformity;
+            } elseif ($nonConformity instanceof ComplianceResult) {
+                $complianceResults[] = $nonConformity;
+            }
+        }
+        if (null === $risk && null === $control && [] === $input->nonConformities && 'OTHER' === $input->origin) {
+            return new JsonResponse(['code' => 'SOURCE_REQUIRED', 'message' => 'At least one business source is required.'], 422);
+        }
+        $fieldDefinitions = $this->entityManager->getRepository(ActionCustomField::class)->findBy(['organization' => $actor->getOrganization()]);
+        foreach ($fieldDefinitions as $definition) {
+            $value = $input->customFields[$definition->getKey()] ?? null;
+            if ($definition->isRequired() && (null === $value || '' === $value)) {
+                return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => sprintf('Custom field "%s" is required.', $definition->getLabel())], 422);
+            }
+            if ('URL' === $definition->getType() && null !== $value && '' !== $value && false === filter_var($value, FILTER_VALIDATE_URL)) {
+                return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => sprintf('Custom field "%s" must be a valid URL.', $definition->getLabel())], 422);
+            }
         }
         $dueDate = new \DateTimeImmutable((string) $input->dueDate);
         $startDate = null === $input->startDate ? null : new \DateTimeImmutable($input->startDate);
@@ -129,7 +175,7 @@ final readonly class ActionPlanController
         if (!$created && $item->getOwner() !== $actor && !array_intersect([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RISK_MANAGER], $actor->getRoles())) {
             return new JsonResponse(['code' => 'FORBIDDEN', 'message' => 'Seul le responsable ou un gestionnaire peut modifier cette action.'], 403);
         }
-        $item->setTitle($input->title)->setDescription($input->description)->setRelatedRisk($risk)->setRelatedControl($control)->setOwner($owner)->setPriority($input->priority)->setStatus($input->status)->setStartDate($startDate)->setDueDate($dueDate)->setCompletionDate(null === $input->completionDate ? null : new \DateTimeImmutable($input->completionDate))->setProgress($input->progress)->setEstimatedCost(null === $input->estimatedCost ? null : number_format($input->estimatedCost, 2, '.', ''))->setEstimatedEffortDays(null === $input->estimatedEffortDays ? null : number_format($input->estimatedEffortDays, 2, '.', ''))->setActualCost(null === $input->actualCost ? null : number_format($input->actualCost, 2, '.', ''))->setExpectedRiskReduction($input->expectedRiskReduction)->setEvidence($input->evidence);
+        $item->setTitle($input->title)->setDescription($input->description)->setRelatedRisk($risk)->setRelatedControl($control)->setOwner($owner)->setPriority($input->priority)->setStatus($input->status)->setStartDate($startDate)->setDueDate($dueDate)->setCompletionDate(null === $input->completionDate ? null : new \DateTimeImmutable($input->completionDate))->setProgress($input->progress)->setEstimatedCost(null === $input->estimatedCost ? null : number_format($input->estimatedCost, 2, '.', ''))->setEstimatedEffortDays(null === $input->estimatedEffortDays ? null : number_format($input->estimatedEffortDays, 2, '.', ''))->setActualCost(null === $input->actualCost ? null : number_format($input->actualCost, 2, '.', ''))->setExpectedRiskReduction($input->expectedRiskReduction)->setEvidence($input->evidence)->configureGrc($input->ticketNumber, $input->ticketUrl, $input->origin, $input->actionType, $frameworkIds, $requirementIds, $input->customFields, $auditFindings, $complianceResults);
         $this->entityManager->persist($item);
         if ($created || $previousOwner !== $owner) {
             $this->notifications->notify($owner, $created ? 'ACTION_ASSIGNED' : 'ACTION_OWNER_CHANGED', $created ? 'Nouvelle action affectée' : 'Action réaffectée', sprintf('L’action « %s » vous est affectée avec une échéance au %s.', $item->getTitle(), $dueDate->format('d/m/Y')), '/actions');
