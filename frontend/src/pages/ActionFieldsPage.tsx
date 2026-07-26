@@ -11,8 +11,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import axios from "axios";
 import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import { useTranslation } from "../i18n/useTranslation";
+import { actionFieldKey } from "./actionFieldKey";
 
 type Field = {
   id: number;
@@ -34,8 +37,10 @@ const initial = {
 };
 
 export function ActionFieldsPage() {
+  const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState(initial);
+  const [keyManuallyEdited, setKeyManuallyEdited] = useState(false);
   const fields = useQuery({
     queryKey: ["action-custom-fields"],
     queryFn: async () => (await api.get<Field[]>("/action-custom-fields")).data,
@@ -45,45 +50,75 @@ export function ActionFieldsPage() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["action-custom-fields"] });
       setForm(initial);
+      setKeyManuallyEdited(false);
     },
   });
+  const keyIsValid = /^[a-z][a-z0-9_]{0,79}$/.test(form.key);
+  const errorCode = axios.isAxiosError(create.error)
+    ? create.error.response?.data?.code
+    : undefined;
+  const createError =
+    errorCode === "FIELD_KEY_EXISTS"
+      ? t("actionFields.duplicateError")
+      : errorCode === "VALIDATION_ERROR"
+        ? t("actionFields.validationError")
+        : t("actionFields.createError");
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (!keyIsValid) return;
     create.mutate();
   };
   return (
     <Stack spacing={3}>
       <div>
         <Typography variant="h4" fontWeight={800}>
-          Action columns
+          {t("actionFields.title")}
         </Typography>
         <Typography color="text.secondary">
-          Define organization-specific fields shown in action plans.
+          {t("actionFields.description")}
         </Typography>
       </div>
-      {create.isError && (
-        <Alert severity="error">The field could not be created.</Alert>
-      )}
+      {create.isError && <Alert severity="error">{createError}</Alert>}
       <Card>
         <CardContent>
           <form onSubmit={submit}>
             <Stack spacing={2}>
               <TextField
                 required
-                label="Key"
-                helperText="Lowercase letters, numbers and underscores"
+                label={t("actionFields.key")}
+                helperText={
+                  form.key && !keyIsValid
+                    ? t("actionFields.keyInvalid")
+                    : t("actionFields.keyHelp")
+                }
+                error={Boolean(form.key) && !keyIsValid}
+                inputProps={{
+                  minLength: 1,
+                  maxLength: 80,
+                  pattern: "[a-z][a-z0-9_]{0,79}",
+                }}
                 value={form.key}
-                onChange={(e) => setForm({ ...form, key: e.target.value })}
+                onChange={(e) => {
+                  setKeyManuallyEdited(true);
+                  setForm({ ...form, key: e.target.value });
+                }}
               />
               <TextField
                 required
-                label="Label"
+                label={t("actionFields.label")}
                 value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                onChange={(e) => {
+                  const label = e.target.value;
+                  setForm({
+                    ...form,
+                    label,
+                    key: keyManuallyEdited ? form.key : actionFieldKey(label),
+                  });
+                }}
               />
               <TextField
                 select
-                label="Type"
+                label={t("actionFields.type")}
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
@@ -97,7 +132,7 @@ export function ActionFieldsPage() {
               </TextField>
               <TextField
                 type="number"
-                label="Display order"
+                label={t("actionFields.order")}
                 value={form.order}
                 onChange={(e) =>
                   setForm({ ...form, order: Number(e.target.value) })
@@ -113,7 +148,7 @@ export function ActionFieldsPage() {
                       }
                     />
                   }
-                  label="Visible"
+                  label={t("actionFields.visible")}
                 />
                 <FormControlLabel
                   control={
@@ -124,11 +159,17 @@ export function ActionFieldsPage() {
                       }
                     />
                   }
-                  label="Required"
+                  label={t("actionFields.required")}
                 />
               </Stack>
-              <Button type="submit" variant="contained">
-                Create column
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={create.isPending || !keyIsValid || !form.label.trim()}
+              >
+                {create.isPending
+                  ? t("actionFields.creating")
+                  : t("actionFields.create")}
               </Button>
             </Stack>
           </form>
@@ -140,8 +181,11 @@ export function ActionFieldsPage() {
             <CardContent>
               <Typography fontWeight={700}>{field.label}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {field.key} · {field.type} · order {field.order} ·{" "}
-                {field.required ? "required" : "optional"}
+                {field.key} · {field.type} ·{" "}
+                {t("actionFields.order").toLowerCase()} {field.order} ·{" "}
+                {field.required
+                  ? t("actionFields.required").toLowerCase()
+                  : t("actionFields.optional")}
               </Typography>
             </CardContent>
           </Card>

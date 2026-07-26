@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Application\CurrentUser;
 use App\Entity\ActionCustomField;
 use App\Entity\User;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -33,12 +34,20 @@ final readonly class ActionCustomFieldController
         $key = trim((string) ($data['key'] ?? ''));
         $label = trim((string) ($data['label'] ?? ''));
         $type = (string) ($data['type'] ?? '');
-        if (!preg_match('/^[a-z][a-z0-9_]{1,79}$/', $key) || '' === $label || !in_array($type, ActionCustomField::TYPES, true)) {
-            return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'Invalid key, label or type.'], 422);
+        if (!preg_match('/^[a-z][a-z0-9_]{0,79}$/', $key) || '' === $label || !in_array($type, ActionCustomField::TYPES, true)) {
+            return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'The key, label or type is invalid.'], 422);
         }
-        $item = (new ActionCustomField($this->currentUser->get()->getOrganization(), $key, $label, $type))->configure($label, $type, array_values(array_filter($data['options'] ?? [], 'is_string')), (int) ($data['order'] ?? 0), (bool) ($data['visible'] ?? true), (bool) ($data['required'] ?? false));
+        $organization = $this->currentUser->get()->getOrganization();
+        if (null !== $this->em->getRepository(ActionCustomField::class)->findOneBy(['organization' => $organization, 'key' => $key])) {
+            return new JsonResponse(['code' => 'FIELD_KEY_EXISTS', 'message' => 'A field with this key already exists.'], 409);
+        }
+        $item = (new ActionCustomField($organization, $key, $label, $type))->configure($label, $type, array_values(array_filter($data['options'] ?? [], 'is_string')), (int) ($data['order'] ?? 0), (bool) ($data['visible'] ?? true), (bool) ($data['required'] ?? false));
         $this->em->persist($item);
-        $this->em->flush();
+        try {
+            $this->em->flush();
+        } catch (UniqueConstraintViolationException) {
+            return new JsonResponse(['code' => 'FIELD_KEY_EXISTS', 'message' => 'A field with this key already exists.'], 409);
+        }
 
         return new JsonResponse($this->serialize($item), 201);
     }
