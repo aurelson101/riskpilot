@@ -20,4 +20,5 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS production
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+USER nginx
 HEALTHCHECK CMD wget -qO- http://localhost:8080/ >/dev/null || exit 1
