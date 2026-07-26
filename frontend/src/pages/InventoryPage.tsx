@@ -29,6 +29,8 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Asset, Scope, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { confirmLocalized } from "../i18n/confirm";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 type InventoryKind =
   "scopes" | "assets" | "threats" | "vulnerabilities" | "security-controls";
@@ -204,6 +206,7 @@ export function InventoryPage({
   kind: InventoryKind;
   assetFamily?: Asset["family"];
 }) {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const canManage = user?.roles.some((role) =>
     ["ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RISK_MANAGER"].includes(role),
@@ -392,8 +395,10 @@ export function InventoryPage({
                         aria-label="Supprimer"
                         color="error"
                         onClick={() =>
-                          window.confirm(`Supprimer « ${item.name} » ?`) &&
-                          remove.mutate(item.id)
+                          confirmLocalized(locale, {
+                            fr: `Supprimer « ${item.name} » ?`,
+                            en: `Delete “${item.name}”?`,
+                          }) && remove.mutate(item.id)
                         }
                       >
                         <DeleteOutline />

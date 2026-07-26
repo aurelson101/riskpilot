@@ -25,6 +25,8 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Organization } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { confirmLocalized } from "../i18n/confirm";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
 type Form = {
   name: string;
@@ -48,6 +50,7 @@ const errorMessage = (error: unknown) =>
     : "L’opération a échoué.";
 
 export function OrganizationsPage() {
+  const locale = useInterfaceLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,18 +158,24 @@ export function OrganizationsPage() {
                     {item.riskThresholds.highMax}
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton onClick={() => openEdit(item)}>
+                    <IconButton
+                      aria-label={`Modifier l’organisation ${item.name}`}
+                      onClick={() => openEdit(item)}
+                    >
                       <EditOutlined />
                     </IconButton>
                     <IconButton
+                      aria-label={`Désactiver l’organisation ${item.name}`}
                       color="error"
                       disabled={
                         item.id === user?.organization.id ||
                         item.status === "INACTIVE"
                       }
                       onClick={() =>
-                        window.confirm(`Désactiver « ${item.name} » ?`) &&
-                        remove.mutate(item.id)
+                        confirmLocalized(locale, {
+                          fr: `Désactiver « ${item.name} » ?`,
+                          en: `Disable “${item.name}”?`,
+                        }) && remove.mutate(item.id)
                       }
                     >
                       <DeleteOutline />

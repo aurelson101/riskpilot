@@ -39,6 +39,8 @@ import type {
   Vulnerability,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { confirmLocalized } from "../i18n/confirm";
+import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import { RiskGovernancePanel } from "../components/RiskGovernancePanel";
 
 const levelLabels: Record<RiskLevel, string> = {
@@ -123,6 +125,7 @@ function message(error: unknown) {
 }
 
 export function RisksPage() {
+  const locale = useInterfaceLocale();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -325,8 +328,10 @@ export function RisksPage() {
                         color="warning"
                         disabled={risk.status === "ARCHIVED"}
                         onClick={() =>
-                          window.confirm(`Archiver « ${risk.title} » ?`) &&
-                          archive.mutate(risk.id)
+                          confirmLocalized(locale, {
+                            fr: `Archiver « ${risk.title} » ?`,
+                            en: `Archive “${risk.title}”?`,
+                          }) && archive.mutate(risk.id)
                         }
                       >
                         <ArchiveOutlined />

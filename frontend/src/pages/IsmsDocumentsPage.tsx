@@ -47,6 +47,7 @@ import { api } from "../api/client";
 import type { IsmsDocument, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { confirmLocalized } from "../i18n/confirm";
 
 const categories = [
   "Politique",
@@ -787,9 +788,10 @@ export function IsmsDocumentsPage() {
                 startIcon={<DeleteOutline />}
                 onClick={() => {
                   if (
-                    confirm(
-                      "Supprimer définitivement ce document et son historique ?",
-                    )
+                    confirmLocalized(locale, {
+                      fr: "Supprimer définitivement ce document et son historique ?",
+                      en: "Permanently delete this document and its history?",
+                    })
                   )
                     remove.mutate(current.id);
                 }}

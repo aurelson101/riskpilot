@@ -6,6 +6,17 @@ const originalText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const translatedAttributes = ["aria-label", "placeholder", "title"];
 
+function replacePhrase(value: string, source: string, target: string) {
+  if (source.startsWith(" ") || source.endsWith(" "))
+    return value.split(source).join(target);
+  const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`,
+    "gu",
+  );
+  return value.replace(pattern, (_match, prefix: string) => prefix + target);
+}
+
 function translateValue(value: string, locale: Locale): string {
   const dictionary = locale === "en" ? frToEn : enToFr;
   const exact = dictionary.get(value);
@@ -16,7 +27,7 @@ function translateValue(value: string, locale: Locale): string {
     const source = locale === "en" ? fr : en;
     const target = locale === "en" ? en : fr;
     if (source.length < 4 || !translated.includes(source)) continue;
-    translated = translated.split(source).join(target);
+    translated = replacePhrase(translated, source, target);
   }
   return translated;
 }

@@ -72,6 +72,13 @@ import {
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
 );
+const LOCALE_STORAGE_KEY = "riskpilot.interfaceLocale";
+
+function initialInterfaceLocale(): "fr" | "en" {
+  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (stored === "fr" || stored === "en") return stored;
+  return navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
 const ResetPasswordPage = lazy(() =>
   import("./pages/ResetPasswordPage").then((module) => ({
     default: module.ResetPasswordPage,
@@ -625,6 +632,7 @@ function Layout() {
             placement="right"
           >
             <IconButton
+              aria-label={collapsed ? "Déployer le menu" : "Réduire le menu"}
               color="inherit"
               onClick={() => setCollapsed((value) => !value)}
               sx={{ width: "100%", borderRadius: 1.5, mt: 0.5 }}
@@ -647,183 +655,199 @@ function Layout() {
   );
 
   return (
-    <LanguageBoundary locale={user.locale ?? "fr"}>
-      <Box
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        bgcolor: "#f4f7fb",
+        width: "100%",
+      }}
+    >
+      <AppBar
+        position="fixed"
+        color="inherit"
+        elevation={0}
         sx={{
-          display: "flex",
-          minHeight: "100vh",
-          bgcolor: "#f4f7fb",
-          width: "100%",
+          ml: { md: `${currentDrawerWidth}px` },
+          width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
+          transition: theme.transitions.create(["margin", "width"]),
         }}
       >
-        <AppBar
-          position="fixed"
-          color="inherit"
-          elevation={0}
-          sx={{
-            ml: { md: `${currentDrawerWidth}px` },
-            width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
-            transition: theme.transitions.create(["margin", "width"]),
-          }}
+        <Toolbar
+          sx={{ borderBottom: "1px solid #e5eaf1", px: { xs: 1.5, sm: 3 } }}
         >
-          <Toolbar
-            sx={{ borderBottom: "1px solid #e5eaf1", px: { xs: 1.5, sm: 3 } }}
-          >
-            {mobile && (
-              <IconButton
-                edge="start"
-                onClick={() => setMobileOpen(true)}
-                aria-label="Ouvrir le menu"
-                sx={{ mr: 1 }}
-              >
-                <MenuOutlined />
-              </IconButton>
-            )}
-            <Typography
-              variant="h6"
-              noWrap
-              sx={{ flexGrow: 1, fontSize: { xs: "1rem", sm: "1.25rem" } }}
+          {mobile && (
+            <IconButton
+              edge="start"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Ouvrir le menu"
+              sx={{ mr: 1 }}
             >
-              {location.pathname === "/isms-documents" && location.search
-                ? `Documents ISMS — ${new URLSearchParams(location.search).get("category") ?? "Vue d’ensemble"}`
-                : (titleByPath[location.pathname] ?? "RiskPilot")}
-            </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
-                {user.firstName[0]}
-                {user.lastName[0]}
-              </Avatar>
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>
-                <Typography variant="body2" fontWeight={700}>
-                  {user.firstName} {user.lastName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {user.organization.name}
-                </Typography>
-              </Box>
-            </Stack>
-          </Toolbar>
-        </AppBar>
-        <Drawer
-          variant={mobile ? "temporary" : "permanent"}
-          open={mobile ? mobileOpen : true}
-          onClose={() => setMobileOpen(false)}
-          ModalProps={{ keepMounted: true }}
-          sx={{
+              <MenuOutlined />
+            </IconButton>
+          )}
+          <Typography
+            variant="h6"
+            noWrap
+            sx={{ flexGrow: 1, fontSize: { xs: "1rem", sm: "1.25rem" } }}
+          >
+            {location.pathname === "/isms-documents" && location.search
+              ? `Documents ISMS — ${new URLSearchParams(location.search).get("category") ?? "Vue d’ensemble"}`
+              : (titleByPath[location.pathname] ?? "RiskPilot")}
+          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ bgcolor: "#1769e0", width: 34, height: 34 }}>
+              {user.firstName[0]}
+              {user.lastName[0]}
+            </Avatar>
+            <Box sx={{ display: { xs: "none", sm: "block" } }}>
+              <Typography variant="body2" fontWeight={700}>
+                {user.firstName} {user.lastName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user.organization.name}
+              </Typography>
+            </Box>
+          </Stack>
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        variant={mobile ? "temporary" : "permanent"}
+        open={mobile ? mobileOpen : true}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          width: mobile ? drawerWidth : currentDrawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
             width: mobile ? drawerWidth : currentDrawerWidth,
-            flexShrink: 0,
-            "& .MuiDrawer-paper": {
-              width: mobile ? drawerWidth : currentDrawerWidth,
-              bgcolor: "#062b4b",
-              color: "white",
-              border: 0,
-              transition: theme.transitions.create("width"),
-            },
-          }}
-        >
-          {drawerContent}
-        </Drawer>
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            minWidth: 0,
-            pt: { xs: 9, sm: 10 },
-            pb: { xs: 3, sm: 5 },
-            width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
+            bgcolor: "#062b4b",
+            color: "white",
+            border: 0,
             transition: theme.transitions.create("width"),
-          }}
-        >
-          <Container maxWidth="xl" sx={{ px: { xs: 1.5, sm: 3 } }}>
-            <Outlet />
-          </Container>
-        </Box>
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          pt: { xs: 9, sm: 10 },
+          pb: { xs: 3, sm: 5 },
+          width: { xs: "100%", md: `calc(100% - ${currentDrawerWidth}px)` },
+          transition: theme.transitions.create("width"),
+        }}
+      >
+        <Container maxWidth="xl" sx={{ px: { xs: 1.5, sm: 3 } }}>
+          <Outlet />
+        </Container>
       </Box>
-    </LanguageBoundary>
+    </Box>
   );
 }
 
 export default function App() {
+  const { user } = useAuth();
+  const [storedLocale, setStoredLocale] = useState(initialInterfaceLocale);
+  const locale = user?.locale ?? storedLocale;
+
+  useEffect(() => {
+    if (!user?.locale) return;
+    localStorage.setItem(LOCALE_STORAGE_KEY, user.locale);
+    setStoredLocale(user.locale);
+  }, [user?.locale]);
+
   return (
-    <Suspense
-      fallback={
-        <Stack minHeight="50vh" alignItems="center" justifyContent="center">
-          <CircularProgress aria-label="Chargement de la page" />
-        </Stack>
-      }
-    >
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route
-          path="/shared/documents/:token"
-          element={<PublicDocumentPage />}
-        />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="risks" element={<RisksPage />} />
-            <Route path="actions" element={<ActionsPage />} />
-            <Route path="indicators" element={<IndicatorsPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="compliance" element={<CompliancePage />} />
-            <Route path="third-parties" element={<ThirdPartiesPage />} />
-            <Route path="resilience" element={<ResiliencePage />} />
-            <Route path="regulatory" element={<RegulatoryPage />} />
-            <Route path="risk-matrix" element={<RiskMatrixPage />} />
-            <Route path="scopes" element={<InventoryPage kind="scopes" />} />
-            <Route path="assets" element={<InventoryPage kind="assets" />} />
-            <Route
-              path="assets/hardware"
-              element={<InventoryPage kind="assets" assetFamily="HARDWARE" />}
-            />
-            <Route
-              path="assets/software"
-              element={<InventoryPage kind="assets" assetFamily="SOFTWARE" />}
-            />
-            <Route
-              path="assets/information"
-              element={
-                <InventoryPage kind="assets" assetFamily="INFORMATION" />
-              }
-            />
-            <Route path="threats" element={<InventoryPage kind="threats" />} />
-            <Route
-              path="vulnerabilities"
-              element={<InventoryPage kind="vulnerabilities" />}
-            />
-            <Route
-              path="security-controls"
-              element={<InventoryPage kind="security-controls" />}
-            />
-            <Route path="administration/users" element={<UsersPage />} />
-            <Route
-              path="administration/organizations"
-              element={<OrganizationsPage />}
-            />
-            <Route
-              path="administration/audit-logs"
-              element={<AuditLogsPage />}
-            />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route
-              path="administration/email-settings"
-              element={<EmailSettingsPage />}
-            />
-            <Route
-              path="administration/integrations"
-              element={<IntegrationSettingsPage />}
-            />
-            <Route
-              path="administration/action-fields"
-              element={<ActionFieldsPage />}
-            />
-            <Route path="reports/executive" element={<ExecutiveReportPage />} />
-            <Route path="isms-documents" element={<IsmsDocumentsPage />} />
+    <LanguageBoundary locale={locale}>
+      <Suspense
+        fallback={
+          <Stack minHeight="50vh" alignItems="center" justifyContent="center">
+            <CircularProgress aria-label="Chargement de la page" />
+          </Stack>
+        }
+      >
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/shared/documents/:token"
+            element={<PublicDocumentPage />}
+          />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="risks" element={<RisksPage />} />
+              <Route path="actions" element={<ActionsPage />} />
+              <Route path="indicators" element={<IndicatorsPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="compliance" element={<CompliancePage />} />
+              <Route path="third-parties" element={<ThirdPartiesPage />} />
+              <Route path="resilience" element={<ResiliencePage />} />
+              <Route path="regulatory" element={<RegulatoryPage />} />
+              <Route path="risk-matrix" element={<RiskMatrixPage />} />
+              <Route path="scopes" element={<InventoryPage kind="scopes" />} />
+              <Route path="assets" element={<InventoryPage kind="assets" />} />
+              <Route
+                path="assets/hardware"
+                element={<InventoryPage kind="assets" assetFamily="HARDWARE" />}
+              />
+              <Route
+                path="assets/software"
+                element={<InventoryPage kind="assets" assetFamily="SOFTWARE" />}
+              />
+              <Route
+                path="assets/information"
+                element={
+                  <InventoryPage kind="assets" assetFamily="INFORMATION" />
+                }
+              />
+              <Route
+                path="threats"
+                element={<InventoryPage kind="threats" />}
+              />
+              <Route
+                path="vulnerabilities"
+                element={<InventoryPage kind="vulnerabilities" />}
+              />
+              <Route
+                path="security-controls"
+                element={<InventoryPage kind="security-controls" />}
+              />
+              <Route path="administration/users" element={<UsersPage />} />
+              <Route
+                path="administration/organizations"
+                element={<OrganizationsPage />}
+              />
+              <Route
+                path="administration/audit-logs"
+                element={<AuditLogsPage />}
+              />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route
+                path="administration/email-settings"
+                element={<EmailSettingsPage />}
+              />
+              <Route
+                path="administration/integrations"
+                element={<IntegrationSettingsPage />}
+              />
+              <Route
+                path="administration/action-fields"
+                element={<ActionFieldsPage />}
+              />
+              <Route
+                path="reports/executive"
+                element={<ExecutiveReportPage />}
+              />
+              <Route path="isms-documents" element={<IsmsDocumentsPage />} />
+            </Route>
           </Route>
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </LanguageBoundary>
   );
 }

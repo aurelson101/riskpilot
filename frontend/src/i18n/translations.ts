@@ -664,6 +664,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Modifier l’action", "Edit action"],
   ["Modifier l’enregistrement", "Edit record"],
   ["Modifier l’organisation", "Edit organization"],
+  ["Désactiver l’organisation", "Disable organization"],
   [
     "Modifiez les informations utilisées dans RiskPilot.",
     "Edit the information used in RiskPilot.",

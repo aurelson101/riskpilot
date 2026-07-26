@@ -30,6 +30,7 @@ import { api } from "../api/client";
 import { hasAnyRole } from "../auth/roles";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { confirmLocalized } from "../i18n/confirm";
 import type { Scope, User } from "../api/types";
 
 type TimelineEvent = { at: string; event: string; actor: string };
@@ -309,7 +310,12 @@ export function ResiliencePage() {
     setKind("process");
   };
   const deleteItem = async (type: "incident" | "process", id: number) => {
-    if (!window.confirm("Supprimer définitivement cet enregistrement ?"))
+    if (
+      !confirmLocalized(locale, {
+        fr: "Supprimer définitivement cet enregistrement ?",
+        en: "Permanently delete this record?",
+      })
+    )
       return;
     await api.delete(
       type === "incident"

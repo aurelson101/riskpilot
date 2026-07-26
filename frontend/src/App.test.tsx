@@ -15,11 +15,13 @@ import { api, TOKEN_STORAGE_KEY } from "./api/client";
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
   vi.restoreAllMocks();
 });
 
 describe("App", () => {
   it("affiche la connexion RiskPilot", async () => {
+    localStorage.setItem("riskpilot.interfaceLocale", "fr");
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/login"]}>
@@ -37,7 +39,25 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("conserve l’anglais sur les pages publiques", async () => {
+    localStorage.setItem("riskpilot.interfaceLocale", "en");
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/login"]}>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(
+      await screen.findByText("Sign in to your GRC workspace"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
   it("revient à la connexion quand le JWT stocké est expiré", async () => {
+    localStorage.setItem("riskpilot.interfaceLocale", "fr");
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "expired-token");
     vi.spyOn(api, "get").mockRejectedValueOnce(new Error("Unauthorized"));
     vi.spyOn(api, "post").mockRejectedValueOnce(new Error("Unauthorized"));
@@ -154,6 +174,7 @@ describe("App", () => {
       }),
     );
     expect(await screen.findByText("My profile and MFA")).toBeInTheDocument();
+    expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Indicators")).toBeInTheDocument();
     expect(screen.getByText("Hardware assets")).toBeInTheDocument();

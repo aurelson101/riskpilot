@@ -52,6 +52,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { confirmLocalized } from "../i18n/confirm";
 import axios from "axios";
 
 const statuses = [
@@ -612,8 +613,10 @@ export function ActionsPage() {
                           color="error"
                           disabled={action.status === "CANCELLED"}
                           onClick={() =>
-                            window.confirm(`Annuler « ${action.title} » ?`) &&
-                            remove.mutate(action.id)
+                            confirmLocalized(locale, {
+                              fr: `Annuler « ${action.title} » ?`,
+                              en: `Cancel “${action.title}”?`,
+                            }) && remove.mutate(action.id)
                           }
                         >
                           <DeleteOutline />
