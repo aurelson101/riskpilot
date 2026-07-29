@@ -158,7 +158,13 @@ describe("App", () => {
 
     expect(await screen.findByText("Mon profil et MFA")).toBeInTheDocument();
     expect(screen.getByText("Indicateurs")).toBeInTheDocument();
-    expect(screen.getByText("Actifs matériels")).toBeInTheDocument();
+    expect(screen.getByText("Actifs")).toBeInTheDocument();
+    const assetsMenu = screen.getByRole("button", { name: "Actifs" });
+    expect(assetsMenu).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(assetsMenu);
+    expect(assetsMenu).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Tous les actifs")).toBeInTheDocument();
+    expect(await screen.findByText("Actifs matériels")).toBeInTheDocument();
     expect(screen.getByText("Colonnes des actions")).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
     fireEvent.click(await screen.findByRole("option", { name: "Anglais" }));
@@ -177,8 +183,12 @@ describe("App", () => {
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Indicators")).toBeInTheDocument();
+    expect(screen.getByText("All assets")).toBeInTheDocument();
     expect(screen.getByText("Hardware assets")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("ISMS documents"));
+    const ismsMenu = screen.getByRole("button", { name: "ISMS documents" });
+    expect(ismsMenu).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(ismsMenu);
+    expect(ismsMenu).toHaveAttribute("aria-expanded", "true");
     expect(await screen.findByText("Politique interne")).toBeInTheDocument();
     expect(screen.getAllByText("Recent publications")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));

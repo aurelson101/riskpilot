@@ -310,6 +310,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Achèvement", "Completion"],
   ["actes)", "action(s)"],
   ["Actifs", "Assets"],
+  ["Tous les actifs", "All assets"],
   [
     "Action refusée : vérifiez la séparation responsable/approbateur et vos droits.",
     "Action refused: check the responsible/approver separation and your rights.",

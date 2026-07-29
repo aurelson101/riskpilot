@@ -206,6 +206,9 @@ function Layout() {
     location.pathname === "/profile" ||
     location.pathname.startsWith("/administration");
   const [settingsOpen, setSettingsOpen] = useState(settingsActive);
+  const assetsActive =
+    location.pathname === "/assets" || location.pathname.startsWith("/assets/");
+  const [assetsOpen, setAssetsOpen] = useState(assetsActive);
   const ismsActive = location.pathname === "/isms-documents";
   const [ismsOpen, setIsmsOpen] = useState(ismsActive);
   const ismsDocuments = useQuery({
@@ -234,6 +237,10 @@ function Layout() {
   useEffect(() => {
     if (settingsActive) setSettingsOpen(true);
   }, [settingsActive]);
+
+  useEffect(() => {
+    if (assetsActive) setAssetsOpen(true);
+  }, [assetsActive]);
 
   useEffect(() => {
     if (ismsActive) setIsmsOpen(true);
@@ -278,6 +285,7 @@ function Layout() {
     "/administration/audit-logs": "Journal d’audit",
     "/administration/email-settings": "Paramètres email",
     "/administration/integrations": "Identité et intégrations",
+    "/administration/action-fields": "Action columns",
   };
 
   function NavItem({
@@ -392,21 +400,75 @@ function Layout() {
           label="Périmètres"
           icon={<AccountTreeOutlined />}
         />
-        <NavItem
-          path="/assets/hardware"
-          label="Hardware assets"
-          icon={<Inventory2Outlined />}
-        />
-        <NavItem
-          path="/assets/software"
-          label="Software assets"
-          icon={<Inventory2Outlined />}
-        />
-        <NavItem
-          path="/assets/information"
-          label="Information assets"
-          icon={<Inventory2Outlined />}
-        />
+        <Tooltip title={collapsed && !mobile ? "Actifs" : ""} placement="right">
+          <ListItemButton
+            aria-label="Actifs"
+            aria-expanded={assetsOpen}
+            aria-controls="assets-navigation"
+            selected={assetsActive}
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                setAssetsOpen(true);
+              } else setAssetsOpen((open) => !open);
+            }}
+            sx={{
+              minHeight: 44,
+              borderRadius: 1.5,
+              mb: 0.25,
+              justifyContent: collapsed ? "center" : "initial",
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: collapsed ? 0 : 42,
+                color: "inherit",
+                justifyContent: "center",
+              }}
+            >
+              <Inventory2Outlined />
+            </ListItemIcon>
+            {!collapsed && (
+              <>
+                <ListItemText
+                  primary="Actifs"
+                  primaryTypographyProps={{ fontSize: 14 }}
+                />
+                {assetsOpen ? <ExpandLess /> : <ExpandMore />}
+              </>
+            )}
+          </ListItemButton>
+        </Tooltip>
+        {!collapsed && (
+          <Collapse in={assetsOpen} timeout="auto" unmountOnExit>
+            <List id="assets-navigation" component="div" disablePadding>
+              <NavItem
+                nested
+                path="/assets"
+                label="Tous les actifs"
+                icon={<Inventory2Outlined fontSize="small" />}
+              />
+              <NavItem
+                nested
+                path="/assets/hardware"
+                label="Hardware assets"
+                icon={<Inventory2Outlined fontSize="small" />}
+              />
+              <NavItem
+                nested
+                path="/assets/software"
+                label="Software assets"
+                icon={<Inventory2Outlined fontSize="small" />}
+              />
+              <NavItem
+                nested
+                path="/assets/information"
+                label="Information assets"
+                icon={<Inventory2Outlined fontSize="small" />}
+              />
+            </List>
+          </Collapse>
+        )}
         <NavItem path="/threats" label="Menaces" icon={<GppMaybeOutlined />} />
         <NavItem
           path="/vulnerabilities"
@@ -444,6 +506,8 @@ function Layout() {
         >
           <ListItemButton
             aria-label="Documents ISMS"
+            aria-expanded={ismsOpen}
+            aria-controls="isms-navigation"
             selected={ismsActive}
             onClick={() => {
               if (collapsed) {
@@ -480,7 +544,7 @@ function Layout() {
         </Tooltip>
         {!collapsed && (
           <Collapse in={ismsOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
+            <List id="isms-navigation" component="div" disablePadding>
               <NavItem
                 nested
                 path="/isms-documents"
@@ -516,6 +580,8 @@ function Layout() {
         >
           <ListItemButton
             aria-label="Paramètres"
+            aria-expanded={settingsOpen}
+            aria-controls="settings-navigation"
             selected={settingsActive}
             onClick={() => {
               if (collapsed) {
@@ -551,7 +617,7 @@ function Layout() {
         </Tooltip>
         {!collapsed && (
           <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
+            <List id="settings-navigation" component="div" disablePadding>
               <NavItem
                 nested
                 path="/profile"
