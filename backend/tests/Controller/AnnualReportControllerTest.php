@@ -40,14 +40,33 @@ final class AnnualReportControllerTest extends WebTestCase
         self::assertSame(1, $preview['totals']['activities']);
         self::assertSame(1, $preview['byDomain']['RISKS']);
         self::assertArrayNotHasKey('newValues', $preview['activities'][0]);
+        $client->request('GET', '/api/annual-reports/'.$year.'/maturity');
+        self::assertResponseIsSuccessful();
+        $emptyMaturity = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(0, $emptyMaturity['assessedDomains']);
+        self::assertNull($emptyMaturity['average']);
+        $client->jsonRequest('PUT', '/api/annual-reports/'.$year.'/maturity', ['assessments' => []]);
+        self::assertResponseStatusCodeSame(403);
         $client->jsonRequest('POST', '/api/annual-reports/'.$year.'/generate');
         self::assertResponseStatusCodeSame(403);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($managerUser));
+        $domains = ['IAM', 'GOVERNANCE', 'RISK_MANAGEMENT', 'ASSET_MANAGEMENT', 'VULNERABILITY_MANAGEMENT', 'DETECTION_RESPONSE', 'BUSINESS_CONTINUITY', 'THIRD_PARTIES', 'COMPLIANCE', 'AWARENESS'];
+        $assessments = [];
+        foreach ($domains as $domain) {
+            $assessments[$domain] = ['score' => 'IAM' === $domain ? 1.5 : 3.0, 'rationale' => 'Évaluation documentée'];
+        }
+        $client->jsonRequest('PUT', '/api/annual-reports/'.$year.'/maturity', ['assessments' => $assessments]);
+        self::assertResponseStatusCodeSame(201);
+        $maturity = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(['IAM'], $maturity['weaknesses']);
+        self::assertSame(10, $maturity['assessedDomains']);
+        self::assertTrue($maturity['complete']);
         $client->jsonRequest('POST', '/api/annual-reports/'.$year.'/generate');
         self::assertResponseStatusCodeSame(201);
         $saved = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(1, $saved['version']);
+        self::assertSame(1.5, $saved['report']['maturity']['assessments']['IAM']['score']);
         $client->jsonRequest('POST', '/api/annual-reports/'.$year.'/generate');
         self::assertResponseStatusCodeSame(201);
         $second = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

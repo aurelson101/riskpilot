@@ -1262,6 +1262,35 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Octobre", "October"],
   ["Novembre", "November"],
   ["Décembre", "December"],
+  ["Radar de maturité cyber · 0 à 5", "Cyber maturity radar · 0 to 5"],
+  [
+    "Une note faible signale un service à renforcer. Chaque note doit être étayée par une justification vérifiable.",
+    "A low score identifies a service that needs strengthening. Each score must be supported by a verifiable rationale.",
+  ],
+  ["domaines évalués", "domains assessed"],
+  ["Faiblesses prioritaires :", "Priority weaknesses:"],
+  ["Service de sécurité", "Security service"],
+  ["Niveau 0–5", "Level 0–5"],
+  ["Justification", "Rationale"],
+  ["Gestion des actifs", "Asset management"],
+  ["Détection et réponse", "Detection and response"],
+  ["Continuité d’activité", "Business continuity"],
+  ["Gestion des tiers", "Third-party management"],
+  ["Sensibilisation", "Awareness"],
+  [
+    "Preuves, constats et progrès attendus",
+    "Evidence, findings and expected progress",
+  ],
+  ["Enregistrer l’évaluation", "Save assessment"],
+  ["L’évaluation de maturité", "The maturity assessment for"],
+  ["a été enregistrée.", "has been saved."],
+  [
+    "Vérifiez que chaque note supérieure à zéro possède une justification.",
+    "Check that every score above zero has a rationale.",
+  ],
+  ["activités", "activities"],
+  ["HTML / PDF", "HTML / PDF"],
+  ["Objet", "Item"],
 ];
 
 export const frToEn = new Map(pairs);

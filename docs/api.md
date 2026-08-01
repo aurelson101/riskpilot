@@ -57,10 +57,13 @@ Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, 
 
 - `GET /api/annual-reports/years` liste les années connues et les instantanés conservés ;
 - `GET /api/annual-reports/{year}` produit la vue annuelle courante depuis le journal d’audit du tenant ;
+- `GET|PUT /api/annual-reports/{year}/maturity` consulte ou met à jour l'évaluation annuelle de maturité cyber sur dix services, de 0 à 5 par pas de 0,5 ;
 - `POST /api/annual-reports/{year}/generate` crée une nouvelle version immuable (`ROLE_RISK_MANAGER` minimum) ;
 - `GET /api/annual-reports/saved/{id}/export?format=json|html` exporte un instantané reproductible, dont la version HTML est imprimable en PDF.
 
 La classification agrège les changements par mois, domaine, action et contributeur. Le journal complet des activités mutantes de la période est inclus, sans exposer les anciennes/nouvelles valeurs ni les données techniques du client.
+
+Le radar de maturité est indépendant du volume d'activité. Chaque score supérieur à zéro exige une justification ; les scores inférieurs ou égaux à 2 sont signalés comme faiblesses prioritaires. La mise à jour exige `ROLE_RISK_MANAGER`, tandis que la lecture suit les droits du rapport annuel. L'instantané annuel incorpore l'évaluation en vigueur afin de conserver la situation observée au moment de la génération.
 
 Le scheduler exécute `app:operations:remind`. Une tâche active attribuée et arrivée dans sa fenêtre de rappel produit au plus une relance par jour via la file transactionnelle de notifications.
 

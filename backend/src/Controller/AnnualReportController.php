@@ -20,6 +20,19 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/annual-reports')]
 final readonly class AnnualReportController
 {
+    private const MATURITY_DOMAINS = [
+        'IAM',
+        'GOVERNANCE',
+        'RISK_MANAGEMENT',
+        'ASSET_MANAGEMENT',
+        'VULNERABILITY_MANAGEMENT',
+        'DETECTION_RESPONSE',
+        'BUSINESS_CONTINUITY',
+        'THIRD_PARTIES',
+        'COMPLIANCE',
+        'AWARENESS',
+    ];
+
     public function __construct(
         private CurrentUser $currentUser,
         private AuditLogRepository $logs,
@@ -56,6 +69,56 @@ final readonly class AnnualReportController
         }
 
         return new JsonResponse($this->build($year));
+    }
+
+    #[Route('/{year<\d{4}>}/maturity', methods: ['GET'])]
+    public function maturity(int $year): JsonResponse
+    {
+        if (!$this->validYear($year)) {
+            return new JsonResponse(['code' => 'INVALID_YEAR', 'message' => 'Année invalide.'], 422);
+        }
+
+        return new JsonResponse($this->maturitySnapshot($year));
+    }
+
+    #[Route('/{year<\d{4}>}/maturity', methods: ['PUT'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function updateMaturity(int $year, Request $request): JsonResponse
+    {
+        if (!$this->validYear($year)) {
+            return new JsonResponse(['code' => 'INVALID_YEAR', 'message' => 'Année invalide.'], 422);
+        }
+        $payload = $request->toArray();
+        $received = (array) ($payload['assessments'] ?? []);
+        $assessments = [];
+        foreach (self::MATURITY_DOMAINS as $domain) {
+            $item = (array) ($received[$domain] ?? []);
+            $score = $item['score'] ?? null;
+            if (!is_int($score) && !is_float($score)) {
+                return new JsonResponse(['code' => 'INVALID_SCORE', 'message' => sprintf('Un score de 0 à 5 est requis pour %s.', $domain)], 422);
+            }
+            $score = (float) $score;
+            if ($score < 0 || $score > 5 || abs($score * 2 - round($score * 2)) > 0.00001) {
+                return new JsonResponse(['code' => 'INVALID_SCORE', 'message' => 'Les scores doivent être compris entre 0 et 5, par pas de 0,5.'], 422);
+            }
+            $rationale = trim((string) ($item['rationale'] ?? ''));
+            if ($score > 0 && '' === $rationale) {
+                return new JsonResponse(['code' => 'RATIONALE_REQUIRED', 'message' => sprintf('Une justification est requise pour %s.', $domain)], 422);
+            }
+            $assessments[$domain] = ['score' => $score, 'rationale' => mb_substr($rationale, 0, 1000)];
+        }
+        $actor = $this->currentUser->get();
+        $details = ['year' => $year, 'assessments' => $assessments, 'updatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM), 'updatedBy' => ['id' => $actor->getId(), 'name' => trim($actor->getFirstName().' '.$actor->getLastName())]];
+        $record = $this->maturityRecord($year);
+        $created = null === $record;
+        if (null === $record) {
+            $record = new OperationalRecord($actor->getOrganization(), 'ANNUAL_MATURITY', sprintf('Maturité cyber %d', $year), $details);
+            $this->entityManager->persist($record);
+        }
+        $record->update($record->getTitle(), 'ACTIVE', $details, $actor, null);
+        $this->entityManager->flush();
+
+        return new JsonResponse($this->maturitySnapshot($year), $created ? 201 : 200);
     }
 
     #[Route('/{year<\d{4}>}/generate', methods: ['POST'])]
@@ -142,6 +205,7 @@ final readonly class AnnualReportController
             'byDomain' => $domains,
             'contributors' => $contributors,
             'activities' => $activities,
+            'maturity' => $this->maturitySnapshot($year),
             'methodology' => 'Classification exhaustive des changements consignés dans le journal d’audit du tenant sur la période. Les consultations sans modification ne sont pas comptabilisées.',
         ];
     }
@@ -179,5 +243,40 @@ final readonly class AnnualReportController
         $details = $record->getDetails();
 
         return ['id' => $record->getId(), 'year' => (int) ($details['year'] ?? 0), 'version' => (int) ($details['version'] ?? 1), 'title' => $record->getTitle(), 'generatedAt' => $details['generatedAt'] ?? $record->getCreatedAt()->format(DATE_ATOM), 'activities' => (int) ($details['totals']['activities'] ?? 0)];
+    }
+
+    /** @return array<string, mixed> */
+    private function maturitySnapshot(int $year): array
+    {
+        $record = $this->maturityRecord($year);
+        $saved = $record?->getDetails()['assessments'] ?? [];
+        $assessments = [];
+        foreach (self::MATURITY_DOMAINS as $domain) {
+            $item = (array) ($saved[$domain] ?? []);
+            $assessments[$domain] = ['score' => isset($item['score']) ? (float) $item['score'] : 0.0, 'rationale' => (string) ($item['rationale'] ?? '')];
+        }
+        $assessed = array_filter($assessments, static fn (array $item): bool => '' !== $item['rationale']);
+
+        return [
+            'year' => $year,
+            'scale' => ['min' => 0, 'max' => 5, 'step' => 0.5],
+            'assessments' => $assessments,
+            'average' => [] === $assessed ? null : round(array_sum(array_column($assessed, 'score')) / count($assessed), 2),
+            'weaknesses' => array_keys(array_filter($assessments, static fn (array $item): bool => '' !== $item['rationale'] && $item['score'] <= 2.0)),
+            'assessedDomains' => count($assessed),
+            'complete' => count($assessed) === count(self::MATURITY_DOMAINS),
+            'updatedAt' => $record?->getDetails()['updatedAt'] ?? null,
+        ];
+    }
+
+    private function maturityRecord(int $year): ?OperationalRecord
+    {
+        foreach ($this->records->findForOrganization($this->currentUser->get()->getOrganization(), 'ANNUAL_MATURITY') as $record) {
+            if ($year === (int) ($record->getDetails()['year'] ?? 0)) {
+                return $record;
+            }
+        }
+
+        return null;
     }
 }
