@@ -20,6 +20,8 @@ import {
 } from "@mui/material";
 import { useMemo, useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import { useAuth } from "../auth/useAuth";
+import { hasAnyRole } from "../auth/roles";
 
 type RecordType =
   | "TASK"
@@ -66,6 +68,12 @@ const sections: Array<{ type: RecordType | "MY_TASKS"; label: string }> = [
 ];
 
 export function OperationsPage() {
+  const { user } = useAuth();
+  const canManage = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
+    "ROLE_RISK_MANAGER",
+  ]);
   const client = useQueryClient();
   const [section, setSection] = useState<RecordType | "MY_TASKS">("MY_TASKS");
   const [open, setOpen] = useState(false);
@@ -189,14 +197,16 @@ export function OperationsPage() {
         </Stack>
       ) : (
         <Stack spacing={2}>
-          <Button
-            sx={{ alignSelf: "flex-start" }}
-            variant="contained"
-            startIcon={<AddOutlined />}
-            onClick={() => setOpen(true)}
-          >
-            Créer
-          </Button>
+          {canManage && (
+            <Button
+              sx={{ alignSelf: "flex-start" }}
+              variant="contained"
+              startIcon={<AddOutlined />}
+              onClick={() => setOpen(true)}
+            >
+              Créer
+            </Button>
+          )}
           {records.data?.map((item) => {
             const progress = currentTrajectory.get(item.id);
             return (
@@ -247,7 +257,7 @@ export function OperationsPage() {
         </Stack>
       )}
       <Dialog
-        open={open}
+        open={canManage && open}
         onClose={() => setOpen(false)}
         fullWidth
         maxWidth="sm"

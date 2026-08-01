@@ -223,4 +223,56 @@ describe("App", () => {
     );
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });
+
+  it("bloque une route d’administration lors d’un accès direct sans rôle", async () => {
+    localStorage.setItem("riskpilot.interfaceLocale", "en");
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, "viewer-token");
+    const get = vi.spyOn(api, "get").mockImplementation(async (url) => ({
+      data:
+        url === "/isms-documents"
+          ? []
+          : {
+              id: 2,
+              email: "viewer@example.test",
+              firstName: "Victor",
+              lastName: "Viewer",
+              roles: ["ROLE_VIEWER"],
+              status: "ACTIVE",
+              locale: "en",
+              mfaEnabled: false,
+              lastLoginAt: null,
+              organization: {
+                id: 1,
+                name: "Demo",
+                description: null,
+                status: "ACTIVE",
+                riskThresholds: {
+                  lowMax: 4,
+                  moderateMax: 9,
+                  highMax: 16,
+                  criticalMax: 25,
+                },
+              },
+            },
+    }));
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/administration/users"]}>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByText(
+        "Access denied. Your role does not allow you to open this page.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Users" }),
+    ).not.toBeInTheDocument();
+    expect(get).not.toHaveBeenCalledWith("/users");
+  });
 });

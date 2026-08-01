@@ -106,7 +106,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
     private function canManage(): bool
     {
-        return [] !== array_intersect([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RISK_MANAGER, User::ROLE_AUDITOR], $this->currentUser->get()->getRoles());
+        return [] !== array_intersect([User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN, User::ROLE_RISK_MANAGER], $this->currentUser->get()->getRoles());
     }
 
     private function forbidden(): JsonResponse

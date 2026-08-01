@@ -50,4 +50,33 @@ final class ExecutiveGovernanceControllerTest extends WebTestCase
         self::assertCount(1, $payload['financialScenarios']);
         self::assertSame(0, $payload['risks']['total']);
     }
+
+    public function testAuditorCanReadButCannotCreateGovernanceRecord(): void
+    {
+        $client = self::createClient();
+        $client->disableReboot();
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $metadata = $manager->getMetadataFactory()->getAllMetadata();
+        $tool = new SchemaTool($manager);
+        $tool->dropSchema($metadata);
+        $tool->createSchema($metadata);
+        $organization = new Organization('Audit');
+        $auditor = new User('auditor@example.test', 'Anne', 'Audit', $organization, [User::ROLE_AUDITOR]);
+        $manager->persist($organization);
+        $manager->persist($auditor);
+        $manager->flush();
+        $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($auditor));
+
+        $client->request('GET', '/api/executive-governance/records');
+        self::assertResponseIsSuccessful();
+        $client->jsonRequest('POST', '/api/executive-governance/records', [
+            'type' => 'FINANCIAL_SCENARIO',
+            'title' => 'Interdit',
+            'ownerId' => $auditor->getId(),
+            'details' => [],
+        ]);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('FORBIDDEN', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
+    }
 }

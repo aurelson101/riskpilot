@@ -24,6 +24,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+import { hasAnyRole } from "../auth/roles";
 
 type Section =
   | "SECURITY_PROJECT"
@@ -122,6 +123,12 @@ const defaults: Record<Section, Record<string, unknown>> = {
 
 export function DecisionWorkspacePage() {
   const { user } = useAuth();
+  const isAdmin = hasAnyRole(user?.roles, ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"]);
+  const canContribute = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
+    "ROLE_RISK_MANAGER",
+  ]);
   const client = useQueryClient();
   const [section, setSection] = useState<Section>("SECURITY_PROJECT");
   const [open, setOpen] = useState(false);
@@ -136,6 +143,7 @@ export function DecisionWorkspacePage() {
   });
   const isFinancial = section === "FINANCIAL_SCENARIO";
   const isConnector = section === "CONNECTOR_SYNC";
+  const canCreate = isConnector ? isAdmin : canContribute;
   const portfolio = useQuery({
     queryKey: ["decision-tprm"],
     enabled: section === "TPRM_PROGRAM",
@@ -442,14 +450,16 @@ export function DecisionWorkspacePage() {
           ))}
         </Stack>
       )}
-      <Button
-        variant="contained"
-        startIcon={<AddOutlined />}
-        sx={{ alignSelf: "flex-start" }}
-        onClick={() => setOpen(true)}
-      >
-        Créer
-      </Button>
+      {canCreate && (
+        <Button
+          variant="contained"
+          startIcon={<AddOutlined />}
+          sx={{ alignSelf: "flex-start" }}
+          onClick={() => setOpen(true)}
+        >
+          Créer
+        </Button>
+      )}
       <Stack spacing={2}>
         {items?.map((item) => (
           <Card key={item.id}>
@@ -467,14 +477,16 @@ export function DecisionWorkspacePage() {
                   {JSON.stringify(item.details, null, 2)}
                 </Typography>
                 {section === "REPORT_TEMPLATE" &&
-                  item.details.approved !== true && (
+                  item.details.approved !== true &&
+                  isAdmin && (
                     <Button onClick={() => approveReport.mutate(item)}>
                       Approuver le modèle de rapport
                     </Button>
                   )}
                 {section === "REPORT_TEMPLATE" &&
                   item.status === "ACTIVE" &&
-                  item.details.approved === true && (
+                  item.details.approved === true &&
+                  canContribute && (
                     <Button
                       startIcon={<PlayArrowOutlined />}
                       disabled={runReport.isPending}
@@ -486,30 +498,36 @@ export function DecisionWorkspacePage() {
                     </Button>
                   )}
                 {section === "FINANCIAL_SCENARIO" &&
-                  item.status !== "APPROVED" && (
+                  item.status !== "APPROVED" &&
+                  isAdmin && (
                     <Button onClick={() => approveFinance.mutate(item)}>
                       Approuver le modèle financier
                     </Button>
                   )}
-                {section === "CONNECTOR_SYNC" && item.status === "ACTIVE" && (
-                  <Button onClick={() => reconcile.mutate(item.id)}>
-                    Tester le rapprochement
-                  </Button>
-                )}
-                {section === "SECURITY_PROJECT" && item.status === "ACTIVE" && (
-                  <Button
-                    onClick={() =>
-                      transitionProject.mutate({
-                        id: item.id,
-                        status: "IN_PROGRESS",
-                      })
-                    }
-                  >
-                    Démarrer la revue sécurité
-                  </Button>
-                )}
+                {section === "CONNECTOR_SYNC" &&
+                  item.status === "ACTIVE" &&
+                  isAdmin && (
+                    <Button onClick={() => reconcile.mutate(item.id)}>
+                      Tester le rapprochement
+                    </Button>
+                  )}
                 {section === "SECURITY_PROJECT" &&
-                  ["IN_PROGRESS", "AT_RISK"].includes(item.status) && (
+                  item.status === "ACTIVE" &&
+                  canContribute && (
+                    <Button
+                      onClick={() =>
+                        transitionProject.mutate({
+                          id: item.id,
+                          status: "IN_PROGRESS",
+                        })
+                      }
+                    >
+                      Démarrer la revue sécurité
+                    </Button>
+                  )}
+                {section === "SECURITY_PROJECT" &&
+                  ["IN_PROGRESS", "AT_RISK"].includes(item.status) &&
+                  canContribute && (
                     <Button
                       onClick={() =>
                         transitionProject.mutate({
@@ -550,7 +568,7 @@ export function DecisionWorkspacePage() {
         </Card>
       )}
       <Dialog
-        open={open}
+        open={canCreate && open}
         onClose={() => setOpen(false)}
         fullWidth
         maxWidth="md"

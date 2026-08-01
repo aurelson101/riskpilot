@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+import { hasAnyRole } from "../auth/roles";
 type Analysis = {
   id: number;
   key: string;
@@ -39,6 +40,11 @@ const artifactKinds = [
 ];
 export function AnalysisWorkspacePage() {
   const { user } = useAuth();
+  const canManage = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
+    "ROLE_RISK_MANAGER",
+  ]);
   const qc = useQueryClient();
   const [selected, setSelected] = useState<number | null>(null);
   const [form, setForm] = useState({
@@ -100,52 +106,59 @@ export function AnalysisWorkspacePage() {
       {(create.isError || add.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
-      <Card>
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography variant="h6">Nouvelle analyse</Typography>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-              <TextField
-                label="Clé stable"
-                value={form.key}
-                onChange={(e) => setForm({ ...form, key: e.target.value })}
-              />
-              <TextField
-                label="Titre"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
-              <TextField
-                label="Scénarios (identifiants séparés par des virgules)"
-                value={form.scenarioIds}
-                onChange={(e) =>
-                  setForm({ ...form, scenarioIds: e.target.value })
-                }
-              />
-              <TextField
-                select
-                label="Méthode"
-                value={form.method}
-                onChange={(e) => setForm({ ...form, method: e.target.value })}
-              >
-                {["EBIOS_RM", "ISO_27005", "SIMPLIFIED"].map((x) => (
-                  <MenuItem key={x} value={x}>
-                    {x}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant="contained"
-                startIcon={<AddOutlined />}
-                disabled={!form.key || !form.title || create.isPending}
-                onClick={() => create.mutate()}
-              >
-                Créer l’analyse
-              </Button>
+      {canManage ? (
+        <Card>
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography variant="h6">Nouvelle analyse</Typography>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <TextField
+                  label="Clé stable"
+                  value={form.key}
+                  onChange={(e) => setForm({ ...form, key: e.target.value })}
+                />
+                <TextField
+                  label="Titre"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                />
+                <TextField
+                  label="Scénarios (identifiants séparés par des virgules)"
+                  value={form.scenarioIds}
+                  onChange={(e) =>
+                    setForm({ ...form, scenarioIds: e.target.value })
+                  }
+                />
+                <TextField
+                  select
+                  label="Méthode"
+                  value={form.method}
+                  onChange={(e) => setForm({ ...form, method: e.target.value })}
+                >
+                  {["EBIOS_RM", "ISO_27005", "SIMPLIFIED"].map((x) => (
+                    <MenuItem key={x} value={x}>
+                      {x}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  variant="contained"
+                  startIcon={<AddOutlined />}
+                  disabled={!form.key || !form.title || create.isPending}
+                  onClick={() => create.mutate()}
+                >
+                  Créer l’analyse
+                </Button>
+              </Stack>
             </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <Alert severity="info">
+          Consultation uniquement : la création et la modification nécessitent
+          le rôle de responsable des risques.
+        </Alert>
+      )}
       <Stack spacing={2}>
         {analyses.data?.map((a) => (
           <Card
@@ -172,7 +185,7 @@ export function AnalysisWorkspacePage() {
           </Card>
         ))}
       </Stack>
-      {selected && (
+      {selected && canManage && (
         <Card>
           <CardContent>
             <Stack spacing={2}>

@@ -27,6 +27,7 @@ import {
 } from "@mui/icons-material";
 import {
   AppBar,
+  Alert,
   Avatar,
   Box,
   Button,
@@ -57,6 +58,7 @@ import {
 } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth/useAuth";
+import { hasAnyRole } from "./auth/roles";
 import { api } from "./api/client";
 import type { IsmsDocument } from "./api/types";
 import { LanguageBoundary } from "./i18n/LanguageBoundary";
@@ -213,6 +215,26 @@ const collapsedDrawerWidth = 76;
 function ProtectedRoute() {
   return useAuth().token ? <Outlet /> : <Navigate to="/login" replace />;
 }
+
+function RoleRoute({
+  allowedRoles,
+  children,
+}: {
+  allowedRoles: readonly string[];
+  children: ReactNode;
+}) {
+  const { user } = useAuth();
+  if (!hasAnyRole(user?.roles, allowedRoles)) {
+    return (
+      <Alert severity="warning">
+        Accès refusé. Votre rôle ne permet pas d’ouvrir cette page.
+      </Alert>
+    );
+  }
+  return children;
+}
+
+const adminRoles = ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"] as const;
 
 function Layout() {
   const { user, logout } = useAuth();
@@ -991,27 +1013,54 @@ export default function App() {
                   path="security-controls"
                   element={<InventoryPage kind="security-controls" />}
                 />
-                <Route path="administration/users" element={<UsersPage />} />
+                <Route
+                  path="administration/users"
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <UsersPage />
+                    </RoleRoute>
+                  }
+                />
                 <Route
                   path="administration/organizations"
-                  element={<OrganizationsPage />}
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <OrganizationsPage />
+                    </RoleRoute>
+                  }
                 />
                 <Route
                   path="administration/audit-logs"
-                  element={<AuditLogsPage />}
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <AuditLogsPage />
+                    </RoleRoute>
+                  }
                 />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route
                   path="administration/email-settings"
-                  element={<EmailSettingsPage />}
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <EmailSettingsPage />
+                    </RoleRoute>
+                  }
                 />
                 <Route
                   path="administration/integrations"
-                  element={<IntegrationSettingsPage />}
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <IntegrationSettingsPage />
+                    </RoleRoute>
+                  }
                 />
                 <Route
                   path="administration/action-fields"
-                  element={<ActionFieldsPage />}
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <ActionFieldsPage />
+                    </RoleRoute>
+                  }
                 />
                 <Route
                   path="reports/executive"
