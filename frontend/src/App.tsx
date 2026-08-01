@@ -186,6 +186,11 @@ const ActionFieldsPage = lazy(() =>
     default: module.ActionFieldsPage,
   })),
 );
+const OperationsPage = lazy(() =>
+  import("./pages/OperationsPage").then((module) => ({
+    default: module.OperationsPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -262,6 +267,7 @@ function Layout() {
     "/": "Tableau de bord",
     "/risks": "Risques",
     "/actions": "Plans d’action",
+    "/operations": "Pilotage opérationnel",
     "/indicators": "Indicators",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
@@ -383,6 +389,11 @@ function Layout() {
           path="/actions"
           label="Plans d’action"
           icon={<TaskAltOutlined />}
+        />
+        <NavItem
+          path="/operations"
+          label="Mes tâches et programmes"
+          icon={<FactCheckOutlined />}
         />
         <NavItem
           path="/indicators"
@@ -855,6 +866,7 @@ export default function App() {
                 <Route index element={<DashboardPage />} />
                 <Route path="risks" element={<RisksPage />} />
                 <Route path="actions" element={<ActionsPage />} />
+                <Route path="operations" element={<OperationsPage />} />
                 <Route path="indicators" element={<IndicatorsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />

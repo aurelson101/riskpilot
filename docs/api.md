@@ -44,6 +44,17 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 
 Les actions et toutes leurs relations sont limitées au tenant courant. Les notifications ne sont visibles que par leur destinataire.
 
+## Pilotage opérationnel P1
+
+- `GET /api/operations/my-tasks` : tâches personnelles consolidées depuis les tâches opérationnelles, plans d’action et évaluations de conformité ;
+- `GET|POST /api/operations/records` : liste ou création d’un objet opérationnel, filtrable par `type` ;
+- `PUT /api/operations/records/{id}` : modification tenant-scoped d’un objet ;
+- `GET /api/operations/compliance-trajectory` : trajectoires calculées vers la date cible.
+
+Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, `QUESTIONNAIRE_TEMPLATE`, `QUESTIONNAIRE_CAMPAIGN` et `REFERENCE_PACK`. Les écritures exigent au minimum `ROLE_RISK_MANAGER`. Les règles, modèles, campagnes et packs conservent leur configuration versionnée dans `details`; un pack doit référencer sa source, sa licence et sa version sans reproduire le texte protégé d’une norme.
+
+Le scheduler exécute `app:operations:remind`. Une tâche active attribuée et arrivée dans sa fenêtre de rappel produit au plus une relance par jour via la file transactionnelle de notifications.
+
 ## Conformité
 
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;

@@ -54,7 +54,7 @@ services:
 
   scheduler:
     <<: *backend
-    command: sh -c 'while true; do php bin/console app:risk:expire-acceptances; php bin/console app:risk:remind-reviews; sleep 3600; done'
+    command: sh -c 'while true; do php bin/console app:risk:expire-acceptances; php bin/console app:risk:remind-reviews; php bin/console app:operations:remind; sleep 3600; done'
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "ps | grep -q '[a]pp:risk:expire-acceptances'"]
