@@ -208,6 +208,11 @@ const AnalysisWorkspacePage = lazy(() =>
     default: module.AnalysisWorkspacePage,
   })),
 );
+const AnnualReportsPage = lazy(() =>
+  import("./pages/AnnualReportsPage").then((module) => ({
+    default: module.AnnualReportsPage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -258,6 +263,7 @@ function Layout() {
     "/decision",
     "/experiments",
     "/indicators",
+    "/annual-reports",
   ].some((path) => location.pathname === path);
   const [steeringOpen, setSteeringOpen] = useState(steeringActive);
   const complianceActive = [
@@ -358,6 +364,7 @@ function Layout() {
     "/vulnerabilities": "Vulnérabilités",
     "/notifications": "Notifications",
     "/reports/executive": "Rapport exécutif",
+    "/annual-reports": "Rapports annuels",
     "/isms-documents": "Documents ISMS",
     "/profile": "Mon profil",
     "/administration/users": "Utilisateurs",
@@ -593,6 +600,12 @@ function Layout() {
             path="/indicators"
             label="Indicateurs"
             icon={<AssessmentOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/annual-reports"
+            label="Rapports annuels"
+            icon={<HistoryOutlined fontSize="small" />}
           />
           <NavItem
             nested
@@ -969,6 +982,7 @@ export default function App() {
                   element={<AnalysisWorkspacePage />}
                 />
                 <Route path="indicators" element={<IndicatorsPage />} />
+                <Route path="annual-reports" element={<AnnualReportsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />
                 <Route path="third-parties" element={<ThirdPartiesPage />} />

@@ -53,6 +53,15 @@ Les actions et toutes leurs relations sont limitées au tenant courant. Les noti
 
 Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, `QUESTIONNAIRE_TEMPLATE`, `QUESTIONNAIRE_CAMPAIGN` et `REFERENCE_PACK`. Les écritures exigent au minimum `ROLE_RISK_MANAGER`. Les règles, modèles, campagnes et packs conservent leur configuration versionnée dans `details`; un pack doit référencer sa source, sa licence et sa version sans reproduire le texte protégé d’une norme.
 
+## Rapports annuels
+
+- `GET /api/annual-reports/years` liste les années connues et les instantanés conservés ;
+- `GET /api/annual-reports/{year}` produit la vue annuelle courante depuis le journal d’audit du tenant ;
+- `POST /api/annual-reports/{year}/generate` crée une nouvelle version immuable (`ROLE_RISK_MANAGER` minimum) ;
+- `GET /api/annual-reports/saved/{id}/export?format=json|html` exporte un instantané reproductible, dont la version HTML est imprimable en PDF.
+
+La classification agrège les changements par mois, domaine, action et contributeur. Le journal complet des activités mutantes de la période est inclus, sans exposer les anciennes/nouvelles valeurs ni les données techniques du client.
+
 Le scheduler exécute `app:operations:remind`. Une tâche active attribuée et arrivée dans sa fenêtre de rappel produit au plus une relance par jour via la file transactionnelle de notifications.
 
 ## Décision et différenciation P2

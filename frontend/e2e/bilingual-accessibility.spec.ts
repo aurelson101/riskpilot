@@ -11,6 +11,7 @@ const allRoutes = [
   "/experiments",
   "/analysis-workspace",
   "/indicators",
+  "/annual-reports",
   "/notifications",
   "/compliance",
   "/third-parties",
