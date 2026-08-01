@@ -52,6 +52,38 @@ use Symfony\Component\Routing\Attribute\Route;
         return new JsonResponse($this->response($record), 201);
     }
 
+    #[Route('/records/{id<\d+>}', methods: ['PUT'])]
+    public function update(int $id, Request $request): JsonResponse
+    {
+        if (!$this->canManage()) {
+            return $this->forbidden();
+        }
+        $actor = $this->currentUser->get();
+        $record = $this->records->find($id);
+        if (!$record instanceof ExecutiveGovernanceRecord || $record->getOrganization() !== $actor->getOrganization()) {
+            return new JsonResponse(['code' => 'NOT_FOUND'], 404);
+        }
+        $data = $request->toArray();
+        $owner = array_key_exists('ownerId', $data) ? $this->users->findOneVisibleTo((int) $data['ownerId'], $actor) : $record->getOwner();
+        if (null === $owner) {
+            return $this->invalid('Responsable invalide.');
+        }
+        try {
+            $record->update(
+                (string) ($data['title'] ?? $record->getTitle()),
+                (array) ($data['details'] ?? $record->getDetails()),
+                (string) ($data['status'] ?? $record->getStatus()),
+                array_key_exists('reviewAt', $data) ? (empty($data['reviewAt']) ? null : new \DateTimeImmutable((string) $data['reviewAt'])) : $record->getReviewAt(),
+                $owner,
+            );
+            $this->entityManager->flush();
+        } catch (\Exception $exception) {
+            return $this->invalid($exception->getMessage());
+        }
+
+        return new JsonResponse($this->response($record));
+    }
+
     #[Route('/vision-360', methods: ['GET'])]
     public function vision(): JsonResponse
     {

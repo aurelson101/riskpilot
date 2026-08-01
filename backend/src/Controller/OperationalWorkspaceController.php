@@ -31,7 +31,17 @@ final readonly class OperationalWorkspaceController
             return $this->error('INVALID_TYPE', 422);
         }
 
-        return new JsonResponse(array_map($this->serialize(...), $this->records->findForOrganization($this->currentUser->get()->getOrganization(), $type)));
+        $actor = $this->currentUser->get();
+        $records = $this->records->findForOrganization($actor->getOrganization(), $type);
+        $records = array_values(array_filter($records, static function (OperationalRecord $record) use ($actor): bool {
+            if ('SAVED_VIEW' !== $record->getType()) {
+                return true;
+            }
+
+            return $record->getOwner() === $actor || true === ($record->getDetails()['shared'] ?? false);
+        }));
+
+        return new JsonResponse(array_map($this->serialize(...), $records));
     }
 
     #[Route('/records', methods: ['POST'])] #[IsGranted(User::ROLE_RISK_MANAGER)]
@@ -41,7 +51,7 @@ final readonly class OperationalWorkspaceController
         try {
             $record = new OperationalRecord($this->currentUser->get()->getOrganization(), (string) ($data['type'] ?? ''), (string) ($data['title'] ?? ''), $this->details($data));
             $this->apply($record, $data);
-        } catch (\InvalidArgumentException $error) {
+        } catch (\Exception $error) {
             return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => $error->getMessage()], 422);
         }
         $this->entityManager->persist($record);
@@ -59,7 +69,7 @@ final readonly class OperationalWorkspaceController
         }
         try {
             $this->apply($record, $request->toArray());
-        } catch (\InvalidArgumentException $error) {
+        } catch (\Exception $error) {
             return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => $error->getMessage()], 422);
         }
         $this->entityManager->flush();
@@ -96,7 +106,11 @@ final readonly class OperationalWorkspaceController
             $details = $program->getDetails();
             $target = max(1, (int) ($details['targetScore'] ?? 100));
             $current = max(0, min(100, (int) ($details['currentScore'] ?? 0)));
-            $start = new \DateTimeImmutable((string) ($details['startDate'] ?? $program->getCreatedAt()->format('Y-m-d')));
+            try {
+                $start = new \DateTimeImmutable((string) ($details['startDate'] ?? $program->getCreatedAt()->format('Y-m-d')));
+            } catch (\Exception) {
+                $start = $program->getCreatedAt();
+            }
             $end = $program->getDueAt() ?? new \DateTimeImmutable('+90 days');
             $duration = max(1, $end->getTimestamp() - $start->getTimestamp());
             $expected = min($target, (int) round($target * max(0, min(1, (time() - $start->getTimestamp()) / $duration))));

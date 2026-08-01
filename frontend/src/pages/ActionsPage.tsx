@@ -393,7 +393,8 @@ export function ActionsPage() {
     setError("");
     save.mutate();
   }
-  if (query.isLoading) return <CircularProgress />;
+  if (query.isLoading)
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (query.isError)
     return (
       <Alert severity="error">Impossible de charger les plans d’action.</Alert>

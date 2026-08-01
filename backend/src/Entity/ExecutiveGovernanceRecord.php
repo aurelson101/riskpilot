@@ -82,6 +82,8 @@ class ExecutiveGovernanceRecord
             }
         } if ('FINANCIAL_SCENARIO' === $this->type && ((float) $details['lossMin'] > (float) $details['lossMostLikely'] || (float) $details['lossMostLikely'] > (float) $details['lossMax'])) {
             throw new \InvalidArgumentException('La fourchette de pertes doit être ordonnée.');
+        } if ('FINANCIAL_SCENARIO' === $this->type && 'APPROVED' === $status && ('' === trim((string) ($details['modelVersion'] ?? '')) || true !== ($details['financeApproval']['approved'] ?? false))) {
+            throw new \InvalidArgumentException('La version du modèle et l’approbation finance sont obligatoires.');
         } $this->title = trim($title);
         $this->details = $details;
         $this->status = $status;

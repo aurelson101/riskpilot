@@ -148,7 +148,7 @@ export function CompliancePage() {
     },
   });
   if (frameworks.isLoading || assessments.isLoading)
-    return <CircularProgress />;
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (frameworks.isError || assessments.isError)
     return (
       <Alert severity="error">
@@ -298,7 +298,7 @@ export function CompliancePage() {
                   Sélectionnez une évaluation pour saisir ses résultats.
                 </Typography>
               ) : results.isLoading ? (
-                <CircularProgress />
+                <CircularProgress aria-label="Chargement de la page" />
               ) : (
                 <Stack spacing={2}>
                   <Typography variant="h6" fontWeight={750}>

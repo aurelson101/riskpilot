@@ -33,6 +33,14 @@ final class ExecutiveGovernanceControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
         $client->jsonRequest('POST', '/api/executive-governance/records', ['type' => 'FINANCIAL_SCENARIO', 'title' => 'Rançongiciel', 'ownerId' => $admin->getId(), 'status' => 'ACTIVE', 'details' => ['frequencyMin' => 0.1, 'frequencyMax' => 0.3, 'lossMin' => 100000, 'lossMostLikely' => 500000, 'lossMax' => 1000000, 'currency' => 'EUR']]);
         self::assertResponseStatusCodeSame(201);
+        $scenario = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $client->jsonRequest('PUT', '/api/executive-governance/records/'.$scenario['id'], ['status' => 'APPROVED', 'details' => [...$scenario['details'], 'modelVersion' => '1.0', 'indirectLossFactor' => 0.2, 'financeApproval' => ['approved' => true, 'approvedBy' => 'Finance']]]);
+        self::assertResponseIsSuccessful();
+        $client->jsonRequest('POST', '/api/decision/financial-scenarios/'.$scenario['id'].'/simulate');
+        self::assertResponseIsSuccessful();
+        $simulation = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(1000, $simulation['samples']);
+        self::assertGreaterThan(0, $simulation['annualLoss']['p95']);
         $client->request('GET', '/api/executive-governance/vision-360');
         self::assertResponseIsSuccessful();
         $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

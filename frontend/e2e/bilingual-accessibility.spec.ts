@@ -6,6 +6,8 @@ const routes = [
   "/",
   "/risks",
   "/actions",
+  "/operations",
+  "/decision",
   "/indicators",
   "/notifications",
   "/compliance",
@@ -78,7 +80,7 @@ async function visibleValues(page: Page) {
 }
 
 for (const locale of ["fr", "en"] as const) {
-  test(`${locale.toUpperCase()} — 27 routes, responsive et accessibles`, async ({
+  test(`${locale.toUpperCase()} — 29 routes, responsive et accessibles`, async ({
     page,
     request,
   }) => {

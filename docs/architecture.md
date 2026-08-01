@@ -99,6 +99,15 @@ ROLE_ACTION_OWNER --> ROLE_VIEWER
 
 `ExecutiveGovernanceRecord` applique un schéma par objectif, indicateur, revue de direction, scénario financier ou investissement. Les fourchettes financières sont contrôlées et les dossiers conservent coût, charge, réduction attendue et ROI. L’endpoint Vision 360° agrège directement les repositories tenant-scoped afin que le rapport ne repose pas sur une copie désynchronisée.
 
+Le workspace P2 conserve ses définitions versionnées dans `OperationalRecord`
+et ne duplique pas les registres métier. Les projets Security by Design pointent
+vers les actifs, risques et actions existants ; les vues et rapports recalculent
+leurs instantanés depuis les repositories tenant-scoped. La quantification
+financière utilise un échantillonnage déterministe et exige une approbation
+finance explicite. Les connecteurs Jira et ServiceNow séparent configuration,
+secret haché et journaux de rapprochement idempotents. La vision plateforme est
+un endpoint distinct, limité au super-administrateur.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |

@@ -12,8 +12,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['organization_id', 'type', 'enabled'], name: 'idx_integration_tenant_type')]
 class PlatformIntegration
 {
-    public const TYPES = ['OIDC', 'SAML', 'SCIM', 'API_KEY', 'WEBHOOK'];
-    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'GENERIC'];
+    public const TYPES = ['OIDC', 'SAML', 'SCIM', 'API_KEY', 'WEBHOOK', 'CONNECTOR'];
+    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'JIRA', 'SERVICENOW', 'GENERIC'];
     public const SCOPES = ['risks:read', 'controls:read', 'actions:read', 'events:write', 'scim:write'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
@@ -105,7 +105,7 @@ class PlatformIntegration
 
     public function setCredential(string $plainSecret): void
     {
-        if ('API_KEY' !== $this->type && 'WEBHOOK' !== $this->type) {
+        if (!in_array($this->type, ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
             throw new \LogicException('Cette intégration ne porte pas de secret technique.');
         }
         $this->credentialPrefix = substr($plainSecret, 0, 12);
@@ -161,6 +161,15 @@ class PlatformIntegration
             $url = (string) ($configuration['url'] ?? '');
             if (!str_starts_with($url, 'https://')) {
                 throw new \InvalidArgumentException('Un webhook HTTPS est obligatoire.');
+            }
+        }
+        if ('CONNECTOR' === $type) {
+            $url = (string) ($configuration['baseUrl'] ?? '');
+            $direction = strtoupper((string) ($configuration['direction'] ?? ''));
+            $conflictStrategy = strtoupper((string) ($configuration['conflictStrategy'] ?? ''));
+            $fieldOwnership = (array) ($configuration['fieldOwnership'] ?? []);
+            if (!str_starts_with($url, 'https://') || !in_array($direction, ['IMPORT', 'EXPORT', 'BIDIRECTIONAL'], true) || !in_array($conflictStrategy, ['SOURCE_WINS', 'RISKPILOT_WINS', 'MANUAL'], true) || [] === $fieldOwnership) {
+                throw new \InvalidArgumentException('Le connecteur exige une URL HTTPS, un sens, une stratégie de conflit et la propriété des champs.');
             }
         }
     }

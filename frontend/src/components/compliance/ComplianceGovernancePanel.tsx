@@ -112,7 +112,8 @@ export function ComplianceGovernancePanel() {
     URL.revokeObjectURL(url);
   };
 
-  if (statements.isLoading) return <CircularProgress />;
+  if (statements.isLoading)
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (statements.isError)
     return (
       <Alert severity="error">

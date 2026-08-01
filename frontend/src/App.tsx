@@ -191,6 +191,11 @@ const OperationsPage = lazy(() =>
     default: module.OperationsPage,
   })),
 );
+const DecisionWorkspacePage = lazy(() =>
+  import("./pages/DecisionWorkspacePage").then((module) => ({
+    default: module.DecisionWorkspacePage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -268,6 +273,7 @@ function Layout() {
     "/risks": "Risques",
     "/actions": "Plans d’action",
     "/operations": "Pilotage opérationnel",
+    "/decision": "Décision et différenciation",
     "/indicators": "Indicators",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
@@ -394,6 +400,11 @@ function Layout() {
           path="/operations"
           label="Mes tâches et programmes"
           icon={<FactCheckOutlined />}
+        />
+        <NavItem
+          path="/decision"
+          label="Décision et différenciation"
+          icon={<GridViewOutlined />}
         />
         <NavItem
           path="/indicators"
@@ -867,6 +878,7 @@ export default function App() {
                 <Route path="risks" element={<RisksPage />} />
                 <Route path="actions" element={<ActionsPage />} />
                 <Route path="operations" element={<OperationsPage />} />
+                <Route path="decision" element={<DecisionWorkspacePage />} />
                 <Route path="indicators" element={<IndicatorsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />

@@ -35,7 +35,7 @@ use Symfony\Component\Routing\Attribute\Route;
         try {
             $item = new PlatformIntegration($actor->getOrganization(), (string) ($data['type'] ?? ''), (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), (array) ($data['configuration'] ?? []), (bool) ($data['enabled'] ?? false));
             $plainSecret = null;
-            if (in_array($item->getType(), ['API_KEY', 'WEBHOOK'], true)) {
+            if (in_array($item->getType(), ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
                 $item->setCredential($plainSecret);
             }

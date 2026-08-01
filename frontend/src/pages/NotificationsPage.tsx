@@ -23,7 +23,8 @@ export function NotificationsPage() {
     mutationFn: (id: number) => api.put(`/notifications/${id}/read`),
     onSuccess: () => client.invalidateQueries({ queryKey: ["notifications"] }),
   });
-  if (query.isLoading) return <CircularProgress />;
+  if (query.isLoading)
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (query.isError)
     return (
       <Alert severity="error">Impossible de charger les notifications.</Alert>

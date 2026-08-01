@@ -55,6 +55,26 @@ Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, 
 
 Le scheduler exécute `app:operations:remind`. Une tâche active attribuée et arrivée dans sa fenêtre de rappel produit au plus une relance par jour via la file transactionnelle de notifications.
 
+## Décision et différenciation P2
+
+Les objets `SECURITY_PROJECT`, `SAVED_VIEW`, `REPORT_TEMPLATE`, `REPORT_RUN`,
+`CONNECTOR_SYNC` et `TPRM_PROGRAM` utilisent les endpoints tenant-scoped du
+pilotage opérationnel. Les traitements spécialisés sont exposés sous
+`/api/decision` :
+
+- `POST /api/decision/projects/{id}/transition` : workflow Security by Design avec transitions contrôlées, validation tenant des actifs, risques et actions, puis portes d'avis et de mise en production ;
+- `POST /api/decision/financial-scenarios/{id}/simulate` : simulation déterministe de 1 000 observations, percentiles, intervalle à 90 % et sensibilité, uniquement après approbation finance ;
+- `GET /api/decision/views/{id}/snapshot` : exécution d'une vue enregistrée personnelle ou partagée sans copie des données sources ;
+- `GET /api/decision/platform-vision` : consolidation multi-organisations réservée au super-administrateur ;
+- `POST /api/decision/reports/{id}/run` et `GET /api/decision/reports/{runId}/export?format=json|html` : instantané reproductible d'un modèle versionné et export JSON ou HTML imprimable en PDF ;
+- `POST /api/decision/connectors/{id}/reconcile` : rapprochement Jira ou ServiceNow idempotent, journalisé et exécutable en simulation ;
+- `GET /api/decision/tprm/portfolio` : segmentation légère, standard ou approfondie, cyberscores, réévaluations, échéances contractuelles, dépendances et plans de sortie.
+
+Les connecteurs se configurent avec `type=CONNECTOR` dans `/api/v1/integrations`.
+Ils exigent une URL HTTPS, un sens de synchronisation, une stratégie de conflit
+et la propriété explicite des champs. Le secret généré n'est retourné qu'à la
+création ; seules son empreinte et son préfixe sont conservés.
+
 ## Conformité
 
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;

@@ -42,6 +42,16 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $service = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame($first->getId(), $service['organizationId']);
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
+        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'CONNECTOR', 'provider' => 'JIRA', 'name' => 'Jira actions', 'configuration' => ['baseUrl' => 'https://jira.example.test', 'direction' => 'BIDIRECTIONAL', 'conflictStrategy' => 'MANUAL', 'fieldOwnership' => ['status' => 'JIRA']], 'enabled' => true]);
+        self::assertResponseStatusCodeSame(201);
+        $connector = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $client->jsonRequest('POST', '/api/decision/connectors/'.$connector['id'].'/reconcile', ['dryRun' => true, 'idempotencyKey' => 'jira-test-1', 'items' => [['id' => 'ABC-1']]]);
+        self::assertResponseStatusCodeSame(201);
+        $sync = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $client->jsonRequest('POST', '/api/decision/connectors/'.$connector['id'].'/reconcile', ['dryRun' => false, 'idempotencyKey' => 'jira-test-1', 'items' => []]);
+        self::assertResponseIsSuccessful();
+        self::assertSame($sync['id'], json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['id']);
+        $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->jsonRequest('PUT', '/api/v1/integrations/'.$created['id'], ['name' => 'Vol']);
         self::assertResponseStatusCodeSame(404);

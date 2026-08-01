@@ -63,7 +63,8 @@ export function DashboardPage() {
     queryKey: ["dashboard"],
     queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
   });
-  if (query.isLoading) return <CircularProgress />;
+  if (query.isLoading)
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (query.isError || !query.data)
     return (
       <Alert severity="error">Impossible de charger le tableau de bord.</Alert>

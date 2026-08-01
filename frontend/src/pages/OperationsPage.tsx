@@ -75,6 +75,7 @@ export function OperationsPage() {
     ownerId: "",
     details: "{}",
   });
+  const [formError, setFormError] = useState<string | null>(null);
   const tasks = useQuery({
     queryKey: ["my-tasks"],
     queryFn: async () =>
@@ -115,7 +116,13 @@ export function OperationsPage() {
   );
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    create.mutate();
+    try {
+      JSON.parse(form.details);
+      setFormError(null);
+      create.mutate();
+    } catch {
+      setFormError("La configuration JSON n’est pas valide.");
+    }
   };
 
   return (
@@ -148,6 +155,7 @@ export function OperationsPage() {
         create.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
+      {formError && <Alert severity="error">{formError}</Alert>}
       {section === "MY_TASKS" ? (
         <Stack spacing={2}>
           {tasks.data?.map((item) => (

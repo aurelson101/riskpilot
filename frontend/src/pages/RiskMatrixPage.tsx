@@ -40,7 +40,8 @@ export function RiskMatrixPage() {
     queryFn: async () =>
       (await api.get<RiskMatrix>(`/risk-matrix?scoreType=${scoreType}`)).data,
   });
-  if (query.isLoading) return <CircularProgress />;
+  if (query.isLoading)
+    return <CircularProgress aria-label="Chargement de la page" />;
   if (query.isError || !query.data)
     return <Alert severity="error">Impossible de charger la matrice.</Alert>;
   const selectedCell = query.data.cells.find(

@@ -35,4 +35,24 @@ final class OperationalRecordTest extends TestCase
         self::assertSame($owner, $record->getOwner());
         self::assertSame($dueAt, $record->getDueAt());
     }
+
+    public function testRecordAcceptsEveryP2WorkspaceType(): void
+    {
+        $organization = new Organization('Primary');
+
+        foreach (['SECURITY_PROJECT', 'SAVED_VIEW', 'REPORT_TEMPLATE', 'REPORT_RUN', 'CONNECTOR_SYNC', 'TPRM_PROGRAM'] as $type) {
+            self::assertSame($type, (new OperationalRecord($organization, $type, $type))->getType());
+        }
+    }
+
+    public function testSavedViewCanCarryExplicitSharingPolicy(): void
+    {
+        $organization = new Organization('Primary');
+        $owner = new User('owner@example.test', 'View', 'Owner', $organization);
+        $record = new OperationalRecord($organization, 'SAVED_VIEW', 'Board view');
+        $record->update('Board view', 'ACTIVE', ['version' => '1.0', 'shared' => false, 'filters' => ['status' => 'OPEN']], $owner, null);
+
+        self::assertFalse($record->getDetails()['shared']);
+        self::assertSame($owner, $record->getOwner());
+    }
 }
