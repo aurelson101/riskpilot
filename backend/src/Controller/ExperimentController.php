@@ -61,7 +61,12 @@ final readonly class ExperimentController
     #[Route('/assistant/proposals', methods: ['GET'])]
     public function proposals(Request $request): JsonResponse
     {
-        return new JsonResponse(['items' => array_map($this->proposalResponse(...), $this->proposals->findForOrganization($this->currentUser->get()->getOrganization(), $request->query->getInt('limit', 100)))]);
+        $organization = $this->currentUser->get()->getOrganization();
+        $limit = min(100, max(1, $request->query->getInt('limit', 25)));
+        $page = max(1, $request->query->getInt('page', 1));
+        $total = $this->proposals->countForOrganization($organization);
+
+        return new JsonResponse(['items' => array_map($this->proposalResponse(...), $this->proposals->findForOrganization($organization, $limit, $page)), 'page' => $page, 'limit' => $limit, 'total' => $total, 'pages' => (int) ceil($total / $limit)]);
     }
 
     #[Route('/assistant/proposals', methods: ['POST'])]
@@ -125,7 +130,10 @@ final readonly class ExperimentController
         $limit = min(100, max(1, $request->query->getInt('limit', 25)));
         $items = $this->library->search($this->currentUser->get()->getOrganization(), is_string($kind) ? $kind : null, is_string($status) ? $status : null, $request->query->getInt('page', 1), $limit);
 
-        return new JsonResponse(['items' => array_map($this->libraryResponse(...), $items), 'page' => max(1, $request->query->getInt('page', 1)), 'limit' => $limit]);
+        $page = max(1, $request->query->getInt('page', 1));
+        $total = $this->library->countVisible($this->currentUser->get()->getOrganization(), is_string($kind) ? $kind : null, is_string($status) ? $status : null);
+
+        return new JsonResponse(['items' => array_map($this->libraryResponse(...), $items), 'page' => $page, 'limit' => $limit, 'total' => $total, 'pages' => (int) ceil($total / $limit)]);
     }
 
     #[Route('/library', methods: ['POST'])]
@@ -133,6 +141,55 @@ final readonly class ExperimentController
     public function createLibraryItem(Request $request): JsonResponse
     {
         return $this->saveLibrary(null, $request->toArray());
+    }
+
+    #[Route('/library/import', methods: ['POST'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function importLibrary(Request $request): JsonResponse
+    {
+        $data = $request->toArray();
+        $rows = array_values((array) ($data['items'] ?? []));
+        $dryRun = true !== ($data['commit'] ?? false);
+        if (1 !== (int) ($data['schemaVersion'] ?? 0) || [] === $rows || count($rows) > 100) {
+            return $this->error('INVALID_IMPORT', 'Le schéma, le nombre de lignes ou le lot est invalide (maximum 100).', 422);
+        }
+        $actor = $this->currentUser->get();
+        $items = [];
+        $results = [];
+        foreach ($rows as $index => $row) {
+            try {
+                if (!is_array($row)) {
+                    throw new \InvalidArgumentException('Ligne non structurée.');
+                }
+                $key = strtolower(trim((string) ($row['key'] ?? '')));
+                if (null !== $this->library->findOneBy(['organization' => $actor->getOrganization(), 'key' => $key, 'version' => 1])) {
+                    throw new \InvalidArgumentException('La clé existe déjà dans ce tenant.');
+                }
+                $dependencies = (array) ($row['dependencies'] ?? []);
+                $this->assertDependencies($dependencies);
+                $item = new KnowledgeLibraryItem($actor->getOrganization(), $actor, $key, strtoupper((string) ($row['kind'] ?? '')), (string) ($row['title'] ?? ''), 1, (array) ($row['content'] ?? []), $dependencies, isset($row['source']) ? (string) $row['source'] : null, isset($row['license']) ? (string) $row['license'] : null);
+                $items[] = $item;
+                $results[] = ['row' => $index + 1, 'key' => $key, 'valid' => true];
+            } catch (\InvalidArgumentException $e) {
+                $results[] = ['row' => $index + 1, 'key' => is_array($row) ? (string) ($row['key'] ?? '') : '', 'valid' => false, 'error' => $e->getMessage()];
+            }
+        }
+        if (count($items) !== count($rows)) {
+            return new JsonResponse(['dryRun' => $dryRun, 'imported' => 0, 'results' => $results], 422);
+        }
+        if ($dryRun) {
+            return new JsonResponse(['dryRun' => true, 'imported' => 0, 'results' => $results]);
+        }
+        try {
+            foreach ($items as $item) {
+                $this->entityManager->persist($item);
+            }
+            $this->entityManager->flush();
+        } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+            return $this->error('IMPORT_CONFLICT', $e->getMessage(), 409);
+        }
+
+        return new JsonResponse(['dryRun' => false, 'imported' => count($items), 'items' => array_map($this->libraryResponse(...), $items)], 201);
     }
 
     #[Route('/library/{id<\d+>}/revisions', methods: ['POST'])]
@@ -227,11 +284,7 @@ final readonly class ExperimentController
         $actor = $this->currentUser->get();
         try {
             $dependencies = (array) ($data['dependencies'] ?? []);
-            foreach ($dependencies as $dependency) {
-                if (!is_array($dependency) || '' === trim((string) ($dependency['key'] ?? '')) || (int) ($dependency['minVersion'] ?? 0) < 1 || !$this->library->hasApprovedDependency($actor->getOrganization(), (string) $dependency['key'], (int) $dependency['minVersion'])) {
-                    throw new \InvalidArgumentException('Une dépendance est invalide, étrangère ou non approuvée.');
-                }
-            }
+            $this->assertDependencies($dependencies);
             $item = new KnowledgeLibraryItem($actor->getOrganization(), $actor, null === $previous ? strtolower(trim((string) ($data['key'] ?? ''))) : $previous->getKey(), null === $previous ? strtoupper((string) ($data['kind'] ?? '')) : $previous->getKind(), (string) ($data['title'] ?? $previous?->getTitle() ?? ''), null === $previous ? 1 : $previous->getVersion() + 1, (array) ($data['content'] ?? []), $dependencies, isset($data['source']) ? (string) $data['source'] : $previous?->getSource(), isset($data['license']) ? (string) $data['license'] : $previous?->getLicense(), $previous);
             $this->entityManager->persist($item);
             $this->entityManager->flush();
@@ -240,6 +293,16 @@ final readonly class ExperimentController
         }
 
         return new JsonResponse($this->libraryResponse($item), 201);
+    }
+
+    /** @param array<array-key, mixed> $dependencies */
+    private function assertDependencies(array $dependencies): void
+    {
+        foreach ($dependencies as $dependency) {
+            if (!is_array($dependency) || '' === trim((string) ($dependency['key'] ?? '')) || (int) ($dependency['minVersion'] ?? 0) < 1 || !$this->library->hasApprovedDependency($this->currentUser->get()->getOrganization(), (string) $dependency['key'], (int) $dependency['minVersion'])) {
+                throw new \InvalidArgumentException('Une dépendance est invalide, étrangère ou non approuvée.');
+            }
+        }
     }
 
     private function transitionLibrary(int $id, string $transition): JsonResponse

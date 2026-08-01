@@ -195,6 +195,10 @@ docker compose exec backend php bin/console doctrine:migrations:migrate --no-int
 docker compose exec backend php bin/console doctrine:schema:validate
 ```
 
+La CI revient également à la migration précédente, réapplique la dernière
+version et valide le mapping. Les critères communs, limites d'import et budgets
+sont détaillés dans [Exigences transverses](transverse-requirements.md).
+
 Redis utilise l’AOF pour les données locales. Les pièces jointes ISMS, dépendances Composer et modules Node disposent de volumes distincts. Le code source reste monté dans les conteneurs de développement.
 
 ## Réseau et déploiement

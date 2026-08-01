@@ -18,8 +18,15 @@ final class AssistantProposalRepository extends ServiceEntityRepository
     }
 
     /** @return list<AssistantProposal> */
-    public function findForOrganization(Organization $organization, int $limit = 100): array
+    public function findForOrganization(Organization $organization, int $limit = 100, int $page = 1): array
     {
-        return $this->findBy(['organization' => $organization], ['createdAt' => 'DESC'], min(200, max(1, $limit)));
+        $limit = min(200, max(1, $limit));
+
+        return $this->findBy(['organization' => $organization], ['createdAt' => 'DESC'], $limit, (max(1, $page) - 1) * $limit);
+    }
+
+    public function countForOrganization(Organization $organization): int
+    {
+        return $this->count(['organization' => $organization]);
     }
 }

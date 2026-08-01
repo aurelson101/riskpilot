@@ -84,6 +84,9 @@ export function ExperimentsPage() {
   const isAdmin = user?.roles.some((role) =>
     ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
   );
+  const canContribute = user?.roles.some((role) =>
+    ["ROLE_RISK_MANAGER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
+  );
   const settings = useQuery({
     queryKey: ["experiment-settings"],
     queryFn: async () =>
@@ -245,15 +248,17 @@ export function ExperimentsPage() {
               </Stack>
             </CardContent>
           </Card>
-          <Button
-            startIcon={<AddOutlined />}
-            variant="contained"
-            sx={{ alignSelf: "flex-start" }}
-            disabled={!settings.data?.assistantEnabled}
-            onClick={() => setOpen(true)}
-          >
-            Créer une proposition
-          </Button>
+          {canContribute && (
+            <Button
+              startIcon={<AddOutlined />}
+              variant="contained"
+              sx={{ alignSelf: "flex-start" }}
+              disabled={!settings.data?.assistantEnabled}
+              onClick={() => setOpen(true)}
+            >
+              Créer une proposition
+            </Button>
+          )}
           {proposals.data?.map((item) => (
             <Card key={item.id}>
               <CardContent>
@@ -280,6 +285,7 @@ export function ExperimentsPage() {
                     />
                   ))}
                   {item.status === "PENDING" &&
+                    canContribute &&
                     item.requestedBy !== user?.id && (
                       <Stack direction="row" gap={1}>
                         <Button
@@ -315,14 +321,16 @@ export function ExperimentsPage() {
       )}
       {tab === "library" && (
         <>
-          <Button
-            startIcon={<AddOutlined />}
-            variant="contained"
-            sx={{ alignSelf: "flex-start" }}
-            onClick={() => setOpen(true)}
-          >
-            Créer une ressource
-          </Button>
+          {canContribute && (
+            <Button
+              startIcon={<AddOutlined />}
+              variant="contained"
+              sx={{ alignSelf: "flex-start" }}
+              onClick={() => setOpen(true)}
+            >
+              Créer une ressource
+            </Button>
+          )}
           {library.data?.map((item) => (
             <Card key={item.id}>
               <CardContent>

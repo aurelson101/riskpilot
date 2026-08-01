@@ -41,6 +41,9 @@ final class ExecutiveGovernanceControllerTest extends WebTestCase
         $simulation = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(1000, $simulation['samples']);
         self::assertGreaterThan(0, $simulation['annualLoss']['p95']);
+        $client->jsonRequest('POST', '/api/decision/financial-scenarios/'.$scenario['id'].'/simulate');
+        self::assertResponseIsSuccessful();
+        self::assertSame($simulation, json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR));
         $client->request('GET', '/api/executive-governance/vision-360');
         self::assertResponseIsSuccessful();
         $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

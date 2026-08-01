@@ -80,7 +80,8 @@ création ; seules son empreinte et son préfixe sont conservés.
 - `GET|PUT /api/experiments/settings` : activation complète par tenant et liste
   blanche des usages de l'assistant ; l'écriture est réservée aux administrateurs ;
 - `GET|POST /api/experiments/assistant/proposals` : historique et génération
-  déterministe de propositions sourcées ;
+  déterministe de propositions sourcées ; la liste accepte `page` et `limit`
+  (maximum 100) et retourne `total` et `pages` ;
 - `POST /api/experiments/assistant/proposals/{id}/validate` : approbation ou
   rejet humain avec commentaire obligatoire ;
 - `GET /api/experiments/assistant/evaluation` : couverture des sources, taux de
@@ -92,6 +93,10 @@ création ; seules son empreinte et son préfixe sont conservés.
 - `POST /api/experiments/library/{id}/submit|approve|retire` : workflow avec
   approbateur différent du propriétaire ;
 - `GET /api/experiments/library/export` : export JSON des versions approuvées.
+- `POST /api/experiments/library/import` : validation puis import atomique d'un
+  lot JSON versionné de 100 éléments maximum. Sans `commit: true`, l'endpoint
+  effectue uniquement une prévisualisation ligne par ligne. Toute ligne invalide
+  bloque le lot ; une clé existante ou une dépendance non approuvée est refusée.
 
 Les propositions possibles sont les mappings exigence-contrôle, résumés
 d'écarts, brouillons de rapports et propositions de questions. Chaque réponse
@@ -100,6 +105,11 @@ jamais un risque, un contrôle, une évaluation ou une décision. La bibliothèq
 accepte scénarios, actifs, menaces, vulnérabilités, contrôles, questionnaires et
 modèles de rapports, avec clé stable, version, propriétaire, source, licence,
 dépendances et chaîne de remplacement.
+
+Les écritures P3 sont journalisées par le subscriber d'audit commun. Les
+imports, exports, listes et transitions appliquent tous l'organisation de
+l'utilisateur authentifié ; aucune organisation ne peut être fournie dans le
+payload.
 
 ## Conformité
 

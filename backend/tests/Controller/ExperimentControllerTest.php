@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\AuditLog;
 use App\Entity\Organization;
 use App\Entity\SecurityControl;
 use App\Entity\User;
@@ -27,8 +28,9 @@ final class ExperimentControllerTest extends WebTestCase
         $admin = new User('admin@example.test', 'Alice', 'Admin', $first, [User::ROLE_ADMIN]);
         $riskManager = new User('risk@example.test', 'Rita', 'Risk', $first, [User::ROLE_RISK_MANAGER]);
         $otherAdmin = new User('other@example.test', 'Other', 'Admin', $second, [User::ROLE_ADMIN]);
+        $viewer = new User('viewer@example.test', 'Victor', 'Viewer', $first, [User::ROLE_VIEWER]);
         $control = new SecurityControl('Access control review', 'Identity', $first);
-        foreach ([$first, $second, $admin, $riskManager, $otherAdmin, $control] as $entity) {
+        foreach ([$first, $second, $admin, $riskManager, $otherAdmin, $viewer, $control] as $entity) {
             $manager->persist($entity);
         }
         $manager->flush();
@@ -44,6 +46,16 @@ final class ExperimentControllerTest extends WebTestCase
         $proposal = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertFalse($proposal['appliedAutomatically']);
         self::assertNotEmpty($proposal['sources']);
+        self::assertNotEmpty($client->getResponse()->headers->get('X-Request-ID'));
+
+        $client->request('GET', '/api/experiments/assistant/proposals?page=1&limit=1000');
+        $page = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame(100, $page['limit']);
+        self::assertSame(1, $page['total']);
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($viewer));
+        $client->jsonRequest('POST', '/api/experiments/assistant/proposals', ['kind' => 'QUESTION_SUGGESTIONS', 'context' => []]);
+        self::assertResponseStatusCodeSame(403);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($otherAdmin));
         $client->jsonRequest('POST', '/api/experiments/assistant/proposals/'.$proposal['id'].'/validate', ['decision' => 'APPROVED', 'comment' => 'Cross tenant']);
@@ -70,6 +82,17 @@ final class ExperimentControllerTest extends WebTestCase
         $revision = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(2, $revision['version']);
         self::assertSame($item['id'], $revision['supersedesId']);
+
+        $import = ['schemaVersion' => 1, 'items' => [['key' => 'threat.ransomware', 'kind' => 'THREAT', 'title' => 'Ransomware', 'content' => ['category' => 'Malware'], 'source' => 'Internal', 'license' => 'Internal use']]];
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($riskManager));
+        $client->jsonRequest('POST', '/api/experiments/library/import', $import);
+        self::assertResponseIsSuccessful();
+        self::assertTrue(json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['dryRun']);
+        $client->jsonRequest('POST', '/api/experiments/library/import', $import + ['commit' => true]);
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame(1, json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['imported']);
+
+        self::assertGreaterThan(0, $manager->getRepository(AuditLog::class)->count(['organization' => $first]));
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($otherAdmin));
         $client->request('GET', '/api/experiments/library');
