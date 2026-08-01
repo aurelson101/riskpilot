@@ -1,6 +1,6 @@
 # RiskPilot
 
-RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité, les plans d’action et la documentation ISMS. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports CSV et le rapport exécutif imprimable.
+RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité, les plans d’action, les audits, les tiers, la résilience et la documentation ISMS. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports, les rapports annuels versionnés et un radar de maturité cyber de 0 à 5.
 
 ![Aperçu du tableau de bord RiskPilot](riskpilot.png)
 
@@ -133,6 +133,20 @@ Le module résilience gère les incidents de la détection à la clôture avec c
 Le registre réglementaire regroupe traitements RGPD, AIPD, violations de données, obligations légales/contractuelles et dérogations. Chaque type impose ses informations probantes (finalité, base légale, conservation, risques, mesures, source ou décision de notification). Une dérogation doit documenter le risque et la compensation, expirer et être approuvée par une personne distincte du responsable.
 
 Le pilotage direction structure objectifs SMSI, KPI/KRI et seuils, revues de direction, scénarios financiers par fréquence/fourchette de pertes et dossiers d’investissement avec coût, charge, réduction et ROI. La Vision 360° du rapport exécutif agrège les registres opérationnels sans dupliquer leurs données.
+
+## Pilotage, analyses et rapports annuels
+
+Le groupe **Pilotage** réunit les plans d’action, les tâches et programmes, les indicateurs, les simulations de décision, la bibliothèque gouvernée et les rapports annuels. Les responsabilités, trajectoires de conformité, questionnaires, campagnes et packs de référence sont centralisés dans `/operations`, avec attribution, échéances et relances planifiées.
+
+Le workspace `/analysis-workspace` porte des analyses de risques versionnées selon une méthode simplifiée, ISO 27005 ou EBIOS RM. Il conserve périmètre, objectifs, équipe, jalons, scénarios, échelle, contrôle qualité, approbation indépendante et baseline. Les comparaisons de versions, preuves gouvernées, simulations avant/après, roadmaps, imports contrôlés et métriques agrégées permettent de capitaliser sans modifier silencieusement une analyse approuvée.
+
+L’espace `/decision` complète ce pilotage avec les projets Security by Design, les scénarios financiers approuvés, les vues enregistrées, les modèles de rapport reproductibles, la vision multi-organisations réservée au super-administrateur, les rapprochements de connecteurs idempotents et la segmentation TPRM. L’assistant de `/experiments` produit uniquement des propositions sourcées soumises à validation humaine ; il ne modifie jamais automatiquement un risque, un contrôle ou une décision.
+
+La page `/annual-reports` classe les changements réellement consignés dans le journal d’audit pour chaque année : activité par mois, domaine, type d’action et contributeur, puis journal détaillé sans exposition des valeurs sensibles. Un responsable des risques peut créer plusieurs instantanés immuables d’une année et les exporter en JSON ou HTML imprimable en PDF.
+
+Chaque année possède également un radar de maturité cyber de **0 à 5**, par pas de 0,5, sur dix services : IAM, gouvernance, gestion des risques, actifs, vulnérabilités, détection et réponse, continuité d’activité, tiers, conformité et sensibilisation. Les notes sont saisies et justifiées explicitement — elles ne sont jamais déduites du volume d’activité. Les axes notés 2 ou moins sont signalés comme faiblesses prioritaires, les axes non évalués sont exclus de la moyenne et l’évaluation active est figée dans chaque instantané annuel.
+
+La lecture reste limitée à l’organisation courante. La modification de la maturité et la génération d’un instantané exigent au minimum le rôle Risk Manager ; les lecteurs peuvent consulter et exporter les rapports existants.
 
 Les intégrations d’entreprise se configurent dans **Paramètres → Identité et intégrations** : fournisseurs OIDC/SAML Google Workspace, Microsoft Entra ou génériques, préparation SCIM, clés API à portées et webhooks HTTPS. Les secrets techniques ne sont affichés qu’à leur création et ne sont conservés que sous forme d’empreinte.
 
