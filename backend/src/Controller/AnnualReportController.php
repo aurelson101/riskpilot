@@ -93,6 +93,11 @@ final readonly class AnnualReportController
         $assessments = [];
         foreach (self::MATURITY_DOMAINS as $domain) {
             $item = (array) ($received[$domain] ?? []);
+            $assessed = true === ($item['assessed'] ?? false);
+            if (!$assessed) {
+                $assessments[$domain] = ['assessed' => false, 'score' => null, 'rationale' => ''];
+                continue;
+            }
             $score = $item['score'] ?? null;
             if (!is_int($score) && !is_float($score)) {
                 return new JsonResponse(['code' => 'INVALID_SCORE', 'message' => sprintf('Un score de 0 à 5 est requis pour %s.', $domain)], 422);
@@ -102,10 +107,10 @@ final readonly class AnnualReportController
                 return new JsonResponse(['code' => 'INVALID_SCORE', 'message' => 'Les scores doivent être compris entre 0 et 5, par pas de 0,5.'], 422);
             }
             $rationale = trim((string) ($item['rationale'] ?? ''));
-            if ($score > 0 && '' === $rationale) {
+            if ('' === $rationale) {
                 return new JsonResponse(['code' => 'RATIONALE_REQUIRED', 'message' => sprintf('Une justification est requise pour %s.', $domain)], 422);
             }
-            $assessments[$domain] = ['score' => $score, 'rationale' => mb_substr($rationale, 0, 1000)];
+            $assessments[$domain] = ['assessed' => true, 'score' => $score, 'rationale' => mb_substr($rationale, 0, 1000)];
         }
         $actor = $this->currentUser->get();
         $details = ['year' => $year, 'assessments' => $assessments, 'updatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM), 'updatedBy' => ['id' => $actor->getId(), 'name' => trim($actor->getFirstName().' '.$actor->getLastName())]];
@@ -253,16 +258,18 @@ final readonly class AnnualReportController
         $assessments = [];
         foreach (self::MATURITY_DOMAINS as $domain) {
             $item = (array) ($saved[$domain] ?? []);
-            $assessments[$domain] = ['score' => isset($item['score']) ? (float) $item['score'] : 0.0, 'rationale' => (string) ($item['rationale'] ?? '')];
+            $rationale = (string) ($item['rationale'] ?? '');
+            $assessed = true === ($item['assessed'] ?? false) || (!array_key_exists('assessed', $item) && '' !== $rationale);
+            $assessments[$domain] = ['assessed' => $assessed, 'score' => $assessed && isset($item['score']) ? (float) $item['score'] : null, 'rationale' => $assessed ? $rationale : ''];
         }
-        $assessed = array_filter($assessments, static fn (array $item): bool => '' !== $item['rationale']);
+        $assessed = array_filter($assessments, static fn (array $item): bool => true === $item['assessed']);
 
         return [
             'year' => $year,
             'scale' => ['min' => 0, 'max' => 5, 'step' => 0.5],
             'assessments' => $assessments,
             'average' => [] === $assessed ? null : round(array_sum(array_column($assessed, 'score')) / count($assessed), 2),
-            'weaknesses' => array_keys(array_filter($assessments, static fn (array $item): bool => '' !== $item['rationale'] && $item['score'] <= 2.0)),
+            'weaknesses' => array_keys(array_filter($assessments, static fn (array $item): bool => true === $item['assessed'] && $item['score'] <= 2.0)),
             'assessedDomains' => count($assessed),
             'complete' => count($assessed) === count(self::MATURITY_DOMAINS),
             'updatedAt' => $record?->getDetails()['updatedAt'] ?? null,

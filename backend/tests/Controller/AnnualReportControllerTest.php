@@ -54,8 +54,12 @@ final class AnnualReportControllerTest extends WebTestCase
         $domains = ['IAM', 'GOVERNANCE', 'RISK_MANAGEMENT', 'ASSET_MANAGEMENT', 'VULNERABILITY_MANAGEMENT', 'DETECTION_RESPONSE', 'BUSINESS_CONTINUITY', 'THIRD_PARTIES', 'COMPLIANCE', 'AWARENESS'];
         $assessments = [];
         foreach ($domains as $domain) {
-            $assessments[$domain] = ['score' => 'IAM' === $domain ? 1.5 : 3.0, 'rationale' => 'Évaluation documentée'];
+            $assessments[$domain] = ['assessed' => true, 'score' => 'IAM' === $domain ? 1.5 : 3.0, 'rationale' => 'Évaluation documentée'];
         }
+        $invalidAssessments = $assessments;
+        $invalidAssessments['IAM'] = ['assessed' => true, 'score' => 0, 'rationale' => ''];
+        $client->jsonRequest('PUT', '/api/annual-reports/'.$year.'/maturity', ['assessments' => $invalidAssessments]);
+        self::assertResponseStatusCodeSame(422);
         $client->jsonRequest('PUT', '/api/annual-reports/'.$year.'/maturity', ['assessments' => $assessments]);
         self::assertResponseStatusCodeSame(201);
         $maturity = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
@@ -67,6 +71,10 @@ final class AnnualReportControllerTest extends WebTestCase
         $saved = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(1, $saved['version']);
         self::assertSame(1.5, $saved['report']['maturity']['assessments']['IAM']['score']);
+        $client->jsonRequest('PUT', '/api/operations/records/'.$saved['id'], ['title' => 'Altération interdite']);
+        self::assertResponseStatusCodeSame(409);
+        $client->jsonRequest('POST', '/api/operations/records', ['type' => 'ANNUAL_REPORT', 'title' => 'Contournement interdit']);
+        self::assertResponseStatusCodeSame(403);
         $client->jsonRequest('POST', '/api/annual-reports/'.$year.'/generate');
         self::assertResponseStatusCodeSame(201);
         $second = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

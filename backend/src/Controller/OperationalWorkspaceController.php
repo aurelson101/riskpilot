@@ -48,6 +48,9 @@ final readonly class OperationalWorkspaceController
     public function create(Request $request): JsonResponse
     {
         $data = $request->toArray();
+        if (in_array((string) ($data['type'] ?? ''), OperationalRecord::SYSTEM_MANAGED_TYPES, true)) {
+            return $this->error('SYSTEM_MANAGED_TYPE', 403);
+        }
         try {
             $record = new OperationalRecord($this->currentUser->get()->getOrganization(), (string) ($data['type'] ?? ''), (string) ($data['title'] ?? ''), $this->details($data));
             $this->apply($record, $data);
@@ -66,6 +69,9 @@ final readonly class OperationalWorkspaceController
         $record = $this->records->findOneVisible($id, $this->currentUser->get()->getOrganization());
         if (null === $record) {
             return $this->error('NOT_FOUND', 404);
+        }
+        if (in_array($record->getType(), OperationalRecord::SYSTEM_MANAGED_TYPES, true)) {
+            return $this->error('IMMUTABLE_RECORD', 409);
         }
         try {
             $this->apply($record, $request->toArray());

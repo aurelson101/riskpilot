@@ -47,8 +47,8 @@ Les actions et toutes leurs relations sont limitées au tenant courant. Les noti
 ## Pilotage opérationnel P1
 
 - `GET /api/operations/my-tasks` : tâches personnelles consolidées depuis les tâches opérationnelles, plans d’action et évaluations de conformité ;
-- `GET|POST /api/operations/records` : liste ou création d’un objet opérationnel, filtrable par `type` ;
-- `PUT /api/operations/records/{id}` : modification tenant-scoped d’un objet ;
+- `GET|POST /api/operations/records` : liste ou création d’un objet opérationnel, filtrable par `type` ; les types gérés par le système ne peuvent pas être créés par cette route générique ;
+- `PUT /api/operations/records/{id}` : modification tenant-scoped d’un objet, sauf les instantanés et autres objets système immuables ;
 - `GET /api/operations/compliance-trajectory` : trajectoires calculées vers la date cible.
 
 Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, `QUESTIONNAIRE_TEMPLATE`, `QUESTIONNAIRE_CAMPAIGN` et `REFERENCE_PACK`. Les écritures exigent au minimum `ROLE_RISK_MANAGER`. Les règles, modèles, campagnes et packs conservent leur configuration versionnée dans `details`; un pack doit référencer sa source, sa licence et sa version sans reproduire le texte protégé d’une norme.
@@ -63,7 +63,7 @@ Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, 
 
 La classification agrège les changements par mois, domaine, action et contributeur. Le journal complet des activités mutantes de la période est inclus, sans exposer les anciennes/nouvelles valeurs ni les données techniques du client.
 
-Le radar de maturité est indépendant du volume d'activité. Chaque score supérieur à zéro exige une justification ; les scores inférieurs ou égaux à 2 sont signalés comme faiblesses prioritaires. La mise à jour exige `ROLE_RISK_MANAGER`, tandis que la lecture suit les droits du rapport annuel. L'instantané annuel incorpore l'évaluation en vigueur afin de conserver la situation observée au moment de la génération.
+Le radar de maturité est indépendant du volume d'activité. Un domaine est explicitement évalué ou non évalué ; toute note évaluée, y compris 0, exige une justification. Les scores inférieurs ou égaux à 2 sont signalés comme faiblesses prioritaires et les domaines non évalués sont exclus de la moyenne. La mise à jour exige `ROLE_RISK_MANAGER`, tandis que la lecture suit les droits du rapport annuel. L'instantané annuel incorpore l'évaluation en vigueur afin de conserver la situation observée au moment de la génération. Les instantanés `ANNUAL_REPORT` ne sont ni créables ni modifiables par les endpoints opérationnels génériques.
 
 Le scheduler exécute `app:operations:remind`. Une tâche active attribuée et arrivée dans sa fenêtre de rappel produit au plus une relance par jour via la file transactionnelle de notifications.
 

@@ -63,7 +63,11 @@ type AnnualReport = {
   }>;
   methodology: string;
 };
-type MaturityAssessment = { score: number; rationale: string };
+type MaturityAssessment = {
+  assessed: boolean;
+  score: number | null;
+  rationale: string;
+};
 type MaturityReport = {
   year: number;
   scale: { min: number; max: number; step: number };
@@ -175,7 +179,7 @@ export function AnnualReportsPage() {
     () =>
       Object.entries(maturityDraft).map(([domain, assessment]) => ({
         domain: maturityLabels[domain] ?? domain,
-        score: assessment.score,
+        score: assessment.assessed ? (assessment.score ?? 0) : 0,
         fullMark: 5,
       })),
     [maturityDraft],
@@ -354,21 +358,34 @@ export function AnnualReportsPage() {
                       size="small"
                       fullWidth
                       aria-label={`Niveau ${maturityLabels[domain] ?? domain}`}
-                      value={assessment.score}
+                      value={
+                        assessment.assessed
+                          ? String(assessment.score ?? 0)
+                          : "UNASSESSED"
+                      }
                       disabled={!canGenerate}
                       onChange={(event) =>
                         setMaturityDraft((current) => ({
                           ...current,
                           [domain]: {
                             ...current[domain],
-                            score: Number(event.target.value),
+                            assessed: event.target.value !== "UNASSESSED",
+                            score:
+                              event.target.value === "UNASSESSED"
+                                ? null
+                                : Number(event.target.value),
+                            rationale:
+                              event.target.value === "UNASSESSED"
+                                ? ""
+                                : current[domain].rationale,
                           },
                         }))
                       }
                     >
+                      <MenuItem value="UNASSESSED">Non évalué</MenuItem>
                       {Array.from({ length: 11 }, (_, index) => index / 2).map(
                         (score) => (
-                          <MenuItem key={score} value={score}>
+                          <MenuItem key={score} value={String(score)}>
                             {score}
                           </MenuItem>
                         ),
@@ -380,7 +397,7 @@ export function AnnualReportsPage() {
                       size="small"
                       fullWidth
                       value={assessment.rationale}
-                      disabled={!canGenerate}
+                      disabled={!canGenerate || !assessment.assessed}
                       placeholder="Preuves, constats et progrès attendus"
                       inputProps={{ maxLength: 1000 }}
                       onChange={(event) =>
@@ -416,7 +433,7 @@ export function AnnualReportsPage() {
           )}
           {saveMaturity.isError && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              Vérifiez que chaque note supérieure à zéro possède une
+              Vérifiez que chaque domaine évalué possède une note et une
               justification.
             </Alert>
           )}

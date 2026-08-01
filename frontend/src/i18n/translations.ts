@@ -1271,6 +1271,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Faiblesses prioritaires :", "Priority weaknesses:"],
   ["Service de sécurité", "Security service"],
   ["Niveau 0–5", "Level 0–5"],
+  ["Non évalué", "Not assessed"],
   ["Justification", "Rationale"],
   ["Gestion des actifs", "Asset management"],
   ["Détection et réponse", "Detection and response"],
@@ -1285,8 +1286,8 @@ const pairs: Array<[fr: string, en: string]> = [
   ["L’évaluation de maturité", "The maturity assessment for"],
   ["a été enregistrée.", "has been saved."],
   [
-    "Vérifiez que chaque note supérieure à zéro possède une justification.",
-    "Check that every score above zero has a rationale.",
+    "Vérifiez que chaque domaine évalué possède une note et une justification.",
+    "Check that every assessed domain has a score and a rationale.",
   ],
   ["activités", "activities"],
   ["HTML / PDF", "HTML / PDF"],
