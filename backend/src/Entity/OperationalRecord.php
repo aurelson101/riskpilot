@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['organization_id', 'type', 'status'], name: 'idx_operational_record_lookup')]
 class OperationalRecord
 {
-    public const TYPES = ['TASK', 'RESPONSIBILITY_RULE', 'COMPLIANCE_PROGRAM', 'QUESTIONNAIRE_TEMPLATE', 'QUESTIONNAIRE_CAMPAIGN', 'REFERENCE_PACK', 'SECURITY_PROJECT', 'SAVED_VIEW', 'REPORT_TEMPLATE', 'REPORT_RUN', 'CONNECTOR_SYNC', 'TPRM_PROGRAM'];
+    public const TYPES = ['TASK', 'RESPONSIBILITY_RULE', 'COMPLIANCE_PROGRAM', 'QUESTIONNAIRE_TEMPLATE', 'QUESTIONNAIRE_CAMPAIGN', 'REFERENCE_PACK', 'SECURITY_PROJECT', 'SAVED_VIEW', 'REPORT_TEMPLATE', 'REPORT_RUN', 'CONNECTOR_SYNC', 'TPRM_PROGRAM', 'P3_SETTINGS'];
     public const STATUSES = ['DRAFT', 'ACTIVE', 'IN_PROGRESS', 'AT_RISK', 'COMPLETED', 'ARCHIVED'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;

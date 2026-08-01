@@ -108,6 +108,19 @@ finance explicite. Les connecteurs Jira et ServiceNow séparent configuration,
 secret haché et journaux de rapprochement idempotents. La vision plateforme est
 un endpoint distinct, limité au super-administrateur.
 
+Le P3 sépare strictement expérimentation et données de référence. Une
+`AssistantProposal` conserve demande, proposition, sources, couverture et
+décision humaine ; aucun service ne transforme automatiquement une proposition
+en objet métier. L'assistant est désactivé par défaut et activable intégralement
+par organisation. Les métriques de rejet et de couverture permettent de suivre
+les réponses non fiables sans envoyer de contenu à un service externe.
+
+`KnowledgeLibraryItem` représente une version immuable d'une ressource interne.
+Une révision crée une nouvelle ligne liée par `supersedes`; elle ne réécrit pas
+une analyse ou une version approuvée. Le workflow impose soumission, approbation
+indépendante et retrait explicite. Clé et version sont uniques dans chaque
+organisation, et toutes les lectures et transitions sont tenant-scoped.
+
 Les documents ISMS ajoutent une ACL par ressource :
 
 | Permission | Lecture | Modifier/versionner | ACL, propriétaire, partage, approbation |

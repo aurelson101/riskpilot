@@ -2,12 +2,13 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { enToFr, frToEn, type Locale } from "../src/i18n/translations";
 
-const routes = [
+const allRoutes = [
   "/",
   "/risks",
   "/actions",
   "/operations",
   "/decision",
+  "/experiments",
   "/indicators",
   "/notifications",
   "/compliance",
@@ -33,6 +34,9 @@ const routes = [
   "/administration/integrations",
   "/administration/action-fields",
 ] as const;
+const routes = process.env.PLAYWRIGHT_ROUTE
+  ? allRoutes.filter((route) => route === process.env.PLAYWRIGHT_ROUTE)
+  : allRoutes;
 
 const invariant = new Set([
   "RiskPilot",
@@ -80,7 +84,7 @@ async function visibleValues(page: Page) {
 }
 
 for (const locale of ["fr", "en"] as const) {
-  test(`${locale.toUpperCase()} — 29 routes, responsive et accessibles`, async ({
+  test(`${locale.toUpperCase()} — ${routes.length} routes, responsive et accessibles`, async ({
     page,
     request,
   }) => {

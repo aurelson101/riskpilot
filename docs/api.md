@@ -75,6 +75,32 @@ Ils exigent une URL HTTPS, un sens de synchronisation, une stratégie de conflit
 et la propriété explicite des champs. Le secret généré n'est retourné qu'à la
 création ; seules son empreinte et son préfixe sont conservés.
 
+## Expérimentations contrôlées P3
+
+- `GET|PUT /api/experiments/settings` : activation complète par tenant et liste
+  blanche des usages de l'assistant ; l'écriture est réservée aux administrateurs ;
+- `GET|POST /api/experiments/assistant/proposals` : historique et génération
+  déterministe de propositions sourcées ;
+- `POST /api/experiments/assistant/proposals/{id}/validate` : approbation ou
+  rejet humain avec commentaire obligatoire ;
+- `GET /api/experiments/assistant/evaluation` : couverture des sources, taux de
+  rejet humain et compteur de décisions automatiques, toujours égal à zéro ;
+- `GET|POST /api/experiments/library` : recherche paginée et création d'une
+  ressource interne ;
+- `POST /api/experiments/library/{id}/revisions` : nouvelle version liée sans
+  modifier la version précédente ;
+- `POST /api/experiments/library/{id}/submit|approve|retire` : workflow avec
+  approbateur différent du propriétaire ;
+- `GET /api/experiments/library/export` : export JSON des versions approuvées.
+
+Les propositions possibles sont les mappings exigence-contrôle, résumés
+d'écarts, brouillons de rapports et propositions de questions. Chaque réponse
+contient ses sources visibles et `appliedAutomatically=false`. Elle ne modifie
+jamais un risque, un contrôle, une évaluation ou une décision. La bibliothèque
+accepte scénarios, actifs, menaces, vulnérabilités, contrôles, questionnaires et
+modèles de rapports, avec clé stable, version, propriétaire, source, licence,
+dépendances et chaîne de remplacement.
+
 ## Conformité
 
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;
