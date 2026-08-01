@@ -157,12 +157,33 @@ describe("App", () => {
     );
 
     expect(await screen.findByText("Mon profil et MFA")).toBeInTheDocument();
-    expect(screen.getByText("Indicateurs")).toBeInTheDocument();
+    const riskMenu = screen.getByRole("button", {
+      name: "Gestion des risques",
+    });
+    const steeringMenu = screen.getByRole("button", { name: "Pilotage" });
+    const complianceMenu = screen.getByRole("button", {
+      name: "Conformité et contrôles",
+    });
+    expect(riskMenu).toHaveAttribute("aria-expanded", "false");
+    expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
+    expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(riskMenu);
+    expect(await screen.findByText("Registre des risques")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pilotage" }));
+    expect(await screen.findByText("Indicateurs")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Conformité et contrôles" }),
+    );
+    expect(await screen.findByText("Mesures de sécurité")).toBeInTheDocument();
+    expect(screen.getByText("Analyses de risques")).toBeInTheDocument();
     expect(screen.getByText("Actifs")).toBeInTheDocument();
     const assetsMenu = screen.getByRole("button", { name: "Actifs" });
     expect(assetsMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(assetsMenu);
-    expect(assetsMenu).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Actifs" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(screen.getByText("Tous les actifs")).toBeInTheDocument();
     expect(await screen.findByText("Actifs matériels")).toBeInTheDocument();
     expect(screen.getByText("Colonnes des actions")).toBeInTheDocument();
@@ -183,13 +204,18 @@ describe("App", () => {
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Indicators")).toBeInTheDocument();
+    expect(screen.getByText("Risk analyses")).toBeInTheDocument();
+    expect(screen.getByText("Compliance and controls")).toBeInTheDocument();
     expect(screen.getByText("All assets")).toBeInTheDocument();
     expect(screen.getByText("Hardware assets")).toBeInTheDocument();
-    const ismsMenu = screen.getByRole("button", { name: "ISMS documents" });
+    const ismsMenu = await screen.findByRole("button", {
+      name: "ISMS documents",
+    });
     expect(ismsMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(ismsMenu);
-    expect(ismsMenu).toHaveAttribute("aria-expanded", "true");
-    expect(await screen.findByText("Politique interne")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "ISMS documents" }),
+    ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByText("Recent publications")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
     await waitFor(() =>

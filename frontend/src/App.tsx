@@ -222,6 +222,28 @@ function Layout() {
   const mobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const riskActive = [
+    "/risks",
+    "/analysis-workspace",
+    "/risk-matrix",
+    "/threats",
+    "/vulnerabilities",
+  ].some((path) => location.pathname === path);
+  const [riskOpen, setRiskOpen] = useState(riskActive);
+  const steeringActive = [
+    "/actions",
+    "/operations",
+    "/decision",
+    "/experiments",
+    "/indicators",
+  ].some((path) => location.pathname === path);
+  const [steeringOpen, setSteeringOpen] = useState(steeringActive);
+  const complianceActive = [
+    "/security-controls",
+    "/compliance",
+    "/regulatory",
+  ].some((path) => location.pathname === path);
+  const [complianceOpen, setComplianceOpen] = useState(complianceActive);
   const settingsActive =
     location.pathname === "/profile" ||
     location.pathname.startsWith("/administration");
@@ -259,6 +281,18 @@ function Layout() {
   }, [settingsActive]);
 
   useEffect(() => {
+    if (riskActive) setRiskOpen(true);
+  }, [riskActive]);
+
+  useEffect(() => {
+    if (steeringActive) setSteeringOpen(true);
+  }, [steeringActive]);
+
+  useEffect(() => {
+    if (complianceActive) setComplianceOpen(true);
+  }, [complianceActive]);
+
+  useEffect(() => {
     if (assetsActive) setAssetsOpen(true);
   }, [assetsActive]);
 
@@ -286,13 +320,13 @@ function Layout() {
     "/decision": "Décision et différenciation",
     "/experiments": "Expérimentations sous contrôle",
     "/analysis-workspace": "Analyses et capitalisation",
-    "/indicators": "Indicators",
+    "/indicators": "Indicateurs",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
     "/assets": "Actifs",
-    "/assets/hardware": "Hardware assets",
-    "/assets/software": "Software assets",
-    "/assets/information": "Information assets",
+    "/assets/hardware": "Actifs matériels",
+    "/assets/software": "Actifs logiciels",
+    "/assets/information": "Actifs informationnels",
     "/threats": "Menaces",
     "/compliance": "Conformité",
     "/security-controls": "Mesures de sécurité",
@@ -309,7 +343,7 @@ function Layout() {
     "/administration/audit-logs": "Journal d’audit",
     "/administration/email-settings": "Paramètres email",
     "/administration/integrations": "Identité et intégrations",
-    "/administration/action-fields": "Action columns",
+    "/administration/action-fields": "Colonnes des actions",
   };
 
   function NavItem({
@@ -367,6 +401,77 @@ function Layout() {
     );
   }
 
+  function NavGroup({
+    id,
+    label,
+    icon,
+    active,
+    open,
+    onToggle,
+    children,
+  }: {
+    id: string;
+    label: string;
+    icon: ReactNode;
+    active: boolean;
+    open: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+  }) {
+    return (
+      <>
+        <Tooltip title={collapsed && !mobile ? label : ""} placement="right">
+          <ListItemButton
+            aria-label={label}
+            aria-expanded={open}
+            aria-controls={`${id}-navigation`}
+            selected={active}
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                if (!open) onToggle();
+                return;
+              }
+              onToggle();
+            }}
+            sx={{
+              minHeight: 44,
+              borderRadius: 1.5,
+              mb: 0.25,
+              justifyContent: collapsed ? "center" : "initial",
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: collapsed ? 0 : 42,
+                color: "inherit",
+                justifyContent: "center",
+              }}
+            >
+              {icon}
+            </ListItemIcon>
+            {!collapsed && (
+              <>
+                <ListItemText
+                  primary={label}
+                  primaryTypographyProps={{ fontSize: 14 }}
+                />
+                {open ? <ExpandLess /> : <ExpandMore />}
+              </>
+            )}
+          </ListItemButton>
+        </Tooltip>
+        {!collapsed && (
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <List id={`${id}-navigation`} component="div" disablePadding>
+              {children}
+            </List>
+          </Collapse>
+        )}
+      </>
+    );
+  }
+
   const drawerContent = (
     <Box
       sx={{
@@ -402,133 +507,150 @@ function Layout() {
           label="Tableau de bord"
           icon={<DashboardOutlined />}
         />
-        <NavItem path="/risks" label="Risques" icon={<AssessmentOutlined />} />
-        <NavItem
-          path="/actions"
-          label="Plans d’action"
-          icon={<TaskAltOutlined />}
-        />
-        <NavItem
-          path="/operations"
-          label="Mes tâches et programmes"
-          icon={<FactCheckOutlined />}
-        />
-        <NavItem
-          path="/decision"
-          label="Décision et différenciation"
-          icon={<GridViewOutlined />}
-        />
-        <NavItem
-          path="/experiments"
-          label="Expérimentations"
-          icon={<BugReportOutlined />}
-        />
-        <NavItem
-          path="/analysis-workspace"
-          label="Analyses"
-          icon={<GridViewOutlined />}
-        />
-        <NavItem
-          path="/indicators"
-          label="Indicators"
+        <NavGroup
+          id="risk"
+          label="Gestion des risques"
           icon={<AssessmentOutlined />}
-        />
-        <NavItem
-          path="/risk-matrix"
-          label="Matrice des risques"
-          icon={<GridViewOutlined />}
-        />
+          active={riskActive}
+          open={riskOpen}
+          onToggle={() => setRiskOpen((value) => !value)}
+        >
+          <NavItem
+            nested
+            path="/risks"
+            label="Registre des risques"
+            icon={<AssessmentOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/analysis-workspace"
+            label="Analyses de risques"
+            icon={<GridViewOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/risk-matrix"
+            label="Matrice des risques"
+            icon={<GridViewOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/threats"
+            label="Menaces"
+            icon={<GppMaybeOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/vulnerabilities"
+            label="Vulnérabilités"
+            icon={<BugReportOutlined fontSize="small" />}
+          />
+        </NavGroup>
+        <NavGroup
+          id="steering"
+          label="Pilotage"
+          icon={<TaskAltOutlined />}
+          active={steeringActive}
+          open={steeringOpen}
+          onToggle={() => setSteeringOpen((value) => !value)}
+        >
+          <NavItem
+            nested
+            path="/actions"
+            label="Plans d’action"
+            icon={<TaskAltOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/operations"
+            label="Mes tâches et programmes"
+            icon={<FactCheckOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/indicators"
+            label="Indicateurs"
+            icon={<AssessmentOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/decision"
+            label="Décision et simulations"
+            icon={<GridViewOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/experiments"
+            label="Assistant et bibliothèque"
+            icon={<BugReportOutlined fontSize="small" />}
+          />
+        </NavGroup>
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavItem
           path="/scopes"
           label="Périmètres"
           icon={<AccountTreeOutlined />}
         />
-        <Tooltip title={collapsed && !mobile ? "Actifs" : ""} placement="right">
-          <ListItemButton
-            aria-label="Actifs"
-            aria-expanded={assetsOpen}
-            aria-controls="assets-navigation"
-            selected={assetsActive}
-            onClick={() => {
-              if (collapsed) {
-                setCollapsed(false);
-                setAssetsOpen(true);
-              } else setAssetsOpen((open) => !open);
-            }}
-            sx={{
-              minHeight: 44,
-              borderRadius: 1.5,
-              mb: 0.25,
-              justifyContent: collapsed ? "center" : "initial",
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                minWidth: collapsed ? 0 : 42,
-                color: "inherit",
-                justifyContent: "center",
-              }}
-            >
-              <Inventory2Outlined />
-            </ListItemIcon>
-            {!collapsed && (
-              <>
-                <ListItemText
-                  primary="Actifs"
-                  primaryTypographyProps={{ fontSize: 14 }}
-                />
-                {assetsOpen ? <ExpandLess /> : <ExpandMore />}
-              </>
-            )}
-          </ListItemButton>
-        </Tooltip>
-        {!collapsed && (
-          <Collapse in={assetsOpen} timeout="auto" unmountOnExit>
-            <List id="assets-navigation" component="div" disablePadding>
-              <NavItem
-                nested
-                path="/assets"
-                label="Tous les actifs"
-                icon={<Inventory2Outlined fontSize="small" />}
-              />
-              <NavItem
-                nested
-                path="/assets/hardware"
-                label="Hardware assets"
-                icon={<Inventory2Outlined fontSize="small" />}
-              />
-              <NavItem
-                nested
-                path="/assets/software"
-                label="Software assets"
-                icon={<Inventory2Outlined fontSize="small" />}
-              />
-              <NavItem
-                nested
-                path="/assets/information"
-                label="Information assets"
-                icon={<Inventory2Outlined fontSize="small" />}
-              />
-            </List>
-          </Collapse>
-        )}
-        <NavItem path="/threats" label="Menaces" icon={<GppMaybeOutlined />} />
-        <NavItem
-          path="/vulnerabilities"
-          label="Vulnérabilités"
-          icon={<BugReportOutlined />}
-        />
-        <NavItem
-          path="/security-controls"
-          label="Mesures de sécurité"
+        <NavGroup
+          id="assets"
+          label="Actifs"
+          icon={<Inventory2Outlined />}
+          active={assetsActive}
+          open={assetsOpen}
+          onToggle={() => setAssetsOpen((value) => !value)}
+        >
+          <NavItem
+            nested
+            path="/assets"
+            label="Tous les actifs"
+            icon={<Inventory2Outlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/assets/hardware"
+            label="Actifs matériels"
+            icon={<Inventory2Outlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/assets/software"
+            label="Actifs logiciels"
+            icon={<Inventory2Outlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/assets/information"
+            label="Actifs informationnels"
+            icon={<Inventory2Outlined fontSize="small" />}
+          />
+        </NavGroup>
+        <NavGroup
+          id="compliance"
+          label="Conformité et contrôles"
           icon={<VerifiedUserOutlined />}
-        />
-        <NavItem
-          path="/compliance"
-          label="Conformité"
-          icon={<FactCheckOutlined />}
-        />
+          active={complianceActive}
+          open={complianceOpen}
+          onToggle={() => setComplianceOpen((value) => !value)}
+        >
+          <NavItem
+            nested
+            path="/compliance"
+            label="Conformité"
+            icon={<FactCheckOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/security-controls"
+            label="Mesures de sécurité"
+            icon={<VerifiedUserOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/regulatory"
+            label="Vie privée et obligations"
+            icon={<VerifiedUserOutlined fontSize="small" />}
+          />
+        </NavGroup>
         <NavItem
           path="/third-parties"
           label="Tiers"
@@ -539,74 +661,30 @@ function Layout() {
           label="Résilience"
           icon={<ShieldOutlined />}
         />
-        <NavItem
-          path="/regulatory"
-          label="Réglementaire"
-          icon={<VerifiedUserOutlined />}
-        />
-        <Tooltip
-          title={collapsed && !mobile ? "Documents ISMS" : ""}
-          placement="right"
+        <NavGroup
+          id="isms"
+          label="Documents ISMS"
+          icon={<FolderCopyOutlined />}
+          active={ismsActive}
+          open={ismsOpen}
+          onToggle={() => setIsmsOpen((value) => !value)}
         >
-          <ListItemButton
-            aria-label="Documents ISMS"
-            aria-expanded={ismsOpen}
-            aria-controls="isms-navigation"
-            selected={ismsActive}
-            onClick={() => {
-              if (collapsed) {
-                setCollapsed(false);
-                setIsmsOpen(true);
-              } else setIsmsOpen((open) => !open);
-            }}
-            sx={{
-              minHeight: 44,
-              borderRadius: 1.5,
-              mb: 0.25,
-              justifyContent: collapsed ? "center" : "initial",
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                minWidth: collapsed ? 0 : 42,
-                color: "inherit",
-                justifyContent: "center",
-              }}
-            >
-              <FolderCopyOutlined />
-            </ListItemIcon>
-            {!collapsed && (
-              <>
-                <ListItemText
-                  primary="Documents ISMS"
-                  primaryTypographyProps={{ fontSize: 14 }}
-                />
-                {ismsOpen ? <ExpandLess /> : <ExpandMore />}
-              </>
-            )}
-          </ListItemButton>
-        </Tooltip>
-        {!collapsed && (
-          <Collapse in={ismsOpen} timeout="auto" unmountOnExit>
-            <List id="isms-navigation" component="div" disablePadding>
-              <NavItem
-                nested
-                path="/isms-documents"
-                label="Publications récentes"
-                icon={<DescriptionOutlined fontSize="small" />}
-              />
-              {ismsCategories.map((category) => (
-                <NavItem
-                  key={category}
-                  nested
-                  path={`/isms-documents?category=${encodeURIComponent(category)}`}
-                  label={category}
-                  icon={<FolderCopyOutlined fontSize="small" />}
-                />
-              ))}
-            </List>
-          </Collapse>
-        )}
+          <NavItem
+            nested
+            path="/isms-documents"
+            label="Publications récentes"
+            icon={<DescriptionOutlined fontSize="small" />}
+          />
+          {ismsCategories.map((category) => (
+            <NavItem
+              key={category}
+              nested
+              path={`/isms-documents?category=${encodeURIComponent(category)}`}
+              label={category}
+              icon={<FolderCopyOutlined fontSize="small" />}
+            />
+          ))}
+        </NavGroup>
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavItem
           path="/notifications"
@@ -618,107 +696,69 @@ function Layout() {
           label="Rapport exécutif"
           icon={<DescriptionOutlined />}
         />
-        <Tooltip
-          title={collapsed && !mobile ? "Paramètres" : ""}
-          placement="right"
+        <NavGroup
+          id="settings"
+          label="Paramètres"
+          icon={<SettingsOutlined />}
+          active={settingsActive}
+          open={settingsOpen}
+          onToggle={() => setSettingsOpen((value) => !value)}
         >
-          <ListItemButton
-            aria-label="Paramètres"
-            aria-expanded={settingsOpen}
-            aria-controls="settings-navigation"
-            selected={settingsActive}
-            onClick={() => {
-              if (collapsed) {
-                setCollapsed(false);
-                setSettingsOpen(true);
-              } else setSettingsOpen((open) => !open);
-            }}
-            sx={{
-              minHeight: 44,
-              borderRadius: 1.5,
-              justifyContent: collapsed ? "center" : "initial",
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                minWidth: collapsed ? 0 : 42,
-                color: "inherit",
-                justifyContent: "center",
-              }}
-            >
-              <SettingsOutlined />
-            </ListItemIcon>
-            {!collapsed && (
-              <>
-                <ListItemText
-                  primary="Paramètres"
-                  primaryTypographyProps={{ fontSize: 14 }}
-                />
-                {settingsOpen ? <ExpandLess /> : <ExpandMore />}
-              </>
-            )}
-          </ListItemButton>
-        </Tooltip>
-        {!collapsed && (
-          <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
-            <List id="settings-navigation" component="div" disablePadding>
-              <NavItem
-                nested
-                path="/profile"
-                label="Mon profil et MFA"
-                icon={<AccountCircleOutlined fontSize="small" />}
-              />
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/action-fields"
-                  label="Action columns"
-                  icon={<GridViewOutlined fontSize="small" />}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/integrations"
-                  label="Identité et intégrations"
-                  icon={<AccountTreeOutlined fontSize="small" />}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/email-settings"
-                  label="Messagerie"
-                  icon={<SettingsOutlined fontSize="small" />}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/users"
-                  label="Utilisateurs"
-                  icon={<AdminPanelSettingsOutlined fontSize="small" />}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/organizations"
-                  label="Organisations"
-                  icon={<BusinessOutlined fontSize="small" />}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  nested
-                  path="/administration/audit-logs"
-                  label="Journal d’audit"
-                  icon={<HistoryOutlined fontSize="small" />}
-                />
-              )}
-            </List>
-          </Collapse>
-        )}
+          <NavItem
+            nested
+            path="/profile"
+            label="Mon profil et MFA"
+            icon={<AccountCircleOutlined fontSize="small" />}
+          />
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/action-fields"
+              label="Colonnes des actions"
+              icon={<GridViewOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/integrations"
+              label="Identité et intégrations"
+              icon={<AccountTreeOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/email-settings"
+              label="Messagerie"
+              icon={<SettingsOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/users"
+              label="Utilisateurs"
+              icon={<AdminPanelSettingsOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/organizations"
+              label="Organisations"
+              icon={<BusinessOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/audit-logs"
+              label="Journal d’audit"
+              icon={<HistoryOutlined fontSize="small" />}
+            />
+          )}
+        </NavGroup>
       </List>
       <Box
         sx={{
