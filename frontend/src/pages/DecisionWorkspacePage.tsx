@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AddOutlined, PlayArrowOutlined } from "@mui/icons-material";
+import {
+  AddOutlined,
+  DownloadOutlined,
+  PlayArrowOutlined,
+} from "@mui/icons-material";
 import {
   Alert,
   Button,
@@ -214,9 +218,31 @@ export function DecisionWorkspacePage() {
     },
   });
   const runReport = useMutation({
-    mutationFn: (id: number) => api.post(`/decision/reports/${id}/run`),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: ["decision-records"] }),
+    mutationFn: async (id: number) =>
+      (await api.post<Item>(`/decision/reports/${id}/run`)).data,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["decision-records"] });
+    },
+  });
+  const downloadReport = useMutation({
+    mutationFn: async ({
+      id,
+      format,
+    }: {
+      id: number;
+      format: "json" | "html";
+    }) => {
+      const response = await api.get<Blob>(
+        `/decision/reports/${id}/export?format=${format}`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `riskpilot-report-${id}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
   });
   const approveFinance = useMutation({
     mutationFn: (item: Item) =>
@@ -333,6 +359,7 @@ export function DecisionWorkspacePage() {
         portfolio.isError ||
         create.isError ||
         runReport.isError ||
+        downloadReport.isError ||
         approveFinance.isError ||
         simulate.isError ||
         reconcile.isError ||
@@ -341,6 +368,45 @@ export function DecisionWorkspacePage() {
         error) && (
         <Alert severity="error">
           {error ?? "L’opération n’a pas pu être terminée."}
+        </Alert>
+      )}
+      {runReport.data && (
+        <Alert
+          severity="success"
+          action={
+            <Stack direction="row" spacing={1}>
+              <Button
+                color="inherit"
+                size="small"
+                startIcon={<DownloadOutlined />}
+                disabled={downloadReport.isPending}
+                onClick={() =>
+                  downloadReport.mutate({
+                    id: runReport.data.id,
+                    format: "json",
+                  })
+                }
+              >
+                Télécharger JSON
+              </Button>
+              <Button
+                color="inherit"
+                size="small"
+                startIcon={<DownloadOutlined />}
+                disabled={downloadReport.isPending}
+                onClick={() =>
+                  downloadReport.mutate({
+                    id: runReport.data.id,
+                    format: "html",
+                  })
+                }
+              >
+                Télécharger HTML/PDF
+              </Button>
+            </Stack>
+          }
+        >
+          Rapport généré : {runReport.data.title}
         </Alert>
       )}
       {section === "TPRM_PROGRAM" && portfolio.data && (
@@ -411,9 +477,12 @@ export function DecisionWorkspacePage() {
                   item.details.approved === true && (
                     <Button
                       startIcon={<PlayArrowOutlined />}
+                      disabled={runReport.isPending}
                       onClick={() => runReport.mutate(item.id)}
                     >
-                      Générer le rapport
+                      {runReport.isPending
+                        ? "Génération du rapport…"
+                        : "Générer le rapport"}
                     </Button>
                   )}
                 {section === "FINANCIAL_SCENARIO" &&

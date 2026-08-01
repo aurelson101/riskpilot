@@ -1120,6 +1120,10 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Démarrer la revue sécurité", "Start security review"],
   ["Décider la mise en production", "Decide production release"],
   ["Approuver le modèle de rapport", "Approve report template"],
+  ["Génération du rapport…", "Generating report…"],
+  ["Rapport généré :", "Report generated:"],
+  ["Télécharger JSON", "Download JSON"],
+  ["Télécharger HTML/PDF", "Download HTML/PDF"],
   ["Expérimentations sous contrôle", "Controlled experiments"],
   [
     "Propositions sourcées et bibliothèque versionnée, sans décision automatique",

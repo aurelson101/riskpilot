@@ -167,3 +167,35 @@ for (const locale of ["fr", "en"] as const) {
     expect(runtimeErrors).toEqual([]);
   });
 }
+
+test("la génération d'un rapport affiche le résultat et permet son export", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: { email: "admin@riskpilot.local", password: "ChangeMe123!" },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/decision", { waitUntil: "networkidle" });
+  await page
+    .getByRole("tab", { name: /Rapports gouvernés|Governed reports/ })
+    .click();
+  await page
+    .getByRole("button", { name: /Générer le rapport|Generate report/ })
+    .click();
+
+  await expect(
+    page.getByText(/Rapport généré :|Report generated:/),
+  ).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: /Télécharger JSON|Download JSON/ })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^riskpilot-report-\d+\.json$/);
+});
