@@ -9,6 +9,7 @@ const allRoutes = [
   "/operations",
   "/decision",
   "/experiments",
+  "/analysis-workspace",
   "/indicators",
   "/notifications",
   "/compliance",

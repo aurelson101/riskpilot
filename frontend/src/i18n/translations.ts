@@ -1124,6 +1124,16 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Rapport généré :", "Report generated:"],
   ["Télécharger JSON", "Download JSON"],
   ["Télécharger HTML/PDF", "Download HTML/PDF"],
+  ["Analyses et capitalisation", "Analyses and knowledge reuse"],
+  [
+    "Analyses versionnées, méthodes guidées, preuves, simulations, roadmaps et qualité",
+    "Versioned analyses, guided methods, evidence, simulations, roadmaps and quality",
+  ],
+  ["Nouvelle analyse", "New analysis"],
+  ["Créer l’analyse", "Create analysis"],
+  ["· complétude", "· completeness"],
+  ["Ajouter un artefact gouverné", "Add a governed artifact"],
+  ["Ajouter l’artefact", "Add artifact"],
   ["Expérimentations sous contrôle", "Controlled experiments"],
   [
     "Propositions sourcées et bibliothèque versionnée, sans décision automatique",

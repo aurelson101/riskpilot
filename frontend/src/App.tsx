@@ -201,6 +201,11 @@ const ExperimentsPage = lazy(() =>
     default: module.ExperimentsPage,
   })),
 );
+const AnalysisWorkspacePage = lazy(() =>
+  import("./pages/AnalysisWorkspacePage").then((module) => ({
+    default: module.AnalysisWorkspacePage,
+  })),
+);
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -280,6 +285,7 @@ function Layout() {
     "/operations": "Pilotage opérationnel",
     "/decision": "Décision et différenciation",
     "/experiments": "Expérimentations sous contrôle",
+    "/analysis-workspace": "Analyses et capitalisation",
     "/indicators": "Indicators",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
@@ -416,6 +422,11 @@ function Layout() {
           path="/experiments"
           label="Expérimentations"
           icon={<BugReportOutlined />}
+        />
+        <NavItem
+          path="/analysis-workspace"
+          label="Analyses"
+          icon={<GridViewOutlined />}
         />
         <NavItem
           path="/indicators"
@@ -891,6 +902,10 @@ export default function App() {
                 <Route path="operations" element={<OperationsPage />} />
                 <Route path="decision" element={<DecisionWorkspacePage />} />
                 <Route path="experiments" element={<ExperimentsPage />} />
+                <Route
+                  path="analysis-workspace"
+                  element={<AnalysisWorkspacePage />}
+                />
                 <Route path="indicators" element={<IndicatorsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />

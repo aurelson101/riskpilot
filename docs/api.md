@@ -111,6 +111,17 @@ imports, exports, listes et transitions appliquent tous l'organisation de
 l'utilisateur authentifié ; aucune organisation ne peut être fournie dans le
 payload.
 
+## Analyses et capitalisation
+
+Le préfixe `/api/analysis-workspace` expose les améliorations structurelles 17 à
+31 : analyses versionnées (`GET|POST /analyses`), révisions, contrôle qualité,
+approbation indépendante, comparaison de baselines, artefacts gouvernés,
+prévisualisation d'import et métriques agrégées. Les artefacts typés représentent
+les étapes de méthode, preuves, efficacité des contrôles, simulations avant/après,
+options de roadmap, ACL, activité métier, imports, mises à jour de bibliothèque,
+niveaux fournisseurs et métriques produit. Toutes les recherches sont paginées
+et tenant-scoped ; aucun payload ne choisit l'organisation.
+
 ## Conformité
 
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;
