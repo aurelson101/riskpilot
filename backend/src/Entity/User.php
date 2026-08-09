@@ -334,6 +334,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    #[\Deprecated]
     public function eraseCredentials(): void
     {
     }
