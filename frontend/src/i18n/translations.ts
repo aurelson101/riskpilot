@@ -268,6 +268,8 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Actif", "Active"],
   ["Inactif", "Inactive"],
   ["Brouillon", "Draft"],
+  ["Terminée", "Completed"],
+  ["Archivée", "Archived"],
   ["Publié", "Published"],
   ["Archivé", "Archived"],
   ["Protégé", "Protected"],
@@ -948,6 +950,23 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Justification de la vraisemblance", "Likelihood rationale"],
   ["Conformité par référentiel", "Compliance by framework"],
   ["Aucune évaluation disponible.", "No assessment available."],
+  ["État de l’évaluation", "Assessment status"],
+  [
+    "Brouillon → En cours → Terminée, puis Archivée si nécessaire",
+    "Draft → In progress → Completed, then Archived if needed",
+  ],
+  [
+    "Le changement d’état de l’évaluation a échoué.",
+    "The assessment status change failed.",
+  ],
+  [
+    "Cette évaluation est terminée. Repassez-la « En cours » pour modifier ses résultats.",
+    "This assessment is completed. Set it back to “In progress” to edit its results.",
+  ],
+  [
+    "Cette évaluation est archivée. Repassez-la « En cours » pour modifier ses résultats.",
+    "This assessment is archived. Set it back to “In progress” to edit its results.",
+  ],
   [
     "Aucune évaluation. Lancez-en une avec le bouton ci-dessus.",
     "No assessment. Start one with the button above.",

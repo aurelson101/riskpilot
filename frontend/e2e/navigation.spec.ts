@@ -85,3 +85,48 @@ test("le radar de conformité reste lisible et synthétique", async ({
     page.getByText(/Points forts \(4–5\)|Strong points \(4–5\)/),
   ).toBeVisible();
 });
+
+test("le statut d’une évaluation peut être modifié", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/compliance", { waitUntil: "networkidle" });
+  await page
+    .locator("main")
+    .getByText(/Cadre Cyber Démonstration|Cyber Demonstration Framework/)
+    .first()
+    .click();
+
+  const status = page.getByRole("combobox", {
+    name: /État de l’évaluation|Assessment status/,
+  });
+  const originalStatus = (await status.textContent()) ?? "";
+  const startsCompleted = /Terminée|Completed/.test(originalStatus);
+  const targetStatus = startsCompleted
+    ? /En cours|In progress/
+    : /Terminée|Completed/;
+  const restoreStatus = startsCompleted
+    ? /Terminée|Completed/
+    : /En cours|In progress/;
+
+  await status.click();
+  await page.getByRole("option", { name: targetStatus }).click();
+  await expect(status).toHaveText(targetStatus);
+
+  // Restore the demo fixture so this test remains repeatable.
+  await status.click();
+  await page.getByRole("option", { name: restoreStatus }).click();
+  await expect(status).toHaveText(restoreStatus);
+});

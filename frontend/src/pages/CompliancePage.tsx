@@ -64,6 +64,22 @@ const statusColors: Record<ComplianceResult["complianceStatus"], string> = {
   NOT_APPLICABLE: "#78909c",
   NOT_ASSESSED: "#90a4ae",
 };
+const assessmentStatusLabels: Record<ComplianceAssessment["status"], string> = {
+  DRAFT: "Brouillon",
+  IN_PROGRESS: "En cours",
+  COMPLETED: "Terminée",
+  ARCHIVED: "Archivée",
+};
+
+const assessmentStatusColors: Record<
+  ComplianceAssessment["status"],
+  "default" | "info" | "success"
+> = {
+  DRAFT: "default",
+  IN_PROGRESS: "info",
+  COMPLETED: "success",
+  ARCHIVED: "default",
+};
 
 function summarizeReferences(items: ComplianceResult[]): string {
   const references = items.map((item) => item.requirement.reference);
@@ -193,6 +209,35 @@ export function CompliancePage() {
       void client.invalidateQueries({ queryKey: ["compliance-assessments"] });
     },
   });
+  const selectedAssessmentRecord = assessments.data?.find(
+    (assessment) => assessment.id === selectedAssessment,
+  );
+  const canEditSelected = Boolean(
+    selectedAssessmentRecord &&
+    (canAssess || selectedAssessmentRecord.assessor.id === user?.id),
+  );
+  const assessmentIsLocked =
+    selectedAssessmentRecord?.status === "COMPLETED" ||
+    selectedAssessmentRecord?.status === "ARCHIVED";
+  const updateAssessmentStatus = useMutation({
+    mutationFn: ({
+      assessment,
+      status,
+    }: {
+      assessment: ComplianceAssessment;
+      status: ComplianceAssessment["status"];
+    }) =>
+      api.put(`/compliance-assessments/${assessment.id}`, {
+        frameworkId: assessment.framework.id,
+        scopeId: assessment.scope.id,
+        assessorId: assessment.assessor.id,
+        assessmentDate: assessment.assessmentDate,
+        status,
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["compliance-assessments"] });
+    },
+  });
   const resultSummary = useMemo(
     () => buildComplianceSummary(results.data ?? []),
     [results.data],
@@ -315,7 +360,11 @@ export function CompliancePage() {
                       <Typography fontWeight={750}>
                         {assessment.framework.name}
                       </Typography>
-                      <Chip size="small" label={assessment.status} />
+                      <Chip
+                        size="small"
+                        label={assessmentStatusLabels[assessment.status]}
+                        color={assessmentStatusColors[assessment.status]}
+                      />
                     </Stack>
                     <Typography variant="caption">
                       {assessment.scope.name} · {assessment.assessor.firstName}{" "}
@@ -355,9 +404,64 @@ export function CompliancePage() {
                 </Alert>
               ) : (
                 <Stack spacing={2}>
-                  <Typography variant="h6" fontWeight={750}>
-                    Résultats par exigence
-                  </Typography>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    justifyContent="space-between"
+                    alignItems={{ xs: "stretch", sm: "center" }}
+                    gap={2}
+                  >
+                    <Box>
+                      <Typography variant="h6" fontWeight={750}>
+                        Résultats par exigence
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Brouillon → En cours → Terminée, puis Archivée si
+                        nécessaire
+                      </Typography>
+                    </Box>
+                    {selectedAssessmentRecord && (
+                      <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <InputLabel id="assessment-status-label">
+                          État de l’évaluation
+                        </InputLabel>
+                        <Select
+                          labelId="assessment-status-label"
+                          label="État de l’évaluation"
+                          value={selectedAssessmentRecord.status}
+                          disabled={
+                            !canEditSelected || updateAssessmentStatus.isPending
+                          }
+                          onChange={(event) =>
+                            updateAssessmentStatus.mutate({
+                              assessment: selectedAssessmentRecord,
+                              status: event.target
+                                .value as ComplianceAssessment["status"],
+                            })
+                          }
+                        >
+                          {Object.entries(assessmentStatusLabels).map(
+                            ([status, label]) => (
+                              <MenuItem key={status} value={status}>
+                                {label}
+                              </MenuItem>
+                            ),
+                          )}
+                        </Select>
+                      </FormControl>
+                    )}
+                  </Stack>
+                  {updateAssessmentStatus.isError && (
+                    <Alert severity="error">
+                      Le changement d’état de l’évaluation a échoué.
+                    </Alert>
+                  )}
+                  {assessmentIsLocked && (
+                    <Alert severity="info">
+                      {selectedAssessmentRecord?.status === "ARCHIVED"
+                        ? "Cette évaluation est archivée. Repassez-la « En cours » pour modifier ses résultats."
+                        : "Cette évaluation est terminée. Repassez-la « En cours » pour modifier ses résultats."}
+                    </Alert>
+                  )}
                   {updateResult.isError && (
                     <Alert severity="error">
                       La mise à jour du résultat a échoué. La valeur précédente
@@ -520,6 +624,7 @@ export function CompliancePage() {
                             <Select
                               aria-label={`Maturité ${result.requirement.reference}`}
                               value={result.maturityLevel}
+                              disabled={!canEditSelected || assessmentIsLocked}
                               onChange={(event) =>
                                 updateResult.mutate({
                                   result,
@@ -540,6 +645,7 @@ export function CompliancePage() {
                             <Select
                               aria-label={`Conformité ${result.requirement.reference}`}
                               value={result.complianceStatus}
+                              disabled={!canEditSelected || assessmentIsLocked}
                               onChange={(event) =>
                                 updateResult.mutate({
                                   result,
