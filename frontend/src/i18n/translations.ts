@@ -1166,6 +1166,11 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Points faibles (0–2) :", "Weak points (0–2):"],
   ["Points forts (4–5) :", "Strong points (4–5):"],
   ["À terminer :", "Remaining:"],
+  ["Non applicables :", "Not applicable:"],
+  [
+    "Évaluez au moins trois exigences pour afficher une toile représentative.",
+    "Assess at least three requirements to display a representative radar chart.",
+  ],
   [
     "Impossible de charger les résultats de cette évaluation.",
     "Unable to load the results for this assessment.",

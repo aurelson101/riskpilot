@@ -48,6 +48,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { ComplianceGovernancePanel } from "../components/compliance/ComplianceGovernancePanel";
+import { buildComplianceSummary } from "./complianceSummary";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
   COMPLIANT: "Conforme",
@@ -63,6 +64,15 @@ const statusColors: Record<ComplianceResult["complianceStatus"], string> = {
   NOT_APPLICABLE: "#78909c",
   NOT_ASSESSED: "#90a4ae",
 };
+
+function summarizeReferences(items: ComplianceResult[]): string {
+  const references = items.map((item) => item.requirement.reference);
+  const visible = references.slice(0, 6).join(", ");
+
+  return references.length > 6
+    ? `${visible} +${references.length - 6}`
+    : visible;
+}
 
 export function CompliancePage() {
   const { user } = useAuth();
@@ -183,31 +193,10 @@ export function CompliancePage() {
       void client.invalidateQueries({ queryKey: ["compliance-assessments"] });
     },
   });
-  const resultSummary = useMemo(() => {
-    const items = results.data ?? [];
-    const assessed = items.filter(
-      (item) => item.complianceStatus !== "NOT_ASSESSED",
-    );
-    const average = assessed.length
-      ? assessed.reduce((sum, item) => sum + item.maturityLevel, 0) /
-        assessed.length
-      : null;
-
-    return {
-      radar: items.map((item) => ({
-        requirement: item.requirement.reference,
-        title: item.requirement.title,
-        maturity: item.maturityLevel,
-        fullMark: 5,
-      })),
-      average,
-      weak: assessed.filter((item) => item.maturityLevel <= 2),
-      strong: assessed.filter((item) => item.maturityLevel >= 4),
-      remaining: items.filter(
-        (item) => item.complianceStatus === "NOT_ASSESSED",
-      ),
-    };
-  }, [results.data]);
+  const resultSummary = useMemo(
+    () => buildComplianceSummary(results.data ?? []),
+    [results.data],
+  );
   if (frameworks.isLoading || assessments.isLoading)
     return <CircularProgress aria-label="Chargement de la page" />;
   if (frameworks.isError || assessments.isError)
@@ -375,7 +364,7 @@ export function CompliancePage() {
                       a été restaurée.
                     </Alert>
                   )}
-                  {resultSummary.radar.length > 0 && (
+                  {(results.data?.length ?? 0) > 0 && (
                     <Card variant="outlined">
                       <CardContent>
                         <Stack
@@ -407,69 +396,98 @@ export function CompliancePage() {
                           </Box>
                         </Stack>
                         <Box
-                          role="img"
-                          aria-label="Toile d’araignée des résultats de conformité, échelle de 0 à 5"
-                          sx={{ height: { xs: 340, md: 430 }, mt: 2 }}
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: {
+                              xs: "minmax(0, 1fr)",
+                              lg: "minmax(0, 2fr) minmax(280px, 1fr)",
+                            },
+                            gap: 2,
+                            alignItems: "center",
+                            mt: 2,
+                          }}
                         >
-                          <ResponsiveContainer>
-                            <RadarChart
-                              data={resultSummary.radar}
-                              outerRadius="70%"
+                          {resultSummary.radar.length >= 3 ? (
+                            <Box
+                              role="img"
+                              aria-label="Toile d’araignée des résultats de conformité, échelle de 0 à 5"
+                              sx={{ height: { xs: 340, md: 460 }, minWidth: 0 }}
                             >
-                              <PolarGrid />
-                              <PolarAngleAxis
-                                dataKey="requirement"
-                                tick={{ fontSize: 11 }}
-                              />
-                              <PolarRadiusAxis domain={[0, 5]} tickCount={6} />
-                              <Tooltip
-                                formatter={(value) => [
-                                  `${value} / 5`,
-                                  "Maturité",
-                                ]}
-                                labelFormatter={(reference) => {
-                                  const item = resultSummary.radar.find(
-                                    (entry) => entry.requirement === reference,
-                                  );
-                                  return item
-                                    ? `${reference} · ${item.title}`
-                                    : reference;
-                                }}
-                              />
-                              <Radar
-                                name="Maturité"
-                                dataKey="maturity"
-                                stroke="#1769e0"
-                                fill="#1769e0"
-                                fillOpacity={0.32}
-                              />
-                            </RadarChart>
-                          </ResponsiveContainer>
-                        </Box>
-                        <Stack spacing={1}>
-                          <Alert severity="error">
-                            Points faibles (0–2) : {resultSummary.weak.length}
-                            {resultSummary.weak.length > 0 &&
-                              ` · ${resultSummary.weak
-                                .map((item) => item.requirement.reference)
-                                .join(", ")}`}
-                          </Alert>
-                          <Alert severity="success">
-                            Points forts (4–5) : {resultSummary.strong.length}
-                            {resultSummary.strong.length > 0 &&
-                              ` · ${resultSummary.strong
-                                .map((item) => item.requirement.reference)
-                                .join(", ")}`}
-                          </Alert>
-                          {resultSummary.remaining.length > 0 && (
-                            <Alert severity="warning">
-                              À terminer : {resultSummary.remaining.length}
-                              {` · ${resultSummary.remaining
-                                .map((item) => item.requirement.reference)
-                                .join(", ")}`}
+                              <ResponsiveContainer>
+                                <RadarChart
+                                  data={resultSummary.radar}
+                                  outerRadius="78%"
+                                >
+                                  <PolarGrid stroke="#cbd5e1" />
+                                  <PolarAngleAxis
+                                    dataKey="requirement"
+                                    tick={{ fontSize: 12, fill: "#64748b" }}
+                                  />
+                                  <PolarRadiusAxis
+                                    domain={[0, 5]}
+                                    tickCount={6}
+                                    tick={{ fontSize: 11, fill: "#64748b" }}
+                                  />
+                                  <Tooltip
+                                    formatter={(value) => [
+                                      `${value} / 5`,
+                                      "Maturité",
+                                    ]}
+                                    labelFormatter={(reference) => {
+                                      const item = resultSummary.radar.find(
+                                        (entry) =>
+                                          entry.requirement === reference,
+                                      );
+                                      return item
+                                        ? `${reference} · ${item.title}`
+                                        : reference;
+                                    }}
+                                  />
+                                  <Radar
+                                    name="Maturité"
+                                    dataKey="maturity"
+                                    isAnimationActive={false}
+                                    stroke="#1769e0"
+                                    strokeWidth={2}
+                                    fill="#1769e0"
+                                    fillOpacity={0.28}
+                                    dot={{ r: 3, fill: "#1769e0" }}
+                                  />
+                                </RadarChart>
+                              </ResponsiveContainer>
+                            </Box>
+                          ) : (
+                            <Alert severity="info">
+                              Évaluez au moins trois exigences pour afficher une
+                              toile représentative.
                             </Alert>
                           )}
-                        </Stack>
+                          <Stack spacing={1}>
+                            <Alert severity="error">
+                              Points faibles (0–2) : {resultSummary.weak.length}
+                              {resultSummary.weak.length > 0 &&
+                                ` · ${summarizeReferences(resultSummary.weak)}`}
+                            </Alert>
+                            <Alert severity="success">
+                              Points forts (4–5) : {resultSummary.strong.length}
+                              {resultSummary.strong.length > 0 &&
+                                ` · ${summarizeReferences(resultSummary.strong)}`}
+                            </Alert>
+                            {resultSummary.remaining.length > 0 && (
+                              <Alert severity="warning">
+                                À terminer : {resultSummary.remaining.length}
+                                {` · ${summarizeReferences(resultSummary.remaining)}`}
+                              </Alert>
+                            )}
+                            {resultSummary.notApplicable.length > 0 && (
+                              <Alert severity="info">
+                                Non applicables :{" "}
+                                {resultSummary.notApplicable.length}
+                                {` · ${summarizeReferences(resultSummary.notApplicable)}`}
+                              </Alert>
+                            )}
+                          </Stack>
+                        </Box>
                       </CardContent>
                     </Card>
                   )}
