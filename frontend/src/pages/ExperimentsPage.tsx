@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AddOutlined, CheckOutlined, CloseOutlined } from "@mui/icons-material";
+import {
+  AddOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  SmartToyOutlined,
+} from "@mui/icons-material";
 import {
   Alert,
   Button,
@@ -21,6 +26,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { RecordDetails } from "../components/RecordDetails";
@@ -208,9 +214,26 @@ export function ExperimentsPage() {
         Aucune proposition ne modifie un risque, un contrôle ou un résultat. Une
         validation humaine reste obligatoire.
       </Alert>
+      <Alert
+        severity="info"
+        action={
+          <Button
+            component={Link}
+            to="/compliance"
+            color="inherit"
+            size="small"
+            startIcon={<SmartToyOutlined />}
+          >
+            Ouvrir le copilote IA
+          </Button>
+        }
+      >
+        Cette page gère des propositions gouvernées et une bibliothèque. Le
+        chatbot IA accompagne chaque exigence depuis l’écran Conformité.
+      </Alert>
       <Card>
         <Tabs value={tab} onChange={(_, value) => setTab(value)}>
-          <Tab value="assistant" label="Assistant contrôlé" />
+          <Tab value="assistant" label="Propositions gouvernées" />
           <Tab value="library" label="Bibliothèque interne" />
         </Tabs>
       </Card>
@@ -237,7 +260,7 @@ export function ExperimentsPage() {
               >
                 <div>
                   <Typography fontWeight={750}>
-                    Assistant tenant-scoped
+                    Moteur de propositions gouvernées
                   </Typography>
                   <Typography variant="body2">
                     Décisions automatiques : désactivées

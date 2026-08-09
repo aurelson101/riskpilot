@@ -199,3 +199,28 @@ test("le copilote conformité explique sa configuration sans modifier les donné
     page.getByRole("button", { name: /Fermer|Close/ }),
   ).toBeVisible();
 });
+
+test("les expérimentations orientent clairement vers le copilote IA", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/experiments", { waitUntil: "networkidle" });
+  const copilotLink = page.getByRole("link", {
+    name: /Ouvrir le copilote IA|Open AI copilot/,
+  });
+  await expect(copilotLink).toBeVisible();
+  await copilotLink.click();
+  await expect(page).toHaveURL(/\/compliance$/);
+});
