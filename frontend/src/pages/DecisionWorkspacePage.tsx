@@ -10,6 +10,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -25,6 +26,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { hasAnyRole } from "../auth/roles";
+import { RecordDetails } from "../components/RecordDetails";
 
 type Section =
   | "SECURITY_PROJECT"
@@ -417,6 +419,14 @@ export function DecisionWorkspacePage() {
           Rapport généré : {runReport.data.title}
         </Alert>
       )}
+      {(records.isLoading ||
+        finance.isLoading ||
+        connectors.isLoading ||
+        portfolio.isLoading) && (
+        <Stack alignItems="center" py={4}>
+          <CircularProgress aria-label="Chargement de l’espace décision" />
+        </Stack>
+      )}
       {section === "TPRM_PROGRAM" && portfolio.data && (
         <Stack spacing={2}>
           <Alert severity="info">
@@ -469,13 +479,7 @@ export function DecisionWorkspacePage() {
                   <Typography fontWeight={750}>{item.title}</Typography>
                   <Chip label={item.status} />
                 </Stack>
-                <Typography
-                  component="pre"
-                  variant="caption"
-                  sx={{ whiteSpace: "pre-wrap", m: 0 }}
-                >
-                  {JSON.stringify(item.details, null, 2)}
-                </Typography>
+                <RecordDetails details={item.details} />
                 {section === "REPORT_TEMPLATE" &&
                   item.details.approved !== true &&
                   isAdmin && (
@@ -557,13 +561,7 @@ export function DecisionWorkspacePage() {
         <Card>
           <CardContent>
             <Typography fontWeight={750}>Résultat du traitement</Typography>
-            <Typography
-              component="pre"
-              variant="caption"
-              sx={{ whiteSpace: "pre-wrap" }}
-            >
-              {JSON.stringify(simulation, null, 2)}
-            </Typography>
+            <RecordDetails details={simulation} />
           </CardContent>
         </Card>
       )}

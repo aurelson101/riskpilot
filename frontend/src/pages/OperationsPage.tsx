@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Card,
+  CardActionArea,
   CardContent,
   Chip,
   Dialog,
@@ -11,6 +12,7 @@ import {
   DialogContent,
   DialogTitle,
   LinearProgress,
+  CircularProgress,
   MenuItem,
   Stack,
   Tab,
@@ -19,9 +21,12 @@ import {
   Typography,
 } from "@mui/material";
 import { useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { hasAnyRole } from "../auth/roles";
+import { RecordDetails } from "../components/RecordDetails";
 
 type RecordType =
   | "TASK"
@@ -60,6 +65,7 @@ type Trajectory = {
 
 const sections: Array<{ type: RecordType | "MY_TASKS"; label: string }> = [
   { type: "MY_TASKS", label: "Mes tâches" },
+  { type: "TASK", label: "Tâches opérationnelles" },
   { type: "RESPONSIBILITY_RULE", label: "Responsabilités" },
   { type: "COMPLIANCE_PROGRAM", label: "Trajectoires" },
   { type: "QUESTIONNAIRE_TEMPLATE", label: "Questionnaires" },
@@ -75,6 +81,7 @@ export function OperationsPage() {
     "ROLE_RISK_MANAGER",
   ]);
   const client = useQueryClient();
+  const navigate = useNavigate();
   const [section, setSection] = useState<RecordType | "MY_TASKS">("MY_TASKS");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -100,6 +107,12 @@ export function OperationsPage() {
     enabled: section === "COMPLIANCE_PROGRAM",
     queryFn: async () =>
       (await api.get<Trajectory[]>("/operations/compliance-trajectory")).data,
+  });
+  const users = useQuery({
+    queryKey: ["users", "operations-owner-selector"],
+    enabled: canManage && open,
+    queryFn: async () => (await api.get<User[]>("/users")).data,
+    staleTime: 5 * 60 * 1000,
   });
   const create = useMutation({
     mutationFn: () =>
@@ -164,31 +177,40 @@ export function OperationsPage() {
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
       {formError && <Alert severity="error">{formError}</Alert>}
+      {(tasks.isLoading ||
+        (section !== "MY_TASKS" && records.isLoading) ||
+        (section === "COMPLIANCE_PROGRAM" && trajectory.isLoading)) && (
+        <Stack alignItems="center" py={4}>
+          <CircularProgress aria-label="Chargement du pilotage opérationnel" />
+        </Stack>
+      )}
       {section === "MY_TASKS" ? (
         <Stack spacing={2}>
           {tasks.data?.map((item) => (
             <Card key={`${item.source}-${item.id}`}>
-              <CardContent>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  justifyContent="space-between"
-                  gap={1}
-                >
-                  <div>
-                    <Typography fontWeight={750}>{item.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.source} ·{" "}
-                      {item.dueAt
-                        ? new Date(item.dueAt).toLocaleDateString()
-                        : "Sans échéance"}
-                    </Typography>
-                  </div>
-                  <Chip
-                    color={item.overdue ? "error" : "default"}
-                    label={item.status}
-                  />
-                </Stack>
-              </CardContent>
+              <CardActionArea onClick={() => navigate(item.link)}>
+                <CardContent>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    justifyContent="space-between"
+                    gap={1}
+                  >
+                    <div>
+                      <Typography fontWeight={750}>{item.title}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.source} ·{" "}
+                        {item.dueAt
+                          ? new Date(item.dueAt).toLocaleDateString()
+                          : "Sans échéance"}
+                      </Typography>
+                    </div>
+                    <Chip
+                      color={item.overdue ? "error" : "default"}
+                      label={item.status}
+                    />
+                  </Stack>
+                </CardContent>
+              </CardActionArea>
             </Card>
           ))}
           {tasks.data?.length === 0 && (
@@ -242,13 +264,7 @@ export function OperationsPage() {
                         />
                       </>
                     )}
-                    <Typography
-                      component="pre"
-                      variant="caption"
-                      sx={{ whiteSpace: "pre-wrap", m: 0 }}
-                    >
-                      {JSON.stringify(item.details, null, 2)}
-                    </Typography>
+                    <RecordDetails details={item.details} />
                   </Stack>
                 </CardContent>
               </Card>
@@ -283,11 +299,18 @@ export function OperationsPage() {
                 onChange={(e) => setForm({ ...form, dueAt: e.target.value })}
               />
               <TextField
-                label="Identifiant du responsable"
-                type="number"
+                select
+                label="Responsable"
                 value={form.ownerId}
                 onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-              />
+              >
+                <MenuItem value="">Non attribué</MenuItem>
+                {(users.data ?? []).map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.firstName} {item.lastName} — {item.email}
+                  </MenuItem>
+                ))}
+              </TextField>
               <TextField
                 select
                 label="Modèle de données"

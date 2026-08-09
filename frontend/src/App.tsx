@@ -285,7 +285,8 @@ function Layout() {
     queryKey: ["isms-documents"],
     queryFn: async () =>
       (await api.get<IsmsDocument[]>("/isms-documents")).data,
-    enabled: Boolean(user),
+    enabled: Boolean(user) && (ismsOpen || ismsActive),
+    staleTime: 5 * 60 * 1000,
   });
   const ismsCategories = useMemo(
     () =>

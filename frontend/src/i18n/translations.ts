@@ -1347,6 +1347,12 @@ const pairs: Array<[fr: string, en: string]> = [
   ["activités", "activities"],
   ["HTML / PDF", "HTML / PDF"],
   ["Objet", "Item"],
+  ["Tâches opérationnelles", "Operational tasks"],
+  ["Chargement du pilotage opérationnel", "Loading operations management"],
+  ["Chargement de l’espace décision", "Loading decision workspace"],
+  ["Non attribué", "Unassigned"],
+  ["Aucun détail complémentaire.", "No additional details."],
+  ["Aucun élément", "No items"],
 ];
 
 export const frToEn = new Map(pairs);
