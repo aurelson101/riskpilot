@@ -35,7 +35,7 @@ services:
   backend:
     <<: *backend
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 && php bin/console doctrine:query:sql 'SELECT 1' >/dev/null && php -r '$$redis = new Redis(); $$redis->connect(\"redis\", 6379, 1); exit($$redis->ping() ? 0 : 1);'"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 && php bin/console dbal:run-sql 'SELECT 1' >/dev/null && php -r '$$redis = new Redis(); $$redis->connect(\"redis\", 6379, 1); exit($$redis->ping() ? 0 : 1);'"]
       interval: 10s
       timeout: 5s
       retries: 10
