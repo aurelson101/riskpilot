@@ -38,6 +38,7 @@ final class AnnualReportControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $preview = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(1, $preview['totals']['activities']);
+        self::assertSame('Primary', $preview['organization']);
         self::assertSame(1, $preview['byDomain']['RISKS']);
         self::assertArrayNotHasKey('newValues', $preview['activities'][0]);
         $client->request('GET', '/api/annual-reports/'.$year.'/maturity');
@@ -86,6 +87,9 @@ final class AnnualReportControllerTest extends WebTestCase
         $client->request('GET', '/api/annual-reports/saved/'.$saved['id'].'/export?format=pdf');
         self::assertResponseIsSuccessful();
         self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
-        self::assertStringStartsWith('%PDF-', (string) $client->getResponse()->getContent());
+        $pdf = (string) $client->getResponse()->getContent();
+        self::assertStringStartsWith('%PDF-', $pdf);
+        self::assertGreaterThan(10_000, strlen($pdf));
+        self::assertGreaterThanOrEqual(2, substr_count($pdf, '/Type /Page'));
     }
 }

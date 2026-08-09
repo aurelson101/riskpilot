@@ -166,7 +166,7 @@ final readonly class AnnualReportController
         $format = strtolower((string) $request->query->get('format', 'pdf'));
         $filename = sprintf('riskpilot-rapport-annuel-%d-v%d', (int) ($record->getDetails()['year'] ?? 0), (int) ($record->getDetails()['version'] ?? 1));
         if ('pdf' === $format) {
-            return new Response($this->pdf->render($record->getTitle(), 'Instantané annuel traçable', $record->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+            return new Response($this->pdf->renderAnnualReport($record->getTitle(), $record->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
         }
         if ('json' !== $format) {
             return new JsonResponse(['code' => 'UNSUPPORTED_FORMAT', 'message' => 'Formats disponibles : PDF ou JSON.'], 400);
@@ -204,6 +204,7 @@ final readonly class AnnualReportController
 
         return [
             'year' => $year,
+            'organization' => $this->currentUser->get()->getOrganization()->getName(),
             'period' => ['from' => $from->format('Y-m-d'), 'until' => $until->modify('-1 day')->format('Y-m-d')],
             'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'totals' => ['activities' => count($events), 'contributors' => count($contributors), 'domains' => count($domains)],
