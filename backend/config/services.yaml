@@ -76,5 +76,9 @@ services:
         arguments:
             $shareLimiter: '@limiter.document_share'
 
+    App\Controller\ComplianceCopilotController:
+        arguments:
+            $aiCopilotLimiter: '@limiter.ai_copilot'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

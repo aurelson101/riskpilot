@@ -27,7 +27,7 @@ import {
   InputLabel,
   TextField,
 } from "@mui/material";
-import { Add } from "@mui/icons-material";
+import { Add, SmartToyOutlined } from "@mui/icons-material";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   PolarAngleAxis,
@@ -48,6 +48,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { ComplianceGovernancePanel } from "../components/compliance/ComplianceGovernancePanel";
+import { ComplianceCopilotDialog } from "../components/compliance/ComplianceCopilotDialog";
 import { buildComplianceSummary } from "./complianceSummary";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
@@ -98,6 +99,9 @@ export function CompliancePage() {
   );
   const client = useQueryClient();
   const [assessmentDialog, setAssessmentDialog] = useState(false);
+  const [copilotResult, setCopilotResult] = useState<ComplianceResult | null>(
+    null,
+  );
   const [assessmentForm, setAssessmentForm] = useState({
     frameworkId: "",
     scopeId: "",
@@ -622,7 +626,19 @@ export function CompliancePage() {
                             {result.requirement.category}
                           </Typography>
                         </Stack>
-                        <Stack direction="row" spacing={1}>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1}
+                          alignItems={{ xs: "stretch", sm: "center" }}
+                        >
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<SmartToyOutlined />}
+                            onClick={() => setCopilotResult(result)}
+                          >
+                            Copilote IA
+                          </Button>
                           <FormControl size="small">
                             <Select
                               aria-label={`Maturité ${result.requirement.reference}`}
@@ -805,6 +821,12 @@ export function CompliancePage() {
           </DialogActions>
         </Stack>
       </Dialog>
+      {copilotResult && (
+        <ComplianceCopilotDialog
+          result={copilotResult}
+          onClose={() => setCopilotResult(null)}
+        />
+      )}
     </Stack>
   );
 }

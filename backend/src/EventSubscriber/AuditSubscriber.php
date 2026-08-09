@@ -68,7 +68,7 @@ final readonly class AuditSubscriber
     {
         foreach ($values as $key => $value) {
             $normalizedKey = mb_strtolower((string) $key);
-            if (str_contains($normalizedKey, 'password') || str_contains($normalizedKey, 'token') || str_contains($normalizedKey, 'secret') || str_contains($normalizedKey, 'authorization') || str_contains($normalizedKey, 'credential')) {
+            if (str_contains($normalizedKey, 'password') || str_contains($normalizedKey, 'token') || str_contains($normalizedKey, 'secret') || str_contains($normalizedKey, 'authorization') || str_contains($normalizedKey, 'credential') || in_array($normalizedKey, ['question', 'history'], true)) {
                 $values[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $values[$key] = $this->redact($value);

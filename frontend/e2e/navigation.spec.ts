@@ -164,3 +164,38 @@ test("la création annonce les points ajoutés automatiquement", async ({
     ),
   ).toBeVisible();
 });
+
+test("le copilote conformité explique sa configuration sans modifier les données", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/compliance", { waitUntil: "networkidle" });
+  await page
+    .locator("main")
+    .getByText(/Cadre Cyber Démonstration|Cyber Demonstration Framework/)
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: /Copilote IA|AI copilot/ })
+    .first()
+    .click();
+
+  await expect(
+    page.getByText(/Le copilote IA est désactivé|The AI copilot is disabled/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Fermer|Close/ }),
+  ).toBeVisible();
+});

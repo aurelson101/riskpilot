@@ -115,6 +115,27 @@ répartition des statuts, exigences, maturité, preuves et actions correctives.
 
 Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 
+### Copilote IA de conformité
+
+Après configuration par un administrateur de Mistral, OpenAI ou Gemini dans
+**Paramètres → Identité et intégrations**, chaque exigence évaluée propose un
+bouton **Copilote IA**. Avant l'envoi, RiskPilot affiche exactement le contexte
+qui sera transmis selon la politique `MINIMAL` ou `CONTEXTUAL` et exige un
+consentement explicite. La conversation peut conseiller les preuves à réunir,
+expliquer une exigence ou aider à rédiger un commentaire et une action.
+
+Le copilote ne modifie aucun champ, score, preuve ou statut. Ses réponses citent
+l'exigence source, restent soumises à validation humaine et chaque appel réussi
+est audité avec fournisseur, modèle, politique, empreinte de la question et
+sources, sans conserver le texte de la conversation dans le journal. Le quota
+est limité à 20 appels par utilisateur et par heure. Pour OpenAI, l'intégration
+utilise la Responses API avec `store: false`; les endpoints personnalisés sont
+refusés pour ce workflow tant que leur protection SSRF n'est pas validée.
+
+Les routes sont `GET /api/compliance-results/{id}/copilot/context` pour
+prévisualiser les données et `POST /api/compliance-results/{id}/copilot` pour
+poser une question avec consentement.
+
 ## Documents ISMS
 
 Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.

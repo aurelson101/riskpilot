@@ -1204,6 +1204,31 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Impossible de charger la configuration IA.", "Unable to load AI settings."],
   ["Copilote IA", "AI copilot"],
+  ["Copilote conformité ·", "Compliance copilot ·"],
+  ["Chargement du contexte IA", "Loading AI context"],
+  [
+    "Impossible de préparer le contexte du copilote.",
+    "Unable to prepare the copilot context.",
+  ],
+  [
+    "Le copilote IA est désactivé. Un administrateur doit configurer et activer Mistral, OpenAI ou Gemini dans Paramètres → Intégrations.",
+    "The AI copilot is disabled. An administrator must configure and enable Mistral, OpenAI or Gemini in Settings → Integrations.",
+  ],
+  [
+    "Vérifiez les données ci-dessous avant chaque envoi. La réponse conseille et aide à rédiger, mais ne modifie aucun champ.",
+    "Review the data below before each submission. The answer provides guidance and drafting help but does not change any field.",
+  ],
+  ["Données envoyées au fournisseur IA", "Data sent to the AI provider"],
+  ["Conversation avec le copilote", "Conversation with the copilot"],
+  [
+    "Le fournisseur IA n’a pas pu répondre. Vérifiez la configuration, le quota et le modèle.",
+    "The AI provider could not answer. Check the configuration, quota and model.",
+  ],
+  [
+    "Exemple : quelles preuves dois-je réunir pour évaluer ce point ?",
+    "Example: what evidence should I gather to assess this item?",
+  ],
+  ["Envoyer au copilote", "Send to copilot"],
   [
     "Assistance à l’analyse et à la rédaction. Les suggestions restent soumises à validation humaine et ne prennent aucune décision automatiquement.",
     "Assistance for analysis and drafting. Suggestions remain subject to human validation and never make decisions automatically.",

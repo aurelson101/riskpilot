@@ -17,6 +17,10 @@ framework:
             policy: sliding_window
             limit: 10
             interval: '1 minute'
+        ai_copilot:
+            policy: sliding_window
+            limit: 20
+            interval: '1 hour'
 
     #esi: true
     #fragments: true
