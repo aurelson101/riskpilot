@@ -75,6 +75,7 @@ server {
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     add_header Cross-Origin-Opener-Policy same-origin always;
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action 'self'; worker-src 'self' blob:" always;
 
     # Tous les en-têtes sont définis au niveau du serveur afin d'être hérités par
     # les callbacks OAuth, les routes OIDC/SAML/SCIM et les partages publics.
