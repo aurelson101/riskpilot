@@ -1,0 +1,19 @@
+services:
+  postgres:
+    restart: "no"
+  redis:
+    restart: "no"
+  jwt-init:
+    restart: "no"
+  backend:
+    restart: "no"
+  frontend:
+    restart: "no"
+  nginx:
+    restart: "no"
+  worker:
+    restart: "no"
+  scheduler:
+    restart: "no"
+  demo-reset-scheduler:
+    restart: "no"

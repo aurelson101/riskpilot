@@ -1,0 +1,16 @@
+[Unit]
+Description=RiskPilot demo sequential startup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/son/demo.riskpilot.site/deploy/demo/start-sequential.sh
+ExecStop=/usr/bin/docker compose -p riskpilot_demo -f /home/son/demo.riskpilot.site/compose.yaml -f /home/son/demo.riskpilot.site/compose.prod.yaml -f /home/son/demo.riskpilot.site/deploy/demo/compose.demo.yaml -f /home/son/demo.riskpilot.site/deploy/demo/compose.vps-1gb.yaml -f /home/son/demo.riskpilot.site/deploy/demo/compose.sequential.yaml stop
+TimeoutStartSec=600
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
