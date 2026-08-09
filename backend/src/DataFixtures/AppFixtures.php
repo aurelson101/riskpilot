@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DataFixtures;
 
+use App\Domain\Compliance\StarterFrameworkCatalog;
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
 use App\Entity\ComplianceAssessment;
@@ -12,7 +13,9 @@ use App\Entity\Framework;
 use App\Entity\IsmsDocument;
 use App\Entity\Notification;
 use App\Entity\Organization;
+use App\Entity\RegulatoryRecord;
 use App\Entity\Requirement;
+use App\Entity\RiskAnalysis;
 use App\Entity\RiskScenario;
 use App\Entity\Scope;
 use App\Entity\SecurityControl;
@@ -25,7 +28,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AppFixtures extends Fixture
 {
-    public function __construct(private readonly UserPasswordHasherInterface $hasher)
+    public function __construct(private readonly UserPasswordHasherInterface $hasher, private readonly StarterFrameworkCatalog $starterFrameworks)
     {
     }
 
@@ -89,11 +92,48 @@ final class AppFixtures extends Fixture
             (new ComplianceResult($assessment, $requirement))->setMaturityLevel(2 + ($index % 4))->setComplianceStatus(['COMPLIANT', 'PARTIAL', 'NON_COMPLIANT', 'COMPLIANT', 'PARTIAL'][$index])->setComment('Résultat de démonstration.')->setRemediationAction($actions[$index]);
         }
         $assessment->recalculateScore();
+        $starterEntities = [];
+        foreach ($this->starterFrameworks->keys() as $packIndex => $packKey) {
+            [$starterFramework, $starterRequirements] = $this->starterFrameworks->instantiate($packKey);
+            $starterEntities[] = $starterFramework;
+            array_push($starterEntities, ...$starterRequirements);
+            if ('ebios-rm' === $packKey) {
+                continue;
+            }
+            $starterAssessment = (new ComplianceAssessment($organization, $starterFramework, $scopes[$packIndex % count($scopes)], $riskManager, new \DateTimeImmutable()))->setStatus('IN_PROGRESS');
+            foreach ($starterRequirements as $requirementIndex => $starterRequirement) {
+                (new ComplianceResult($starterAssessment, $starterRequirement))
+                    ->setMaturityLevel(1 + (($packIndex + $requirementIndex) % 4))
+                    ->setComplianceStatus(['PARTIAL', 'NON_COMPLIANT', 'COMPLIANT'][$requirementIndex % 3])
+                    ->setComment('Évaluation de démonstration à confirmer avec les preuves de l’organisation.')
+                    ->setRemediationAction($actions[$requirementIndex % count($actions)]);
+            }
+            $starterAssessment->recalculateScore();
+            $starterEntities[] = $starterAssessment;
+        }
+        $ebiosAnalysis = new RiskAnalysis($organization, $riskManager, 'ebios-demo', 1, 'EBIOS_RM', 'Analyse EBIOS RM — services numériques', [
+            'objectives' => ['Évaluer les scénarios intentionnels affectant les services numériques critiques.'],
+            'team' => ['RSSI', 'Direction métier', 'DSI'],
+            'milestones' => ['ATELIER-1', 'ATELIER-2', 'ATELIER-3', 'ATELIER-4', 'ATELIER-5'],
+            'scenarioIds' => [],
+        ]);
+        $ebiosAnalysis->configure($scopes[1], [
+            'objectives' => ['Évaluer les scénarios intentionnels affectant les services numériques critiques.'],
+            'team' => ['RSSI', 'Direction métier', 'DSI'],
+            'milestones' => ['ATELIER-1', 'ATELIER-2', 'ATELIER-3', 'ATELIER-4', 'ATELIER-5'],
+        ]);
+        $rgpdRecord = new RegulatoryRecord($organization, $riskManager, 'PROCESSING_ACTIVITY', 'Gestion des comptes clients', [
+            'purpose' => 'Fourniture et sécurisation du portail client',
+            'dataCategories' => ['Identité', 'Coordonnées', 'Traces de connexion'],
+            'legalBasis' => 'Exécution du contrat et intérêt légitime de sécurité',
+            'retention' => 'Durée du contrat puis archivage selon les obligations applicables',
+            'recipients' => ['Support habilité', 'Équipe sécurité'],
+        ], [], new \DateTimeImmutable('+90 days'), null);
         $notification = new Notification($actionOwner, 'ACTION_DUE_SOON', 'Actions à suivre', 'Plusieurs actions de démonstration arrivent à échéance.', '/actions');
         $document = new IsmsDocument($organization, $admin, 'Politique de sécurité de l’information', 'Politique', "# Politique de sécurité de l’information\n\nCe document de démonstration présente les principes directeurs du SMSI RiskPilot.");
         $document->updateMetadata($document->getTitle(), $document->getCategory(), 'APPROVED', 'INTERNAL', IsmsDocument::VISIBILITY_ORGANIZATION, $admin);
         $document->initializeVersion($admin, 'Version initiale approuvée');
-        foreach ([$organization, $admin, $riskManager, $actionOwner, ...$scopes, ...$assets, ...$threats, ...$vulnerabilities, ...$controls, ...$risks, ...$actions, $framework, ...$requirements, $assessment, $notification, $document] as $entity) {
+        foreach ([$organization, $admin, $riskManager, $actionOwner, ...$scopes, ...$assets, ...$threats, ...$vulnerabilities, ...$controls, ...$risks, ...$actions, $framework, ...$requirements, $assessment, ...$starterEntities, $ebiosAnalysis, $rgpdRecord, $notification, $document] as $entity) {
             $manager->persist($entity);
         }
         $manager->flush();

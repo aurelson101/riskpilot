@@ -83,5 +83,9 @@ final class AnnualReportControllerTest extends WebTestCase
         $client->request('GET', '/api/annual-reports/saved/'.$saved['id'].'/export?format=json');
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('attachment; filename="riskpilot-rapport-annuel-', (string) $client->getResponse()->headers->get('Content-Disposition'));
+        $client->request('GET', '/api/annual-reports/saved/'.$saved['id'].'/export?format=pdf');
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
+        self::assertStringStartsWith('%PDF-', (string) $client->getResponse()->getContent());
     }
 }

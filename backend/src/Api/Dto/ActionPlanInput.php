@@ -25,9 +25,9 @@ final class ActionPlanInput
     #[Assert\PositiveOrZero] public ?float $actualCost = null;
     #[Assert\Range(min: 0, max: 25)] public ?int $expectedRiskReduction = null;
     /** @var list<string> */
-    #[Assert\All([new Assert\Url()])] public array $evidence = [];
+    #[Assert\All([new Assert\Url(requireTld: false)])] public array $evidence = [];
     #[Assert\Length(max: 120)] public ?string $ticketNumber = null;
-    #[Assert\Url, Assert\Length(max: 2048)] public ?string $ticketUrl = null;
+    #[Assert\Url(requireTld: false), Assert\Length(max: 2048)] public ?string $ticketUrl = null;
     #[Assert\Choice(choices: ActionPlan::ORIGINS)] public string $origin = 'OTHER';
     #[Assert\Choice(choices: ActionPlan::ACTION_TYPES)] public string $actionType = 'OTHER';
     /** @var list<int> */ #[Assert\All([new Assert\Positive()])] public array $frameworkIds = [];

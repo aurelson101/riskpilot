@@ -48,6 +48,7 @@ import type {
   ActionPlan,
   RiskScenario,
   SecurityControl,
+  StoredActionStatus,
   User,
 } from "../api/types";
 import { useAuth } from "../auth/useAuth";
@@ -103,7 +104,10 @@ function dateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function actionPayload(action: ActionPlan, status = action.status) {
+function actionPayload(
+  action: ActionPlan,
+  status: StoredActionStatus = action.storedStatus,
+) {
   return {
     title: action.title,
     description: action.description ?? "",
@@ -143,7 +147,7 @@ type ActionForm = {
   relatedControlId: number | null;
   ownerId: number | "";
   priority: ActionPlan["priority"];
-  status: ActionPlan["status"];
+  status: StoredActionStatus;
   startDate: string | null;
   dueDate: string;
   completionDate: string | null;
@@ -157,6 +161,10 @@ type ActionForm = {
   ticketUrl: string;
   origin: string;
   actionType: string;
+  frameworkIds: number[];
+  requirementIds: number[];
+  customFields: Record<string, string | number | boolean | null>;
+  nonConformities: ActionPlan["nonConformities"];
 };
 type CalendarSubscription = {
   enabled: boolean;
@@ -184,6 +192,10 @@ const emptyForm: ActionForm = {
   ticketUrl: "",
   origin: "RISK_ASSESSMENT",
   actionType: "TECHNICAL",
+  frameworkIds: [],
+  requirementIds: [],
+  customFields: {},
+  nonConformities: [],
 };
 function apiMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -318,7 +330,7 @@ export function ActionsPage() {
       status,
     }: {
       action: ActionPlan;
-      status: ActionPlan["status"];
+      status: StoredActionStatus;
     }) => api.put(`/actions/${action.id}`, actionPayload(action, status)),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["actions"] });
@@ -366,7 +378,7 @@ export function ActionsPage() {
       relatedControlId: action.relatedControl?.id ?? null,
       ownerId: action.owner.id,
       priority: action.priority,
-      status: action.status,
+      status: action.storedStatus,
       startDate: action.startDate,
       dueDate: action.dueDate,
       completionDate: action.completionDate,
@@ -384,6 +396,10 @@ export function ActionsPage() {
       ticketUrl: action.ticketUrl ?? "",
       origin: action.origin,
       actionType: action.actionType,
+      frameworkIds: action.frameworkIds,
+      requirementIds: action.requirementIds,
+      customFields: action.customFields,
+      nonConformities: action.nonConformities,
     });
     setError("");
     setDialogOpen(true);
@@ -1146,7 +1162,7 @@ export function ActionsPage() {
                     label="Statut"
                     value={form.status}
                     onChange={(e) =>
-                      update("status", e.target.value as ActionPlan["status"])
+                      update("status", e.target.value as StoredActionStatus)
                     }
                   >
                     {[

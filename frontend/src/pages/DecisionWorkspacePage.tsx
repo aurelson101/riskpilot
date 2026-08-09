@@ -238,7 +238,7 @@ export function DecisionWorkspacePage() {
       format,
     }: {
       id: number;
-      format: "json" | "html";
+      format: "json" | "pdf";
     }) => {
       const response = await api.get<Blob>(
         `/decision/reports/${id}/export?format=${format}`,
@@ -405,11 +405,11 @@ export function DecisionWorkspacePage() {
                 onClick={() =>
                   downloadReport.mutate({
                     id: runReport.data.id,
-                    format: "html",
+                    format: "pdf",
                   })
                 }
               >
-                Télécharger HTML/PDF
+                Télécharger PDF
               </Button>
             </Stack>
           }

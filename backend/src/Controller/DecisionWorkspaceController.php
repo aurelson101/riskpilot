@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\PdfReportRenderer;
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
 use App\Entity\ExecutiveGovernanceRecord;
@@ -45,6 +46,7 @@ final readonly class DecisionWorkspaceController
         private ActionPlanRepository $actions,
         private OrganizationRepository $organizations,
         private EntityManagerInterface $entityManager,
+        private PdfReportRenderer $pdf,
     ) {
     }
 
@@ -166,11 +168,12 @@ final readonly class DecisionWorkspaceController
         if (null === $run) {
             return $this->error('NOT_FOUND', 'Rapport introuvable.', 404);
         }
-        $format = strtolower((string) $request->query->get('format', 'json'));
-        if ('html' === $format) {
-            $json = htmlspecialchars(json_encode($run->getDetails(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-            return new Response('<!doctype html><html lang="fr"><meta charset="utf-8"><title>'.htmlspecialchars($run->getTitle()).'</title><body><h1>'.htmlspecialchars($run->getTitle()).'</h1><p>Export reproductible imprimable en PDF.</p><pre>'.$json.'</pre></body></html>', 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        $format = strtolower((string) $request->query->get('format', 'pdf'));
+        if ('pdf' === $format) {
+            return new Response($this->pdf->render($run->getTitle(), 'Rapport de décision gouverné', $run->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
+        }
+        if ('json' !== $format) {
+            return $this->error('UNSUPPORTED_FORMAT', 'Formats disponibles : PDF ou JSON.', 400);
         }
 
         return new JsonResponse($this->serialize($run), 200, ['Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.json"', $id)]);

@@ -393,6 +393,38 @@ final class TenantIsolationTest extends WebTestCase
         $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertCount(1, $payload);
         self::assertSame('Action A', $payload[0]['title']);
+        self::assertSame('OPEN', $payload[0]['storedStatus']);
+    }
+
+    public function testOverdueActionCanBeUpdatedWithItsStoredStatus(): void
+    {
+        $action = $this->entityManager->getRepository(ActionPlan::class)->findOneBy(['title' => 'Action A']);
+        self::assertInstanceOf(ActionPlan::class, $action);
+        $action->setDueDate(new \DateTimeImmutable('-1 day'))->setStatus('IN_PROGRESS');
+        $this->entityManager->flush();
+
+        $this->client->request('GET', '/api/actions/'.(int) $action->getId());
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('OVERDUE', $payload['status']);
+        self::assertSame('IN_PROGRESS', $payload['storedStatus']);
+
+        $this->client->jsonRequest('PUT', '/api/actions/'.(int) $action->getId(), [
+            'title' => 'Action A corrigée', 'description' => null,
+            'relatedRiskId' => $payload['relatedRisk']['id'], 'relatedControlId' => null,
+            'ownerId' => $payload['owner']['id'], 'priority' => $payload['priority'],
+            'status' => $payload['storedStatus'], 'startDate' => null,
+            'dueDate' => $payload['dueDate'], 'completionDate' => null, 'progress' => 25,
+            'estimatedCost' => null, 'estimatedEffortDays' => null, 'actualCost' => null,
+            'expectedRiskReduction' => null, 'evidence' => [], 'ticketNumber' => null,
+            'ticketUrl' => null, 'origin' => 'RISK_ASSESSMENT', 'actionType' => 'TECHNICAL',
+            'frameworkIds' => [], 'requirementIds' => [], 'customFields' => [], 'nonConformities' => [],
+        ]);
+        self::assertResponseIsSuccessful();
+        $updated = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Action A corrigée', $updated['title']);
+        self::assertSame('OVERDUE', $updated['status']);
+        self::assertSame('IN_PROGRESS', $updated['storedStatus']);
     }
 
     public function testForeignActionPlanIsNotAddressable(): void

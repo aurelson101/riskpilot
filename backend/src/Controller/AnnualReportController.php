@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\PdfReportRenderer;
 use App\Entity\AuditLog;
 use App\Entity\OperationalRecord;
 use App\Entity\User;
@@ -38,6 +39,7 @@ final readonly class AnnualReportController
         private AuditLogRepository $logs,
         private OperationalRecordRepository $records,
         private EntityManagerInterface $entityManager,
+        private PdfReportRenderer $pdf,
     ) {
     }
 
@@ -161,13 +163,13 @@ final readonly class AnnualReportController
         if (!$record instanceof OperationalRecord || 'ANNUAL_REPORT' !== $record->getType()) {
             return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Rapport annuel introuvable.'], 404);
         }
-        $format = strtolower((string) $request->query->get('format', 'json'));
+        $format = strtolower((string) $request->query->get('format', 'pdf'));
         $filename = sprintf('riskpilot-rapport-annuel-%d-v%d', (int) ($record->getDetails()['year'] ?? 0), (int) ($record->getDetails()['version'] ?? 1));
-        if ('html' === $format) {
-            $payload = htmlspecialchars(json_encode($record->getDetails(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $html = '<!doctype html><html lang="fr"><meta charset="utf-8"><title>'.htmlspecialchars($record->getTitle()).'</title><style>body{font:14px system-ui;margin:40px;color:#17324d}pre{white-space:pre-wrap}h1{color:#075985}</style><body><h1>'.htmlspecialchars($record->getTitle()).'</h1><p>Instantané annuel traçable généré par RiskPilot.</p><pre>'.$payload.'</pre></body></html>';
-
-            return new Response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="%s.html"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+        if ('pdf' === $format) {
+            return new Response($this->pdf->render($record->getTitle(), 'Instantané annuel traçable', $record->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+        }
+        if ('json' !== $format) {
+            return new JsonResponse(['code' => 'UNSUPPORTED_FORMAT', 'message' => 'Formats disponibles : PDF ou JSON.'], 400);
         }
         $payload = json_encode($record->getDetails(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
@@ -204,7 +206,7 @@ final readonly class AnnualReportController
             'year' => $year,
             'period' => ['from' => $from->format('Y-m-d'), 'until' => $until->modify('-1 day')->format('Y-m-d')],
             'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
-            'totals' => ['activities' => count($events), 'contributors' => count($contributors), 'domains' => count(array_filter($domains))],
+            'totals' => ['activities' => count($events), 'contributors' => count($contributors), 'domains' => count($domains)],
             'byMonth' => array_map(static fn (int $month, int $count): array => ['month' => $month, 'count' => $count], array_keys($months), array_values($months)),
             'byAction' => $actions,
             'byDomain' => $domains,

@@ -189,7 +189,7 @@ export function AnnualReportsPage() {
     if (maturity.data) setMaturityDraft(maturity.data.assessments);
   }, [maturity.data]);
 
-  const download = async (item: SavedReport, format: "json" | "html") => {
+  const download = async (item: SavedReport, format: "json" | "pdf") => {
     const response = await api.get(
       `/annual-reports/saved/${item.id}/export?format=${format}`,
       { responseType: "blob" },
@@ -538,9 +538,9 @@ export function AnnualReportsPage() {
                   <Button
                     size="small"
                     startIcon={<DownloadOutlined />}
-                    onClick={() => download(item, "html")}
+                    onClick={() => download(item, "pdf")}
                   >
-                    HTML / PDF
+                    PDF
                   </Button>
                 </Stack>
               </Stack>

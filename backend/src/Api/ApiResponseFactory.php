@@ -55,7 +55,7 @@ final class ApiResponseFactory
             'id' => $action->getId(), 'title' => $action->getTitle(), 'description' => $action->getDescription(),
             'relatedRisk' => null === $action->getRelatedRisk() ? null : ['id' => $action->getRelatedRisk()->getId(), 'title' => $action->getRelatedRisk()->getTitle()],
             'relatedControl' => null === $action->getRelatedControl() ? null : ['id' => $action->getRelatedControl()->getId(), 'name' => $action->getRelatedControl()->getName()],
-            'owner' => $this->userSummary($action->getOwner()), 'priority' => $action->getPriority(), 'status' => $action->getStatus(),
+            'owner' => $this->userSummary($action->getOwner()), 'priority' => $action->getPriority(), 'status' => $action->getStatus(), 'storedStatus' => $action->getStoredStatus(),
             'startDate' => $action->getStartDate()?->format('Y-m-d'), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'completionDate' => $action->getCompletionDate()?->format('Y-m-d'),
             'progress' => $action->getProgress(), 'estimatedCost' => $action->getEstimatedCost(), 'estimatedEffortDays' => $action->getEstimatedEffortDays(), 'actualCost' => $action->getActualCost(),
             'expectedRiskReduction' => $action->getExpectedRiskReduction(), 'evidence' => $action->getEvidence(),

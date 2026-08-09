@@ -131,6 +131,17 @@ export interface RiskMatrix {
   cells: RiskMatrixCell[];
 }
 
+export type ActionStatus =
+  | "OPEN"
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "BLOCKED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "OVERDUE";
+
+export type StoredActionStatus = Exclude<ActionStatus, "OVERDUE">;
+
 export interface ActionPlan {
   id: number;
   title: string;
@@ -139,14 +150,8 @@ export interface ActionPlan {
   relatedControl: { id: number; name: string } | null;
   owner: Pick<User, "id" | "email" | "firstName" | "lastName">;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  status:
-    | "OPEN"
-    | "PLANNED"
-    | "IN_PROGRESS"
-    | "BLOCKED"
-    | "COMPLETED"
-    | "CANCELLED"
-    | "OVERDUE";
+  status: ActionStatus;
+  storedStatus: StoredActionStatus;
   startDate: string | null;
   dueDate: string;
   completionDate: string | null;

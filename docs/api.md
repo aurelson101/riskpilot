@@ -138,6 +138,15 @@ et tenant-scoped ; aucun payload ne choisit l'organisation.
 
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;
 - `GET|POST /api/frameworks/{id}/requirements` et `PUT /api/requirements/{id}` ;
+
+Les packs RGPD, NIS2, ISO/IEC 27001:2022 et EBIOS Risk Manager peuvent être
+installés avec `php bin/console app:compliance:install-starter-packs`. La
+commande est idempotente sur le couple nom/version. Sources de référence :
+[RGPD 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj),
+[directive NIS2 2022/2555](https://eur-lex.europa.eu/eli/dir/2022/2555/oj),
+[guide EBIOS Risk Manager](https://www.ssi.gouv.fr/guide/la-methode-ebios-risk-manager-le-guide/)
+et [ISO/IEC 27001:2022](https://www.iso.org/standard/27001). Le pack ISO ne
+reproduit pas le texte protégé et ne remplace pas une licence.
 - `GET|POST /api/compliance-assessments` et `GET|PUT /api/compliance-assessments/{id}` ;
 - `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 

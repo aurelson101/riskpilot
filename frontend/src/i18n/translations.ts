@@ -1152,7 +1152,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Génération du rapport…", "Generating report…"],
   ["Rapport généré :", "Report generated:"],
   ["Télécharger JSON", "Download JSON"],
-  ["Télécharger HTML/PDF", "Download HTML/PDF"],
+  ["Télécharger PDF", "Download PDF"],
   ["Analyses et capitalisation", "Analyses and knowledge reuse"],
   [
     "Analyses versionnées, méthodes guidées, preuves, simulations, roadmaps et qualité",

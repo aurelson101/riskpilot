@@ -12,6 +12,6 @@ final class ComplianceResultInput
     #[Assert\Range(min: 0, max: 5)] public int $maturityLevel = 0;
     #[Assert\Choice(choices: ComplianceResult::STATUSES)] public string $complianceStatus = 'NOT_ASSESSED';
     #[Assert\Length(max: 10000)] public ?string $comment = null;
-    /** @var list<string> */ #[Assert\All([new Assert\Url()])] public array $evidence = [];
+    /** @var list<string> */ #[Assert\All([new Assert\Url(requireTld: false)])] public array $evidence = [];
     #[Assert\Positive] public ?int $remediationActionId = null;
 }

@@ -51,6 +51,10 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $run = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('REPORT_RUN', $run['type']);
         self::assertArrayHasKey('snapshot', $run['details']);
+        $client->request('GET', '/api/decision/reports/'.$run['id'].'/export?format=pdf');
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
+        self::assertStringStartsWith('%PDF-', (string) $client->getResponse()->getContent());
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($reader));
         $client->request('GET', '/api/decision/views/'.$privateView['id'].'/snapshot');
