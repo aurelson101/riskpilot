@@ -1353,6 +1353,20 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Non attribué", "Unassigned"],
   ["Aucun détail complémentaire.", "No additional details."],
   ["Aucun élément", "No items"],
+  ["Configuration avancée JSON", "Advanced JSON configuration"],
+  [
+    "Réservée aux administrateurs. Vérifiez la structure avant l’enregistrement.",
+    "Administrators only. Check the structure before saving.",
+  ],
+  ["Modifier l’élément", "Edit item"],
+  ["Chargement des expérimentations", "Loading experiments"],
+  ["Aucune proposition enregistrée.", "No proposals recorded."],
+  ["Aucune ressource dans la bibliothèque.", "No resources in the library."],
+  ["Aucun élément dans cette section.", "No items in this section."],
+  [
+    "Les données de l’artefact doivent être un objet JSON valide.",
+    "Artifact data must be a valid JSON object.",
+  ],
 ];
 
 export const frToEn = new Map(pairs);

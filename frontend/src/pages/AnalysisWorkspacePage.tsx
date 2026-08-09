@@ -58,6 +58,7 @@ export function AnalysisWorkspacePage() {
     title: "",
     payload: "{}",
   });
+  const [formError, setFormError] = useState<string | null>(null);
   const analyses = useQuery({
     queryKey: ["risk-analyses"],
     queryFn: async () =>
@@ -92,6 +93,23 @@ export function AnalysisWorkspacePage() {
         idempotencyKey: crypto.randomUUID(),
       }),
   });
+  const addArtifact = () => {
+    try {
+      const payload = JSON.parse(artifact.payload);
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        Array.isArray(payload)
+      )
+        throw new Error("invalid payload");
+      setFormError(null);
+      add.mutate();
+    } catch {
+      setFormError(
+        "Les données de l’artefact doivent être un objet JSON valide.",
+      );
+    }
+  };
   return (
     <Stack spacing={3}>
       <div>
@@ -106,6 +124,7 @@ export function AnalysisWorkspacePage() {
       {(create.isError || add.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
+      {formError && <Alert severity="error">{formError}</Alert>}
       {canManage ? (
         <Card>
           <CardContent>
@@ -223,7 +242,7 @@ export function AnalysisWorkspacePage() {
               <Button
                 variant="contained"
                 disabled={!artifact.title || add.isPending}
-                onClick={() => add.mutate()}
+                onClick={addArtifact}
               >
                 Ajouter l’artefact
               </Button>

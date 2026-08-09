@@ -44,6 +44,20 @@ final class OperationalWorkspaceControllerTest extends WebTestCase
             'details' => ['framework' => 'ISO 27001'],
         ]);
         self::assertResponseStatusCodeSame(201);
+        $task = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+
+        $client->jsonRequest('PUT', '/api/operations/records/'.$task['id'], [
+            'title' => 'Review updated evidence',
+            'ownerId' => $viewer->getId(),
+            'dueAt' => '2027-01-15T10:30',
+            'details' => ['framework' => 'ISO 27001', 'reviewed' => true],
+        ]);
+        self::assertResponseIsSuccessful();
+        $updatedTask = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('Review updated evidence', $updatedTask['title']);
+        self::assertSame('ACTIVE', $updatedTask['status']);
+        self::assertSame($viewer->getId(), $updatedTask['owner']['id']);
+        self::assertTrue($updatedTask['details']['reviewed']);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($viewer));
         $client->request('GET', '/api/operations/my-tasks');

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AddOutlined } from "@mui/icons-material";
+import { AddOutlined, EditOutlined } from "@mui/icons-material";
 import {
   Alert,
   Button,
@@ -80,10 +80,12 @@ export function OperationsPage() {
     "ROLE_ADMIN",
     "ROLE_RISK_MANAGER",
   ]);
+  const isAdmin = hasAnyRole(user?.roles, ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"]);
   const client = useQueryClient();
   const navigate = useNavigate();
   const [section, setSection] = useState<RecordType | "MY_TASKS">("MY_TASKS");
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     title: "",
     dueAt: "",
@@ -91,6 +93,29 @@ export function OperationsPage() {
     details: "{}",
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const closeDialog = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm({ title: "", dueAt: "", ownerId: "", details: "{}" });
+    setFormError(null);
+  };
+  const openCreateDialog = () => {
+    setEditingId(null);
+    setForm({ title: "", dueAt: "", ownerId: "", details: "{}" });
+    setFormError(null);
+    setOpen(true);
+  };
+  const openEditDialog = (item: RecordItem) => {
+    setEditingId(item.id);
+    setForm({
+      title: item.title,
+      dueAt: item.dueAt?.slice(0, 16) ?? "",
+      ownerId: item.owner ? String(item.owner.id) : "",
+      details: JSON.stringify(item.details, null, 2),
+    });
+    setFormError(null);
+    setOpen(true);
+  };
   const tasks = useQuery({
     queryKey: ["my-tasks"],
     queryFn: async () =>
@@ -127,8 +152,21 @@ export function OperationsPage() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["operations"] });
       await client.invalidateQueries({ queryKey: ["my-tasks"] });
-      setOpen(false);
-      setForm({ title: "", dueAt: "", ownerId: "", details: "{}" });
+      closeDialog();
+    },
+  });
+  const update = useMutation({
+    mutationFn: () =>
+      api.put(`/operations/records/${editingId}`, {
+        title: form.title,
+        ownerId: form.ownerId || null,
+        dueAt: form.dueAt || null,
+        details: JSON.parse(form.details),
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["operations"] });
+      await client.invalidateQueries({ queryKey: ["my-tasks"] });
+      closeDialog();
     },
   });
   const currentTrajectory = useMemo(
@@ -140,7 +178,8 @@ export function OperationsPage() {
     try {
       JSON.parse(form.details);
       setFormError(null);
-      create.mutate();
+      if (editingId) update.mutate();
+      else create.mutate();
     } catch {
       setFormError("La configuration JSON n’est pas valide.");
     }
@@ -173,7 +212,8 @@ export function OperationsPage() {
       {(tasks.isError ||
         records.isError ||
         trajectory.isError ||
-        create.isError) && (
+        create.isError ||
+        update.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
       {formError && <Alert severity="error">{formError}</Alert>}
@@ -224,7 +264,7 @@ export function OperationsPage() {
               sx={{ alignSelf: "flex-start" }}
               variant="contained"
               startIcon={<AddOutlined />}
-              onClick={() => setOpen(true)}
+              onClick={openCreateDialog}
             >
               Créer
             </Button>
@@ -265,22 +305,34 @@ export function OperationsPage() {
                       </>
                     )}
                     <RecordDetails details={item.details} />
+                    {canManage && (
+                      <Button
+                        startIcon={<EditOutlined />}
+                        sx={{ alignSelf: "flex-start" }}
+                        onClick={() => openEditDialog(item)}
+                      >
+                        Modifier
+                      </Button>
+                    )}
                   </Stack>
                 </CardContent>
               </Card>
             );
           })}
+          {records.data?.length === 0 && (
+            <Alert severity="info">Aucun élément dans cette section.</Alert>
+          )}
         </Stack>
       )}
       <Dialog
         open={canManage && open}
-        onClose={() => setOpen(false)}
+        onClose={closeDialog}
         fullWidth
         maxWidth="sm"
       >
         <form onSubmit={submit}>
           <DialogTitle>
-            Nouvel élément —{" "}
+            {editingId ? "Modifier l’élément" : "Nouvel élément"} —{" "}
             {sections.find((item) => item.type === section)?.label}
           </DialogTitle>
           <DialogContent>
@@ -311,72 +363,85 @@ export function OperationsPage() {
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField
-                select
-                label="Modèle de données"
-                value={form.details}
-                onChange={(e) => setForm({ ...form, details: e.target.value })}
-              >
-                <MenuItem value="{}">Vide</MenuItem>
-                {section === "COMPLIANCE_PROGRAM" && (
-                  <MenuItem
-                    value={
-                      '{"startDate":"2026-08-01","currentScore":0,"targetScore":100,"frameworks":[]}'
-                    }
-                  >
-                    Programme de conformité
-                  </MenuItem>
-                )}
-                {section === "RESPONSIBILITY_RULE" && (
-                  <MenuItem
-                    value={
-                      '{"domain":"governance","scopeType":"ORGANIZATION","defaultRole":"ROLE_RISK_MANAGER","requiresApproval":true}'
-                    }
-                  >
-                    Règle de responsabilité
-                  </MenuItem>
-                )}
-                {section === "QUESTIONNAIRE_TEMPLATE" && (
-                  <MenuItem
-                    value={
-                      '{"useCase":"EVIDENCE_COLLECTION","version":1,"questions":[],"reminderDays":[7,2]}'
-                    }
-                  >
-                    Collecte de preuves
-                  </MenuItem>
-                )}
-                {section === "QUESTIONNAIRE_CAMPAIGN" && (
-                  <MenuItem
-                    value={
-                      '{"templateId":null,"recipientIds":[],"responseStatus":"DRAFT"}'
-                    }
-                  >
-                    Campagne interne
-                  </MenuItem>
-                )}
-                {section === "REFERENCE_PACK" && (
-                  <MenuItem
-                    value={
-                      '{"code":"STARTER","version":"1.0","license":"metadata-only","frameworks":[],"mappings":[]}'
-                    }
-                  >
-                    Pack gouverné vide
-                  </MenuItem>
-                )}
-              </TextField>
-              <TextField
-                multiline
-                minRows={7}
-                label="Configuration JSON"
-                value={form.details}
-                onChange={(e) => setForm({ ...form, details: e.target.value })}
-              />
+              {!editingId && (
+                <TextField
+                  select
+                  label="Modèle de données"
+                  value={form.details}
+                  onChange={(e) =>
+                    setForm({ ...form, details: e.target.value })
+                  }
+                >
+                  <MenuItem value="{}">Vide</MenuItem>
+                  {section === "COMPLIANCE_PROGRAM" && (
+                    <MenuItem
+                      value={
+                        '{"startDate":"2026-08-01","currentScore":0,"targetScore":100,"frameworks":[]}'
+                      }
+                    >
+                      Programme de conformité
+                    </MenuItem>
+                  )}
+                  {section === "RESPONSIBILITY_RULE" && (
+                    <MenuItem
+                      value={
+                        '{"domain":"governance","scopeType":"ORGANIZATION","defaultRole":"ROLE_RISK_MANAGER","requiresApproval":true}'
+                      }
+                    >
+                      Règle de responsabilité
+                    </MenuItem>
+                  )}
+                  {section === "QUESTIONNAIRE_TEMPLATE" && (
+                    <MenuItem
+                      value={
+                        '{"useCase":"EVIDENCE_COLLECTION","version":1,"questions":[],"reminderDays":[7,2]}'
+                      }
+                    >
+                      Collecte de preuves
+                    </MenuItem>
+                  )}
+                  {section === "QUESTIONNAIRE_CAMPAIGN" && (
+                    <MenuItem
+                      value={
+                        '{"templateId":null,"recipientIds":[],"responseStatus":"DRAFT"}'
+                      }
+                    >
+                      Campagne interne
+                    </MenuItem>
+                  )}
+                  {section === "REFERENCE_PACK" && (
+                    <MenuItem
+                      value={
+                        '{"code":"STARTER","version":"1.0","license":"metadata-only","frameworks":[],"mappings":[]}'
+                      }
+                    >
+                      Pack gouverné vide
+                    </MenuItem>
+                  )}
+                </TextField>
+              )}
+              {isAdmin && (
+                <TextField
+                  multiline
+                  minRows={7}
+                  label="Configuration avancée JSON"
+                  helperText="Réservée aux administrateurs. Vérifiez la structure avant l’enregistrement."
+                  value={form.details}
+                  onChange={(e) =>
+                    setForm({ ...form, details: e.target.value })
+                  }
+                />
+              )}
             </Stack>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpen(false)}>Annuler</Button>
-            <Button type="submit" variant="contained">
-              Créer
+            <Button onClick={closeDialog}>Annuler</Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={create.isPending || update.isPending}
+            >
+              {editingId ? "Enregistrer les modifications" : "Créer"}
             </Button>
           </DialogActions>
         </form>

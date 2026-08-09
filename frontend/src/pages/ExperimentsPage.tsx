@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -22,6 +23,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+import { RecordDetails } from "../components/RecordDetails";
 
 type Proposal = {
   id: number;
@@ -89,6 +91,7 @@ export function ExperimentsPage() {
   );
   const settings = useQuery({
     queryKey: ["experiment-settings"],
+    enabled: tab === "assistant",
     queryFn: async () =>
       (
         await api.get<{
@@ -100,12 +103,14 @@ export function ExperimentsPage() {
   });
   const proposals = useQuery({
     queryKey: ["assistant-proposals"],
+    enabled: tab === "assistant",
     queryFn: async () =>
       (await api.get<{ items: Proposal[] }>("/experiments/assistant/proposals"))
         .data.items,
   });
   const library = useQuery({
     queryKey: ["knowledge-library"],
+    enabled: tab === "library",
     queryFn: async () =>
       (
         await api.get<{ items: LibraryItem[] }>(
@@ -214,6 +219,12 @@ export function ExperimentsPage() {
           {error ?? "L’opération n’a pas pu être terminée."}
         </Alert>
       )}
+      {((tab === "assistant" && (settings.isLoading || proposals.isLoading)) ||
+        (tab === "library" && library.isLoading)) && (
+        <Stack alignItems="center" py={4}>
+          <CircularProgress aria-label="Chargement des expérimentations" />
+        </Stack>
+      )}
       {tab === "assistant" && (
         <>
           <Card>
@@ -267,13 +278,7 @@ export function ExperimentsPage() {
                     <Typography fontWeight={750}>{item.kind}</Typography>
                     <Chip label={item.status} />
                   </Stack>
-                  <Typography
-                    component="pre"
-                    variant="caption"
-                    sx={{ whiteSpace: "pre-wrap" }}
-                  >
-                    {JSON.stringify(item.proposal, null, 2)}
-                  </Typography>
+                  <RecordDetails details={item.proposal} />
                   <Typography variant="body2">
                     Sources visibles : {item.sources.length} · couverture{" "}
                     {Math.round(item.sourceCoverage * 100)}%
@@ -317,6 +322,9 @@ export function ExperimentsPage() {
               </CardContent>
             </Card>
           ))}
+          {proposals.data?.length === 0 && (
+            <Alert severity="info">Aucune proposition enregistrée.</Alert>
+          )}
         </>
       )}
       {tab === "library" && (
@@ -344,13 +352,7 @@ export function ExperimentsPage() {
                     </div>
                     <Chip label={item.status} />
                   </Stack>
-                  <Typography
-                    component="pre"
-                    variant="caption"
-                    sx={{ whiteSpace: "pre-wrap" }}
-                  >
-                    {JSON.stringify(item.content, null, 2)}
-                  </Typography>
+                  <RecordDetails details={item.content} />
                   {item.supersedesId && (
                     <Typography variant="body2">
                       Remplace la version #{item.supersedesId} sans la modifier.
@@ -401,6 +403,11 @@ export function ExperimentsPage() {
               </CardContent>
             </Card>
           ))}
+          {library.data?.length === 0 && (
+            <Alert severity="info">
+              Aucune ressource dans la bibliothèque.
+            </Alert>
+          )}
         </>
       )}
       <Dialog
