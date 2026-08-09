@@ -192,6 +192,7 @@ test("la génération d'un rapport affiche le résultat et permet son export", a
     .click();
   await page
     .getByRole("button", { name: /Générer le rapport|Generate report/ })
+    .first()
     .click();
 
   await expect(

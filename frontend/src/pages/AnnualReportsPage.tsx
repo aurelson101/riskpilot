@@ -357,7 +357,9 @@ export function AnnualReportsPage() {
                     <Select
                       size="small"
                       fullWidth
-                      aria-label={`Niveau ${maturityLabels[domain] ?? domain}`}
+                      inputProps={{
+                        "aria-label": `Niveau ${maturityLabels[domain] ?? domain}`,
+                      }}
                       value={
                         assessment.assessed
                           ? String(assessment.score ?? 0)
@@ -553,7 +555,12 @@ export function AnnualReportsPage() {
           <Typography variant="h6" fontWeight={750} gutterBottom>
             Journal classé de {year}
           </Typography>
-          <Box sx={{ overflowX: "auto", maxHeight: 520 }}>
+          <Box
+            role="region"
+            aria-label={`Journal classé de ${year}`}
+            tabIndex={0}
+            sx={{ overflowX: "auto", maxHeight: 520 }}
+          >
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>

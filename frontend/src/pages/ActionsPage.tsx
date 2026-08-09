@@ -512,8 +512,12 @@ export function ActionsPage() {
               onChange={(event) => setSearch(event.target.value)}
             />
             <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Priorité</InputLabel>
+              <InputLabel id="action-priority-filter-label">
+                Priorité
+              </InputLabel>
               <Select
+                labelId="action-priority-filter-label"
+                inputProps={{ "aria-label": "Priorité" }}
                 label="Priorité"
                 value={priorityFilter}
                 onChange={(event) => setPriorityFilter(event.target.value)}
@@ -527,8 +531,12 @@ export function ActionsPage() {
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 190 }}>
-              <InputLabel>Responsable</InputLabel>
+              <InputLabel id="action-owner-filter-label">
+                Responsable
+              </InputLabel>
               <Select
+                labelId="action-owner-filter-label"
+                inputProps={{ "aria-label": "Responsable" }}
                 label="Responsable"
                 value={ownerFilter}
                 onChange={(event) => setOwnerFilter(event.target.value)}

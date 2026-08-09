@@ -349,7 +349,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ["action.en retard", "action.overdue"],
   ["Actions en retard", "Late actions"],
   ["Actions à échéance", "Maturity Stocks"],
-  ["Actions CSV", "Actions CSV"],
+  ["Actions CSV", "CSV actions"],
   ["Activer après enregistrement", "Activate after registration"],
   ["Actuel", "Current"],
   ["Administrateur :", "Administrator:"],
