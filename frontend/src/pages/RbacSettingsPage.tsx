@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  CircularProgress,
   FormControlLabel,
   Stack,
   Typography,
@@ -34,6 +35,8 @@ export function RbacSettingsPage() {
         ? current[role].filter((item) => item !== permission)
         : [...(current[role] ?? []), permission],
     }));
+  if (query.isPending)
+    return <CircularProgress aria-label="Chargement des permissions RBAC" />;
   if (query.isError)
     return (
       <Alert severity="error">
@@ -80,7 +83,7 @@ export function RbacSettingsPage() {
       ))}
       <Button
         variant="contained"
-        disabled={save.isPending}
+        disabled={save.isPending || !query.data}
         onClick={() => save.mutate()}
       >
         Enregistrer les permissions

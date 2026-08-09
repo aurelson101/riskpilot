@@ -10,10 +10,12 @@ const allRoutes = [
   "/decision",
   "/experiments",
   "/analysis-workspace",
+  "/ebios",
   "/indicators",
   "/annual-reports",
   "/notifications",
   "/compliance",
+  "/nis2",
   "/third-parties",
   "/resilience",
   "/regulatory",
@@ -34,6 +36,7 @@ const allRoutes = [
   "/administration/audit-logs",
   "/administration/email-settings",
   "/administration/integrations",
+  "/administration/rbac",
   "/administration/action-fields",
 ] as const;
 const routes = process.env.PLAYWRIGHT_ROUTE

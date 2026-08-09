@@ -71,7 +71,7 @@ final readonly class EbiosController
             $this->em->flush();
 
             return new JsonResponse($this->response($workshop), 200);
-        } catch (\Throwable $error) {
+        } catch (\InvalidArgumentException|\LogicException $error) {
             return new JsonResponse(['code' => 'INVALID_WORKSHOP', 'message' => $error->getMessage()], 422);
         }
     }
@@ -102,7 +102,7 @@ final readonly class EbiosController
             $this->em->flush();
 
             return new JsonResponse($this->response($workshop));
-        } catch (\Throwable $error) {
+        } catch (\LogicException $error) {
             return new JsonResponse(['code' => 'INVALID_VALIDATION', 'message' => $error->getMessage()], 422);
         }
     }

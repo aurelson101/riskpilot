@@ -30,6 +30,9 @@ final class PermissionChecker
         if (!in_array($permission, self::ALL, true)) {
             return false;
         }
+        if (in_array(User::ROLE_SUPER_ADMIN, $user->getAssignedRoles(), true)) {
+            return true;
+        }
         $overrides = $user->getOrganization()->getRolePermissions();
         foreach ($user->getAssignedRoles() as $role) {
             $permissions = $overrides[$role] ?? self::DEFAULTS[$role] ?? [];

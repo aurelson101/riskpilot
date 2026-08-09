@@ -11,10 +11,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/settings/rbac')]
-#[IsGranted(User::ROLE_ADMIN)]
 final readonly class RbacSettingsController
 {
     public function __construct(private CurrentUser $currentUser, private PermissionChecker $permissions, private EntityManagerInterface $em)
@@ -24,12 +22,19 @@ final readonly class RbacSettingsController
     #[Route('', methods: ['GET'])]
     public function show(): JsonResponse
     {
-        return new JsonResponse(['permissions' => PermissionChecker::ALL, 'roles' => $this->permissions->effectiveMatrix($this->currentUser->get())]);
+        if (!$this->canManageRoles()) {
+            return $this->forbidden();
+        }
+
+        return $this->matrixResponse();
     }
 
     #[Route('', methods: ['PUT'])]
     public function update(Request $request): JsonResponse
     {
+        if (!$this->canManageRoles()) {
+            return $this->forbidden();
+        }
         $input = $request->toArray();
         $roles = $input['roles'] ?? null;
         if (!is_array($roles)) {
@@ -47,6 +52,21 @@ final readonly class RbacSettingsController
         $organization->setRolePermissions($normalized);
         $this->em->flush();
 
-        return $this->show();
+        return $this->matrixResponse();
+    }
+
+    private function canManageRoles(): bool
+    {
+        return $this->permissions->isGranted($this->currentUser->get(), 'admin.roles');
+    }
+
+    private function forbidden(): JsonResponse
+    {
+        return new JsonResponse(['code' => 'FORBIDDEN', 'message' => 'Permission insuffisante.'], 403);
+    }
+
+    private function matrixResponse(): JsonResponse
+    {
+        return new JsonResponse(['permissions' => PermissionChecker::ALL, 'roles' => $this->permissions->effectiveMatrix($this->currentUser->get())]);
     }
 }

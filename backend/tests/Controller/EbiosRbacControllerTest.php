@@ -56,5 +56,18 @@ final class EbiosRbacControllerTest extends WebTestCase
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($auditor));
         $client->request('GET', '/api/v1/ebios/analyses');
         self::assertResponseStatusCodeSame(403);
+
+        $client->request('GET', '/api/settings/rbac');
+        self::assertResponseStatusCodeSame(403);
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
+        $client->request('GET', '/api/settings/rbac');
+        self::assertResponseIsSuccessful();
+        $matrix = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $matrix['roles'][User::ROLE_ADMIN] = ['risk.read'];
+        $client->jsonRequest('PUT', '/api/settings/rbac', ['roles' => $matrix['roles']]);
+        self::assertResponseIsSuccessful();
+        $client->request('GET', '/api/settings/rbac');
+        self::assertResponseStatusCodeSame(403);
     }
 }

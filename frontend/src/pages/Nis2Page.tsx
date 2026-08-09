@@ -3,6 +3,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   LinearProgress,
   Stack,
   Table,
@@ -51,6 +52,8 @@ export function Nis2Page() {
     }),
     {},
   );
+  if (frameworks.isPending || assessments.isPending)
+    return <CircularProgress aria-label="Chargement du pilotage NIS2" />;
   if (frameworks.isError || assessments.isError || results.isError)
     return (
       <Alert severity="error">Impossible de charger le pilotage NIS2.</Alert>

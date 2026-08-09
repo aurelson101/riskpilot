@@ -22,4 +22,13 @@ final class PermissionCheckerTest extends TestCase
         self::assertFalse($checker->isGranted($manager, 'ebios.update'));
         self::assertTrue($checker->isGranted($manager, 'ebios.read'));
     }
+
+    public function testSuperAdministratorCannotBeLockedOutByOrganizationOverrides(): void
+    {
+        $organization = new Organization('Tenant');
+        $organization->setRolePermissions([User::ROLE_SUPER_ADMIN => []]);
+        $superAdmin = new User('super-admin@example.test', 'Super', 'Admin', $organization, [User::ROLE_SUPER_ADMIN]);
+
+        self::assertTrue((new PermissionChecker())->isGranted($superAdmin, 'admin.roles'));
+    }
 }

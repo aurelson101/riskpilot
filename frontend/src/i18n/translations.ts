@@ -1376,6 +1376,7 @@ const pairs: Array<[fr: string, en: string]> = [
     "Impossible de charger les analyses EBIOS RM.",
     "Unable to load EBIOS RM analyses.",
   ],
+  ["Chargement des analyses EBIOS RM", "Loading EBIOS RM analyses"],
   ["EBIOS Risk Manager", "EBIOS Risk Manager"],
   [
     "Workflow gouverné des cinq ateliers, avec validation indépendante",
@@ -1395,6 +1396,7 @@ const pairs: Array<[fr: string, en: string]> = [
     "Impossible de charger le pilotage NIS2.",
     "Unable to load NIS2 management.",
   ],
+  ["Chargement du pilotage NIS2", "Loading NIS2 management"],
   [
     "Installez le pack de démarrage NIS2 pour activer cette vue.",
     "Install the NIS2 starter pack to enable this view.",
@@ -1414,6 +1416,7 @@ const pairs: Array<[fr: string, en: string]> = [
     "Impossible de charger les permissions RBAC.",
     "Unable to load RBAC permissions.",
   ],
+  ["Chargement des permissions RBAC", "Loading RBAC permissions"],
   ["Rôles et permissions", "Roles and permissions"],
   [
     "Matrice configurable par organisation, compatible avec les rôles existants",

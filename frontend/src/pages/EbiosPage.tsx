@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   MenuItem,
   Stack,
   Tab,
@@ -123,6 +124,8 @@ export function EbiosPage() {
     onSuccess: async () =>
       client.invalidateQueries({ queryKey: ["ebios-analyses"] }),
   });
+  if (analyses.isPending)
+    return <CircularProgress aria-label="Chargement des analyses EBIOS RM" />;
   if (analyses.isError)
     return (
       <Alert severity="error">
