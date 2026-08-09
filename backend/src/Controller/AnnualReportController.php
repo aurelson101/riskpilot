@@ -164,14 +164,16 @@ final readonly class AnnualReportController
             return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Rapport annuel introuvable.'], 404);
         }
         $format = strtolower((string) $request->query->get('format', 'pdf'));
-        $filename = sprintf('riskpilot-rapport-annuel-%d-v%d', (int) ($record->getDetails()['year'] ?? 0), (int) ($record->getDetails()['version'] ?? 1));
+        $details = $record->getDetails();
+        $details['organization'] ??= $record->getOrganization()->getName();
+        $filename = sprintf('riskpilot-rapport-annuel-%d-v%d', (int) ($details['year'] ?? 0), (int) ($details['version'] ?? 1));
         if ('pdf' === $format) {
-            return new Response($this->pdf->renderAnnualReport($record->getTitle(), $record->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+            return new Response($this->pdf->renderAnnualReport($record->getTitle(), $details), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
         }
         if ('json' !== $format) {
             return new JsonResponse(['code' => 'UNSUPPORTED_FORMAT', 'message' => 'Formats disponibles : PDF ou JSON.'], 400);
         }
-        $payload = json_encode($record->getDetails(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $payload = json_encode($details, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         return new Response($payload, 200, ['Content-Type' => 'application/json; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="%s.json"', $filename), 'X-Content-Type-Options' => 'nosniff']);
     }

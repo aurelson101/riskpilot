@@ -77,7 +77,10 @@ final class PdfReportRenderer
         $activityRows = '';
         foreach ((array) ($data['activities'] ?? []) as $activity) {
             $activity = (array) $activity;
-            $activityRows .= '<tr><td>'.$this->escape($this->date((string) ($activity['occurredAt'] ?? ''))).'</td><td>'.$this->escape($this->domainLabel((string) ($activity['domain'] ?? ''))).'</td><td>'.$this->escape($this->actionLabel((string) ($activity['action'] ?? ''))).'</td><td>'.$this->escape((string) ($activity['entityType'] ?? '')).' #'.$this->escape((string) ($activity['entityId'] ?? '')).'</td><td>'.$this->escape((string) ($activity['actor'] ?? '')).'</td><td>'.(true === ($activity['sealed'] ?? false) ? 'Scellée' : 'Non scellée').'</td></tr>';
+            $entityType = (string) ($activity['entityType'] ?? 'Objet');
+            $entityId = $activity['entityId'] ?? null;
+            $entityReference = $entityType.(null === $entityId || '' === $entityId ? ' (global)' : ' #'.(string) $entityId);
+            $activityRows .= '<tr><td>'.$this->escape($this->date((string) ($activity['occurredAt'] ?? ''))).'</td><td>'.$this->escape($this->domainLabel((string) ($activity['domain'] ?? ''))).'</td><td>'.$this->escape($this->actionLabel((string) ($activity['action'] ?? ''))).'</td><td>'.$this->escape($entityReference).'</td><td>'.$this->escape((string) ($activity['actor'] ?? '')).'</td><td>'.(true === ($activity['sealed'] ?? false) ? 'Scellée' : 'Non scellée').'</td></tr>';
         }
 
         $css = '@page{margin:20mm 14mm 18mm}body{font-family:"DejaVu Sans",sans-serif;color:#17324d;font-size:9px;line-height:1.4}header{border-bottom:3px solid #0284c7;padding-bottom:11px;margin-bottom:14px}h1{font-size:21px;color:#075985;margin:0 0 4px}h2{font-size:14px;color:#075985;margin:18px 0 7px;page-break-after:avoid}h3{font-size:11px;color:#164e63;margin:12px 0 5px}.meta{color:#52677a}.cards{width:100%;border-collapse:separate;border-spacing:5px}.card{border:1px solid #bae6fd;background:#f0f9ff;padding:8px;text-align:center}.card strong{display:block;font-size:17px;color:#0369a1}.notice{background:#f8fafc;border-left:4px solid #38bdf8;padding:8px;margin:8px 0}.warning{border-left-color:#f59e0b;background:#fffbeb}table{width:100%;border-collapse:collapse;margin-bottom:9px}tr{page-break-inside:avoid}th,td{border:1px solid #cbd5e1;padding:5px;vertical-align:top}th{background:#eaf5fb;text-align:left;color:#164e63}.score{white-space:nowrap;width:58px}.meter{height:7px;background:#e2e8f0}.meter span{display:block;height:7px;background:#0284c7}.bar{height:6px;background:#e2e8f0;width:100px;display:inline-block;margin-right:5px}.bar span{display:block;height:6px;background:#38bdf8}.empty{color:#64748b;font-style:italic}.page-break{page-break-before:always}footer{position:fixed;bottom:-11mm;left:0;right:0;border-top:1px solid #d8e1e8;padding-top:4px;color:#64748b;font-size:8px}';
@@ -114,7 +117,8 @@ final class PdfReportRenderer
                 $item = (array) $item;
                 $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.(int) ($item['currentScore'] ?? 0).'</td><td>'.(int) ($item['residualScore'] ?? 0).'</td><td>'.$this->escape($this->domainLabel((string) ($item['treatment'] ?? ''))).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
             }
-            $sections .= '<h2>2. Risques prioritaires</h2>'.$this->decisionTable(['Risque', 'Statut', 'Actuel', 'Résiduel', 'Traitement', 'Responsable'], $rows, 'Aucun risque sélectionné.');
+            $empty = !array_key_exists('riskItems', $snapshot) && (int) ($snapshot['risks'] ?? 0) > 0 ? 'Détail non conservé dans cet instantané historique.' : 'Aucun risque sélectionné.';
+            $sections .= '<h2>2. Risques prioritaires</h2>'.$this->decisionTable(['Risque', 'Statut', 'Actuel', 'Résiduel', 'Traitement', 'Responsable'], $rows, $empty);
         }
         if (in_array('actions', $blocks, true)) {
             $rows = '';
@@ -122,7 +126,8 @@ final class PdfReportRenderer
                 $item = (array) $item;
                 $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['priority'] ?? ''))).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.(int) ($item['progress'] ?? 0).'%</td><td>'.$this->escape($this->date((string) ($item['dueAt'] ?? ''))).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
             }
-            $sections .= '<h2>3. Plans d’action prioritaires</h2>'.$this->decisionTable(['Action', 'Priorité', 'Statut', 'Avancement', 'Échéance', 'Responsable'], $rows, 'Aucune action sélectionnée.');
+            $empty = !array_key_exists('actionItems', $snapshot) && (int) ($snapshot['actions'] ?? 0) > 0 ? 'Détail non conservé dans cet instantané historique.' : 'Aucune action sélectionnée.';
+            $sections .= '<h2>3. Plans d’action prioritaires</h2>'.$this->decisionTable(['Action', 'Priorité', 'Statut', 'Avancement', 'Échéance', 'Responsable'], $rows, $empty);
         }
         if (in_array('compliance', $blocks, true)) {
             $rows = '';
@@ -130,7 +135,8 @@ final class PdfReportRenderer
                 $item = (array) $item;
                 $rows .= '<tr><td>'.$this->escape((string) ($item['framework'] ?? '')).'</td><td>'.$this->escape((string) ($item['scope'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.$this->escape(number_format((float) ($item['score'] ?? 0), 1, ',', '').' %').'</td><td>'.$this->escape($this->date((string) ($item['assessedAt'] ?? ''))).'</td></tr>';
             }
-            $sections .= '<h2>4. Situation de conformité</h2>'.$this->decisionTable(['Référentiel', 'Périmètre', 'Statut', 'Score', 'Évaluation'], $rows, 'Aucune évaluation sélectionnée.');
+            $empty = !array_key_exists('complianceItems', $snapshot) && (int) ($snapshot['assessments'] ?? 0) > 0 ? 'Détail non conservé dans cet instantané historique.' : 'Aucune évaluation sélectionnée.';
+            $sections .= '<h2>4. Situation de conformité</h2>'.$this->decisionTable(['Référentiel', 'Périmètre', 'Statut', 'Score', 'Évaluation'], $rows, $empty);
         }
         $css = '@page{margin:20mm 14mm 18mm}body{font-family:"DejaVu Sans",sans-serif;color:#17324d;font-size:9px;line-height:1.4}header{border-bottom:3px solid #0284c7;padding-bottom:11px;margin-bottom:14px}h1{font-size:21px;color:#075985;margin:0 0 4px}h2{font-size:14px;color:#075985;margin:18px 0 7px;page-break-after:avoid}.meta{color:#52677a}.cards{width:100%;border-collapse:separate;border-spacing:4px}.card{border:1px solid #bae6fd;background:#f0f9ff;padding:7px;text-align:center}.card strong{display:block;font-size:16px;color:#0369a1}table{width:100%;border-collapse:collapse;margin-bottom:9px}tr{page-break-inside:avoid}th,td{border:1px solid #cbd5e1;padding:5px;vertical-align:top}th{background:#eaf5fb;text-align:left;color:#164e63}.notice{background:#f8fafc;border-left:4px solid #38bdf8;padding:8px;margin:8px 0}.empty{color:#64748b;font-style:italic}footer{position:fixed;bottom:-11mm;left:0;right:0;border-top:1px solid #d8e1e8;padding-top:4px;color:#64748b;font-size:8px}';
 

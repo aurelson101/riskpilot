@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\AuditLog;
+use App\Entity\OperationalRecord;
 use App\Entity\Organization;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,9 +30,18 @@ final class AnnualReportControllerTest extends WebTestCase
         $manager->persist($managerUser);
         $manager->persist($reader);
         $manager->persist(new AuditLog($organization, $managerUser, 'UPDATE', 'RiskScenario', '42', ['status' => 'TREATED'], '127.0.0.1', 'PHPUnit'));
+        $legacy = new OperationalRecord($organization, 'ANNUAL_REPORT', 'Legacy annual report', ['year' => 2001, 'version' => 1, 'totals' => ['activities' => 0]]);
+        $legacy->update($legacy->getTitle(), 'COMPLETED', $legacy->getDetails(), $managerUser, null);
+        $manager->persist($legacy);
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $year = (int) date('Y');
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($managerUser));
+        $client->request('GET', '/api/annual-reports/saved/'.$legacy->getId().'/export?format=json');
+        self::assertResponseIsSuccessful();
+        $legacyExport = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('Primary', $legacyExport['organization']);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($reader));
         $client->request('GET', '/api/annual-reports/'.$year);

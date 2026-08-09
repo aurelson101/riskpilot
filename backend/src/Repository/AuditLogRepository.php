@@ -31,7 +31,7 @@ final class AuditLogRepository extends ServiceEntityRepository
 
     public function latestHashFor(User $actor): ?string
     {
-        $log = $this->findOneBy(['organization' => $actor->getOrganization()], ['createdAt' => 'DESC', 'id' => 'DESC']);
+        $log = $this->findOneBy(['organization' => $actor->getOrganization(), 'hashVersion' => 2], ['createdAt' => 'DESC', 'id' => 'DESC']);
 
         return $log?->getEventHash();
     }
@@ -42,10 +42,22 @@ final class AuditLogRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('a')
             ->andWhere('a.organization = :organization')
             ->andWhere('a.eventHash IS NOT NULL')
+            ->andWhere('a.hashVersion = 2')
             ->setParameter('organization', $actor->getOrganization())
             ->orderBy('a.createdAt', 'ASC')
             ->addOrderBy('a.id', 'ASC')
             ->getQuery()->getResult();
+    }
+
+    public function countLegacySealedFor(User $actor): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->andWhere('a.organization = :organization')
+            ->andWhere('a.eventHash IS NOT NULL')
+            ->andWhere('a.hashVersion < 2')
+            ->setParameter('organization', $actor->getOrganization())
+            ->getQuery()->getSingleScalarResult();
     }
 
     /** @return list<AuditLog> */

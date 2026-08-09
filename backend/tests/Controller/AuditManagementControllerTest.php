@@ -72,6 +72,11 @@ final class AuditManagementControllerTest extends WebTestCase
         $this->client->request('GET', '/api/audit-management/dashboard');
         self::assertResponseIsSuccessful();
         self::assertSame(0, $this->payload()['openFindings']);
+
+        self::getContainer()->get(EntityManagerInterface::class)->clear();
+        $this->client->request('GET', '/api/audit-logs/integrity');
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->payload()['valid']);
     }
 
     public function testTenantAndRoleIsolation(): void

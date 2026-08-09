@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\OperationalRecord;
 use App\Entity\Organization;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,9 +28,18 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $manager->persist($organization);
         $manager->persist($managerUser);
         $manager->persist($reader);
+        $legacyRun = new OperationalRecord($organization, 'REPORT_RUN', 'Legacy decision report', ['blocks' => ['risks'], 'snapshot' => ['risks' => 2]]);
+        $legacyRun->update($legacyRun->getTitle(), 'COMPLETED', $legacyRun->getDetails(), $managerUser, null);
+        $manager->persist($legacyRun);
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($managerUser));
+
+        $client->request('GET', '/api/decision/reports/'.$legacyRun->getId().'/export?format=json');
+        self::assertResponseIsSuccessful();
+        $legacyExport = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('Primary', $legacyExport['details']['organization']);
+        self::assertSame('Risk Manager', $legacyExport['details']['generatedBy']);
 
         $client->jsonRequest('POST', '/api/operations/records', ['type' => 'SECURITY_PROJECT', 'title' => 'New service', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['assetIds' => [], 'riskIds' => [], 'actionIds' => [], 'milestones' => []]]);
         self::assertResponseStatusCodeSame(201);

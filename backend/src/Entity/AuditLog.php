@@ -22,6 +22,9 @@ class AuditLog
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $user;
 
+    #[ORM\Column(nullable: true)]
+    private ?int $actorId;
+
     #[ORM\Column(length: 20)] private string $action;
     #[ORM\Column(length: 100)] private string $entityType;
     #[ORM\Column(length: 100, nullable: true)] private ?string $entityId;
@@ -31,6 +34,7 @@ class AuditLog
     #[ORM\Column(type: 'text', nullable: true)] private ?string $userAgent;
     #[ORM\Column(length: 64, nullable: true)] private ?string $previousHash = null;
     #[ORM\Column(length: 64, nullable: true)] private ?string $eventHash = null;
+    #[ORM\Column] private int $hashVersion = 2;
     #[ORM\Column(length: 36, nullable: true)] private ?string $requestId = null;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     /**
@@ -41,6 +45,7 @@ class AuditLog
     {
         $this->organization = $organization;
         $this->user = $user;
+        $this->actorId = $user?->getId();
         $this->action = $action;
         $this->entityType = $entityType;
         $this->entityId = $entityId;
@@ -64,6 +69,11 @@ class AuditLog
     public function getUser(): ?User
     {
         return $this->user;
+    }
+
+    public function getActorId(): ?int
+    {
+        return $this->actorId;
     }
 
     public function getAction(): string
@@ -123,8 +133,14 @@ class AuditLog
         return $this->requestId;
     }
 
+    public function getHashVersion(): int
+    {
+        return $this->hashVersion;
+    }
+
     public function seal(?string $previousHash, string $requestId): void
     {
+        $this->hashVersion = 2;
         $this->previousHash = $previousHash;
         $this->requestId = $requestId;
         $this->eventHash = hash('sha256', ($previousHash ?? 'GENESIS').'|'.$this->canonicalPayload());
@@ -143,7 +159,8 @@ class AuditLog
     {
         $payload = [
             'organizationId' => $this->organization->getId(),
-            'userId' => $this->user?->getId(),
+            'hashVersion' => $this->hashVersion,
+            'userId' => $this->actorId,
             'action' => $this->action,
             'entityType' => $this->entityType,
             'entityId' => $this->entityId,
@@ -151,7 +168,9 @@ class AuditLog
             'ipAddress' => $this->ipAddress,
             'userAgent' => $this->userAgent,
             'requestId' => $this->requestId,
-            'createdAt' => $this->createdAt->format('Y-m-d\TH:i:s.uP'),
+            // Doctrine persists this column with second precision. Hash the
+            // persisted representation so a reloaded event remains verifiable.
+            'createdAt' => $this->createdAt->format('Y-m-d\TH:i:sP'),
         ];
         if (null !== $this->oldValues) {
             $payload['oldValues'] = $this->oldValues;

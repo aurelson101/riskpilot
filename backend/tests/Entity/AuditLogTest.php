@@ -15,6 +15,8 @@ final class AuditLogTest extends TestCase
     {
         $organization = new Organization('Test');
         $user = new User('admin@example.test', 'Ada', 'Admin', $organization);
+        $userId = new \ReflectionProperty($user, 'id');
+        $userId->setValue($user, 42);
         $first = new AuditLog($organization, $user, 'POST', 'risks', '1', ['title' => 'Risque'], '127.0.0.1', 'PHPUnit');
         $first->seal(null, 'request-1');
         $second = new AuditLog($organization, $user, 'PUT', 'risks', '1', ['title' => 'Risque révisé'], '127.0.0.1', 'PHPUnit');
@@ -23,5 +25,10 @@ final class AuditLogTest extends TestCase
         self::assertTrue($first->verify(null));
         self::assertTrue($second->verify($first->getEventHash()));
         self::assertFalse($second->verify(str_repeat('0', 64)));
+
+        $userRelation = new \ReflectionProperty($first, 'user');
+        $userRelation->setValue($first, null);
+        self::assertSame(42, $first->getActorId());
+        self::assertTrue($first->verify(null));
     }
 }

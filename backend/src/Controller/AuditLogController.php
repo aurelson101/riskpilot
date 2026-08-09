@@ -43,6 +43,7 @@ final readonly class AuditLogController
         return new JsonResponse([
             'valid' => null === $brokenAt,
             'sealedEvents' => count($logs),
+            'legacyUnverifiableEvents' => $this->logs->countLegacySealedFor($this->currentUser->get()),
             'brokenAt' => $brokenAt,
             'latestHash' => $previousHash,
             'verifiedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
@@ -67,6 +68,6 @@ final readonly class AuditLogController
     /** @return array<string, mixed> */
     private function serialize(AuditLog $log): array
     {
-        return ['id' => $log->getId(), 'user' => null === $log->getUser() ? null : ['id' => $log->getUser()->getId(), 'name' => $log->getUser()->getFirstName().' '.$log->getUser()->getLastName(), 'email' => $log->getUser()->getEmail()], 'action' => $log->getAction(), 'entityType' => $log->getEntityType(), 'entityId' => $log->getEntityId(), 'oldValues' => $log->getOldValues(), 'newValues' => $log->getNewValues(), 'ipAddress' => $log->getIpAddress(), 'userAgent' => $log->getUserAgent(), 'requestId' => $log->getRequestId(), 'previousHash' => $log->getPreviousHash(), 'eventHash' => $log->getEventHash(), 'createdAt' => $log->getCreatedAt()->format(DATE_ATOM)];
+        return ['id' => $log->getId(), 'actorId' => $log->getActorId(), 'user' => null === $log->getUser() ? null : ['id' => $log->getUser()->getId(), 'name' => $log->getUser()->getFirstName().' '.$log->getUser()->getLastName(), 'email' => $log->getUser()->getEmail()], 'action' => $log->getAction(), 'entityType' => $log->getEntityType(), 'entityId' => $log->getEntityId(), 'oldValues' => $log->getOldValues(), 'newValues' => $log->getNewValues(), 'ipAddress' => $log->getIpAddress(), 'userAgent' => $log->getUserAgent(), 'requestId' => $log->getRequestId(), 'previousHash' => $log->getPreviousHash(), 'eventHash' => $log->getEventHash(), 'hashVersion' => $log->getHashVersion(), 'createdAt' => $log->getCreatedAt()->format(DATE_ATOM)];
     }
 }

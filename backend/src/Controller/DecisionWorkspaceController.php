@@ -170,14 +170,17 @@ final readonly class DecisionWorkspaceController
             return $this->error('NOT_FOUND', 'Rapport introuvable.', 404);
         }
         $format = strtolower((string) $request->query->get('format', 'pdf'));
+        $details = $run->getDetails();
+        $details['organization'] ??= $run->getOrganization()->getName();
+        $details['generatedBy'] ??= null === $run->getOwner() ? 'RiskPilot' : trim($run->getOwner()->getFirstName().' '.$run->getOwner()->getLastName());
         if ('pdf' === $format) {
-            return new Response($this->pdf->renderDecisionReport($run->getTitle(), $run->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
+            return new Response($this->pdf->renderDecisionReport($run->getTitle(), $details), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
         }
         if ('json' !== $format) {
             return $this->error('UNSUPPORTED_FORMAT', 'Formats disponibles : PDF ou JSON.', 400);
         }
 
-        return new JsonResponse($this->serialize($run), 200, ['Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.json"', $id)]);
+        return new JsonResponse([...$this->serialize($run), 'details' => $details], 200, ['Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.json"', $id)]);
     }
 
     #[Route('/connectors/{id<\d+>}/reconcile', methods: ['POST'])]
