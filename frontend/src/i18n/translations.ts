@@ -1174,6 +1174,40 @@ const pairs: Array<[fr: string, en: string]> = [
     "La mise à jour du résultat a échoué. La valeur précédente a été restaurée.",
     "The result could not be updated. The previous value has been restored.",
   ],
+  ["Impossible de charger la configuration IA.", "Unable to load AI settings."],
+  ["Copilote IA", "AI copilot"],
+  [
+    "Assistance à l’analyse et à la rédaction. Les suggestions restent soumises à validation humaine et ne prennent aucune décision automatiquement.",
+    "Assistance for analysis and drafting. Suggestions remain subject to human validation and never make decisions automatically.",
+  ],
+  [
+    "La clé est chiffrée et n’est jamais réaffichée. Utilisez une clé dédiée à RiskPilot avec quotas et restrictions côté fournisseur.",
+    "The key is encrypted and never displayed again. Use a dedicated RiskPilot key with provider-side quotas and restrictions.",
+  ],
+  ["Configuration IA enregistrée.", "AI settings saved."],
+  [
+    "Échec de l’enregistrement de la configuration IA.",
+    "Failed to save AI settings.",
+  ],
+  ["Connexion au fournisseur IA validée.", "AI provider connection validated."],
+  [
+    "Le test de connexion au fournisseur IA a échoué.",
+    "The AI provider connection test failed.",
+  ],
+  ["Mistral AI", "Mistral AI"],
+  ["OpenAI", "OpenAI"],
+  ["Google Gemini", "Google Gemini"],
+  ["Endpoint compatible", "Compatible endpoint"],
+  [
+    "Minimale — extraits strictement nécessaires",
+    "Minimal — strictly necessary excerpts",
+  ],
+  [
+    "Contextuelle — contexte GRC sélectionné",
+    "Contextual — selected GRC context",
+  ],
+  ["Enregistrer la configuration IA", "Save AI settings"],
+  ["Tester la connexion", "Test connection"],
   ["Analyses et capitalisation", "Analyses and knowledge reuse"],
   [
     "Analyses versionnées, méthodes guidées, preuves, simulations, roadmaps et qualité",

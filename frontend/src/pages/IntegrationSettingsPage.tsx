@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { api } from "../api/client";
+import { AiCopilotSettingsPanel } from "../components/AiCopilotSettingsPanel";
 
 type Integration = {
   id: number;
@@ -91,6 +92,7 @@ export function IntegrationSettingsPage() {
           OIDC/SAML, provisioning SCIM, clés API limitées et webhooks signés.
         </Typography>
       </div>
+      <AiCopilotSettingsPanel />
       {secret && (
         <Alert severity="warning">
           Copiez ce secret maintenant, il ne sera plus affiché :{" "}
