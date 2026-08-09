@@ -952,6 +952,10 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Aucune évaluation disponible.", "No assessment available."],
   ["État de l’évaluation", "Assessment status"],
   [
+    "points actifs seront ajoutés automatiquement avec l’état « Non évalué ». Vous pourrez ensuite préciser leur maturité, leur conformité, les preuves et les actions correctives.",
+    "active points will be added automatically with the “Not assessed” status. You can then specify their maturity, compliance, evidence and corrective actions.",
+  ],
+  [
     "Brouillon → En cours → Terminée, puis Archivée si nécessaire",
     "Draft → In progress → Completed, then Archived if needed",
   ],

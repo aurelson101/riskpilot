@@ -242,6 +242,9 @@ export function CompliancePage() {
     () => buildComplianceSummary(results.data ?? []),
     [results.data],
   );
+  const selectedFrameworkForCreation = frameworks.data?.find(
+    (framework) => framework.id === Number(assessmentForm.frameworkId),
+  );
   if (frameworks.isLoading || assessments.isLoading)
     return <CircularProgress aria-label="Chargement de la page" />;
   if (frameworks.isError || assessments.isError)
@@ -725,6 +728,14 @@ export function CompliancePage() {
                     ))}
                 </Select>
               </FormControl>
+              {selectedFrameworkForCreation && (
+                <Alert severity="info">
+                  {selectedFrameworkForCreation.requirementCount} points actifs
+                  seront ajoutés automatiquement avec l’état « Non évalué ».
+                  Vous pourrez ensuite préciser leur maturité, leur conformité,
+                  les preuves et les actions correctives.
+                </Alert>
+              )}
               <FormControl required>
                 <InputLabel>Périmètre</InputLabel>
                 <Select

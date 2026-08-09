@@ -130,3 +130,37 @@ test("le statut d’une évaluation peut être modifié", async ({
   await page.getByRole("option", { name: restoreStatus }).click();
   await expect(status).toHaveText(restoreStatus);
 });
+
+test("la création annonce les points ajoutés automatiquement", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/compliance", { waitUntil: "networkidle" });
+  await page
+    .getByRole("button", { name: /Lancer une évaluation|Start an evaluation/ })
+    .click();
+  await page.getByRole("dialog").getByRole("combobox").first().click();
+  await page
+    .getByRole("option", {
+      name: /Cadre Cyber Démonstration|Cyber Demonstration Framework/,
+    })
+    .click();
+
+  await expect(
+    page.getByText(
+      /5 points actifs seront ajoutés automatiquement|5 active points will be added automatically/,
+    ),
+  ).toBeVisible();
+});
