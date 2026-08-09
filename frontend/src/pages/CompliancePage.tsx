@@ -135,25 +135,52 @@ export function CompliancePage() {
       ).data,
   });
   const updateResult = useMutation({
-    mutationFn: ({
+    scope: { id: "compliance-result-update" },
+    mutationFn: async ({
       result,
       patch,
     }: {
       result: ComplianceResult;
       patch: Partial<ComplianceResult>;
-    }) =>
-      api.put(`/compliance-results/${result.id}`, {
-        maturityLevel: patch.maturityLevel ?? result.maturityLevel,
-        complianceStatus: patch.complianceStatus ?? result.complianceStatus,
-        comment: result.comment,
-        evidence: result.evidence,
-        remediationActionId: result.remediationAction?.id ?? null,
-      }),
-    onSuccess: () => {
-      client.invalidateQueries({
+    }) => {
+      const cached = client
+        .getQueryData<ComplianceResult[]>([
+          "compliance-results",
+          selectedAssessment,
+        ])
+        ?.find((item) => item.id === result.id);
+      const current = { ...result, ...cached, ...patch };
+
+      return api.put(`/compliance-results/${result.id}`, {
+        maturityLevel: current.maturityLevel,
+        complianceStatus: current.complianceStatus,
+        comment: current.comment,
+        evidence: current.evidence,
+        remediationActionId: current.remediationAction?.id ?? null,
+      });
+    },
+    onMutate: async ({ result, patch }) => {
+      const queryKey = ["compliance-results", selectedAssessment] as const;
+      await client.cancelQueries({ queryKey });
+      const previous = client.getQueryData<ComplianceResult[]>(queryKey);
+      client.setQueryData<ComplianceResult[]>(queryKey, (current = []) =>
+        current.map((item) =>
+          item.id === result.id ? { ...item, ...patch } : item,
+        ),
+      );
+
+      return { previous, queryKey };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        client.setQueryData(context.queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      void client.invalidateQueries({
         queryKey: ["compliance-results", selectedAssessment],
       });
-      client.invalidateQueries({ queryKey: ["compliance-assessments"] });
+      void client.invalidateQueries({ queryKey: ["compliance-assessments"] });
     },
   });
   const resultSummary = useMemo(() => {
@@ -333,11 +360,21 @@ export function CompliancePage() {
                 </Typography>
               ) : results.isLoading ? (
                 <CircularProgress aria-label="Chargement de la page" />
+              ) : results.isError ? (
+                <Alert severity="error">
+                  Impossible de charger les résultats de cette évaluation.
+                </Alert>
               ) : (
                 <Stack spacing={2}>
                   <Typography variant="h6" fontWeight={750}>
                     Résultats par exigence
                   </Typography>
+                  {updateResult.isError && (
+                    <Alert severity="error">
+                      La mise à jour du résultat a échoué. La valeur précédente
+                      a été restaurée.
+                    </Alert>
+                  )}
                   {resultSummary.radar.length > 0 && (
                     <Card variant="outlined">
                       <CardContent>

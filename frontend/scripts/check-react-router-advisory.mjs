@@ -4,11 +4,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const advisory = "GHSA-qwww-vcr4-c8h2";
-const patchedVersion = [8, 3, 0];
 const packageJson = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
-const installed = packageJson.dependencies["react-router-dom"];
+const packageLock = JSON.parse(
+  fs.readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"),
+);
+const declared = packageJson.dependencies["react-router-dom"];
+const installed =
+  packageLock.packages?.["node_modules/react-router-dom"]?.version;
+if (typeof installed !== "string") {
+  throw new Error("Unable to resolve the installed react-router-dom version.");
+}
 const latest = execFileSync("npm", ["view", "react-router-dom", "version"], {
   encoding: "utf8",
 }).trim();
@@ -52,12 +59,14 @@ if (rscUsages.length) {
     `${advisory}: unstable React Router RSC APIs detected in ${rscUsages.join(", ")}`,
   );
 }
-if (atLeast(latest, patchedVersion) && !atLeast(installed, patchedVersion)) {
+const installedMajor = versionParts(installed)[0];
+const patchedVersion = installedMajor === 7 ? [7, 18, 2] : [8, 3, 0];
+if (!atLeast(installed, patchedVersion)) {
   throw new Error(
-    `${advisory}: react-router-dom ${latest} is now published; upgrade from ${installed} and remove the temporary Trivy exception.`,
+    `${advisory}: installed react-router-dom ${installed} (${declared}) is below the patched ${patchedVersion.join(".")} release; registry latest is ${latest}.`,
   );
 }
 
 console.log(
-  `${advisory}: RSC APIs absent; installed ${installed}; registry latest ${latest}; patched 8.3.0 not yet available.`,
+  `${advisory}: RSC APIs absent; installed ${installed} (${declared}) meets patched ${patchedVersion.join(".")} requirement; registry latest ${latest}.`,
 );

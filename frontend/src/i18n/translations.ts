@@ -1166,6 +1166,14 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Points faibles (0–2) :", "Weak points (0–2):"],
   ["Points forts (4–5) :", "Strong points (4–5):"],
   ["À terminer :", "Remaining:"],
+  [
+    "Impossible de charger les résultats de cette évaluation.",
+    "Unable to load the results for this assessment.",
+  ],
+  [
+    "La mise à jour du résultat a échoué. La valeur précédente a été restaurée.",
+    "The result could not be updated. The previous value has been restored.",
+  ],
   ["Analyses et capitalisation", "Analyses and knowledge reuse"],
   [
     "Analyses versionnées, méthodes guidées, preuves, simulations, roadmaps et qualité",
