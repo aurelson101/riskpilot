@@ -21,7 +21,19 @@ services:
   worker:
     mem_limit: 112m
     cpus: 0.20
-    command: php -d memory_limit=64M bin/console messenger:consume async --time-limit=900 --memory-limit=64M --sleep=2
+    command: >-
+      sh -c 'while true; do
+      php -d memory_limit=64M bin/console messenger:consume async --time-limit=900 --memory-limit=64M --sleep=2;
+      exit_code=$$?;
+      [ "$$exit_code" -eq 0 ] || echo "Messenger worker stopped with exit code $$exit_code" >&2;
+      sleep 2;
+      done'
+    healthcheck:
+      test: ["CMD-SHELL", "ps | grep -q '[m]essenger:consume async'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   scheduler:
     mem_limit: 64m

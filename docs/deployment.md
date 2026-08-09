@@ -41,3 +41,5 @@ LOAD_REQUESTS=100 LOAD_CONCURRENCY=10 LOAD_MAX_P95_MS=750 \
 ```
 
 Ce smoke test ne remplace pas une campagne métier authentifiée, mais bloque une livraison si `/api/health` retourne une erreur ou dépasse le p95 convenu. Superviser en continu `/api/health`, les réponses 5xx, la latence p95, l'espace disque, PostgreSQL, Redis et la profondeur de la file Messenger. Définir une alerte avant saturation et tester au moins annuellement la restauration, la rotation des secrets, le PRA et le retour à l'image précédente.
+
+Sur la démo contrainte en mémoire, le consommateur Messenger recycle son processus PHP toutes les 15 minutes, puis le relance dans le même conteneur. Son healthcheck vérifie le processus de consommation et non la seule accessibilité du transport. Cela conserve une empreinte mémoire bornée sans laisser la file asynchrone arrêtée entre deux réinitialisations.
