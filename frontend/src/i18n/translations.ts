@@ -1367,6 +1367,65 @@ const pairs: Array<[fr: string, en: string]> = [
     "Les données de l’artefact doivent être un objet JSON valide.",
     "Artifact data must be a valid JSON object.",
   ],
+  ["Atelier 1 — Cadrage et socle", "Workshop 1 — Scope and baseline"],
+  ["Atelier 2 — Sources de risque", "Workshop 2 — Risk sources"],
+  ["Atelier 3 — Scénarios stratégiques", "Workshop 3 — Strategic scenarios"],
+  ["Atelier 4 — Scénarios opérationnels", "Workshop 4 — Operational scenarios"],
+  ["Atelier 5 — Traitement du risque", "Workshop 5 — Risk treatment"],
+  [
+    "Impossible de charger les analyses EBIOS RM.",
+    "Unable to load EBIOS RM analyses.",
+  ],
+  ["EBIOS Risk Manager", "EBIOS Risk Manager"],
+  [
+    "Workflow gouverné des cinq ateliers, avec validation indépendante",
+    "Governed five-workshop workflow with independent validation",
+  ],
+  [
+    "Créez d’abord une analyse EBIOS RM dans Analyses et capitalisation.",
+    "First create an EBIOS RM analysis in Analyses and knowledge reuse.",
+  ],
+  [
+    "L’atelier est incomplet ou l’opération n’est pas autorisée.",
+    "The workshop is incomplete or the operation is not allowed.",
+  ],
+  ["Enregistrer l’atelier", "Save workshop"],
+  ["Valider indépendamment", "Validate independently"],
+  [
+    "Impossible de charger le pilotage NIS2.",
+    "Unable to load NIS2 management.",
+  ],
+  [
+    "Installez le pack de démarrage NIS2 pour activer cette vue.",
+    "Install the NIS2 starter pack to enable this view.",
+  ],
+  ["Conformité NIS2", "NIS2 compliance"],
+  [
+    "Pilotage dédié des exigences, écarts, preuves et remédiations",
+    "Dedicated management of requirements, gaps, evidence and remediation",
+  ],
+  [
+    "Lancez une évaluation sur le référentiel",
+    "Start an assessment for framework",
+  ],
+  ["depuis le module Conformité.", "from the Compliance module."],
+  ["Exigences NIS2", "NIS2 requirements"],
+  [
+    "Impossible de charger les permissions RBAC.",
+    "Unable to load RBAC permissions.",
+  ],
+  ["Rôles et permissions", "Roles and permissions"],
+  [
+    "Matrice configurable par organisation, compatible avec les rôles existants",
+    "Organization-level configurable matrix compatible with existing roles",
+  ],
+  [
+    "La matrice n’a pas pu être enregistrée.",
+    "The permission matrix could not be saved.",
+  ],
+  ["Enregistrer les permissions", "Save permissions"],
+  ["EBIOS RM · Ateliers 1 à 5", "EBIOS RM · Workshops 1 to 5"],
+  ["Pilotage NIS2", "NIS2 management"],
 ];
 
 export const frToEn = new Map(pairs);

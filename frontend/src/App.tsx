@@ -208,6 +208,17 @@ const AnalysisWorkspacePage = lazy(() =>
     default: module.AnalysisWorkspacePage,
   })),
 );
+const EbiosPage = lazy(() =>
+  import("./pages/EbiosPage").then((module) => ({ default: module.EbiosPage })),
+);
+const Nis2Page = lazy(() =>
+  import("./pages/Nis2Page").then((module) => ({ default: module.Nis2Page })),
+);
+const RbacSettingsPage = lazy(() =>
+  import("./pages/RbacSettingsPage").then((module) => ({
+    default: module.RbacSettingsPage,
+  })),
+);
 const AnnualReportsPage = lazy(() =>
   import("./pages/AnnualReportsPage").then((module) => ({
     default: module.AnnualReportsPage,
@@ -252,6 +263,7 @@ function Layout() {
   const riskActive = [
     "/risks",
     "/analysis-workspace",
+    "/ebios",
     "/risk-matrix",
     "/threats",
     "/vulnerabilities",
@@ -269,6 +281,7 @@ function Layout() {
   const complianceActive = [
     "/security-controls",
     "/compliance",
+    "/nis2",
     "/regulatory",
   ].some((path) => location.pathname === path);
   const [complianceOpen, setComplianceOpen] = useState(complianceActive);
@@ -349,6 +362,7 @@ function Layout() {
     "/decision": "Décision et différenciation",
     "/experiments": "Expérimentations sous contrôle",
     "/analysis-workspace": "Analyses et capitalisation",
+    "/ebios": "EBIOS Risk Manager",
     "/indicators": "Indicateurs",
     "/risk-matrix": "Matrice des risques",
     "/scopes": "Périmètres",
@@ -358,6 +372,7 @@ function Layout() {
     "/assets/information": "Actifs informationnels",
     "/threats": "Menaces",
     "/compliance": "Conformité",
+    "/nis2": "Conformité NIS2",
     "/security-controls": "Mesures de sécurité",
     "/third-parties": "Tiers et fournisseurs",
     "/resilience": "Incidents et continuité",
@@ -374,6 +389,7 @@ function Layout() {
     "/administration/email-settings": "Paramètres email",
     "/administration/integrations": "Identité et intégrations",
     "/administration/action-fields": "Colonnes des actions",
+    "/administration/rbac": "Rôles et permissions",
   };
 
   function NavItem({
@@ -559,6 +575,12 @@ function Layout() {
           />
           <NavItem
             nested
+            path="/ebios"
+            label="EBIOS RM · Ateliers 1 à 5"
+            icon={<AccountTreeOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
             path="/risk-matrix"
             label="Matrice des risques"
             icon={<GridViewOutlined fontSize="small" />}
@@ -676,6 +698,12 @@ function Layout() {
           />
           <NavItem
             nested
+            path="/nis2"
+            label="Pilotage NIS2"
+            icon={<ShieldOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
             path="/security-controls"
             label="Mesures de sécurité"
             icon={<VerifiedUserOutlined fontSize="small" />}
@@ -746,6 +774,14 @@ function Layout() {
             label="Mon profil et MFA"
             icon={<AccountCircleOutlined fontSize="small" />}
           />
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/rbac"
+              label="Rôles et permissions"
+              icon={<AdminPanelSettingsOutlined fontSize="small" />}
+            />
+          )}
           {isAdmin && (
             <NavItem
               nested
@@ -982,10 +1018,12 @@ export default function App() {
                   path="analysis-workspace"
                   element={<AnalysisWorkspacePage />}
                 />
+                <Route path="ebios" element={<EbiosPage />} />
                 <Route path="indicators" element={<IndicatorsPage />} />
                 <Route path="annual-reports" element={<AnnualReportsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />
+                <Route path="nis2" element={<Nis2Page />} />
                 <Route path="third-parties" element={<ThirdPartiesPage />} />
                 <Route path="resilience" element={<ResiliencePage />} />
                 <Route path="regulatory" element={<RegulatoryPage />} />
@@ -1066,6 +1104,14 @@ export default function App() {
                   element={
                     <RoleRoute allowedRoles={adminRoles}>
                       <IntegrationSettingsPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="administration/rbac"
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <RbacSettingsPage />
                     </RoleRoute>
                   }
                 />

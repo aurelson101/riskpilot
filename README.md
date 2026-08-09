@@ -72,6 +72,12 @@ L’authentification utilise des JWT courts liés à une session serveur et un r
 
 Les écrans `/scopes`, `/assets`, `/threats`, `/vulnerabilities` et `/security-controls` donnent accès à l’inventaire de l’organisation. Le registre `/risks` présente les scores brut, actuel et résiduel ainsi que la gouvernance : appétence/tolérance/capacité par domaine et famille, scénarios stratégiques, méthodes simplifiée, ISO 27005 ou EBIOS RM, recommandations selon coût/charge/réduction, acceptations formelles et campagnes de revue historisées. La matrice interactive `/risk-matrix` restitue ces évaluations sur une grille 5 × 5 selon les seuils configurés par organisation. Les API associées contrôlent systématiquement les rôles et relations entre tenants.
 
+L'espace `/ebios` matérialise les cinq ateliers EBIOS RM : cadrage et socle,
+sources de risque, scénarios stratégiques, scénarios opérationnels et traitement.
+Chaque atelier est persisté, versionné, contrôlé selon ses champs obligatoires et
+validé par une personne distincte de son dernier rédacteur. Les ateliers doivent
+être validés dans l'ordre.
+
 ## Moteur de risque
 
 Un scénario associe un périmètre, un actif, une menace, des vulnérabilités, des mesures de sécurité et un responsable. Chaque évaluation utilise une vraisemblance et un impact de 1 à 5 ; le score est leur produit. Les seuils par défaut sont faible jusqu’à 4, modéré jusqu’à 9, élevé jusqu’à 16 et critique au-delà. Ils sont personnalisables sur l’organisation.
@@ -103,6 +109,9 @@ base de pilotage à adapter au périmètre et ne valent ni certification ni avis
 juridique.
 
 L’écran `/compliance` regroupe les référentiels et les évaluations. Une évaluation porte sur un périmètre et génère un résultat pour chaque exigence active. Les évaluateurs saisissent un niveau de maturité de 0 à 5, un statut conforme, partiel, non conforme, non applicable ou non évalué, ainsi que des preuves et une action corrective facultative. Le score global exclut les exigences non applicables ou non évaluées.
+
+La vue `/nis2` filtre ce moteur sur le pack NIS2 et présente directement score,
+répartition des statuts, exigences, maturité, preuves et actions correctives.
 
 Les API principales sont `GET|POST /api/frameworks`, `GET|POST /api/frameworks/{id}/requirements`, `GET|POST /api/compliance-assessments`, `GET /api/compliance-assessments/{id}/results` et `PUT /api/compliance-results/{id}`.
 
@@ -157,6 +166,11 @@ Chaque année possède également un radar de maturité cyber de **0 à 5**, par
 La lecture reste limitée à l’organisation courante. La modification de la maturité et la génération d’un instantané exigent au minimum le rôle Risk Manager ; les lecteurs peuvent consulter et exporter les rapports existants.
 
 Les intégrations d’entreprise se configurent dans **Paramètres → Identité et intégrations** : fournisseurs OIDC/SAML Google Workspace, Microsoft Entra ou génériques, préparation SCIM, clés API à portées et webhooks HTTPS. Les secrets techniques ne sont affichés qu’à leur création et ne sont conservés que sous forme d’empreinte.
+
+**Paramètres → Rôles et permissions** permet à un administrateur de configurer
+la matrice RBAC de son organisation. Les rôles historiques conservent leurs
+permissions par défaut tant qu'aucune surcharge n'est enregistrée. LDAP/LDAPS
+n'est pas inclus dans cette phase et sera importé ultérieurement.
 
 ## Tests
 

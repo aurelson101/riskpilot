@@ -130,12 +130,14 @@ pas être annulées.
 
 ### Élevé
 
-1. **EBIOS RM non modélisé atelier par atelier.** `RiskMethodValidator` exige
+1. **EBIOS RM non modélisé atelier par atelier dans la baseline auditée.** `RiskMethodValidator` exige
    cinq chaînes (`businessValue`, `fearedEvent`, `threatSource`,
    `strategicScenario`, `operationalScenario`) mais ne modélise ni cardinalités,
    ni propriétaires, ni chemins, ni étapes techniques. Une API/UI dédiée doit
    être ajoutée progressivement autour de `RiskAnalysis`, avec migrations de
    reprise depuis `methodData`.
+   **État après audit :** première tranche livrée par cinq ateliers persistés,
+   versionnés, validés dans l'ordre et exposés dans une interface spécialisée.
 2. **Preuves hétérogènes.** Les documents ISMS sont versionnés et hachés, mais
    plusieurs domaines stockent encore des tableaux de chaînes `evidence`.
    Introduire un registre `Evidence` polymorphe et tenant-scoped, puis migrer les
@@ -144,10 +146,12 @@ pas être annulées.
    existent, mais LDAP/LDAPS, CA, mapping AD et un login SSO de bout en bout ne
    sont pas livrés. Ne pas les présenter comme opérationnels avant tests avec un
    annuaire de préproduction.
-4. **RBAC figé dans le code.** Les rôles couvrent les usages principaux, mais il
+4. **RBAC figé dans le code dans la baseline auditée.** Les rôles couvrent les usages principaux, mais il
    n'existe pas encore de permissions administrables (`risk.read`,
    `ebios.validate`, etc.). Ajouter des permissions versionnées sans supprimer
    la compatibilité des rôles actuels.
+   **État après audit :** matrice configurable par organisation et appliquée aux
+   nouvelles API EBIOS ; la migration des contrôleurs historiques reste progressive.
 
 ### Moyen
 

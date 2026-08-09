@@ -35,6 +35,10 @@ class Organization
     #[ORM\Column(type: 'json')]
     private array $riskThresholds = ['lowMax' => 4, 'moderateMax' => 9, 'highMax' => 16, 'criticalMax' => 25];
 
+    /** @var array<string, list<string>> */
+    #[ORM\Column(type: 'json')]
+    private array $rolePermissions = [];
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -104,6 +108,20 @@ class Organization
     public function setRiskThresholds(array $thresholds): self
     {
         $this->riskThresholds = $thresholds;
+
+        return $this;
+    }
+
+    /** @return array<string, list<string>> */
+    public function getRolePermissions(): array
+    {
+        return $this->rolePermissions;
+    }
+
+    /** @param array<string, list<string>> $permissions */
+    public function setRolePermissions(array $permissions): self
+    {
+        $this->rolePermissions = $permissions;
 
         return $this;
     }
