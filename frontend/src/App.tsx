@@ -24,6 +24,7 @@ import {
   ExpandLess,
   ExpandMore,
   FolderCopyOutlined,
+  SmartToyOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -43,6 +44,7 @@ import {
   Typography,
   Collapse,
   Divider,
+  Fab,
   IconButton,
   Tooltip,
   useMediaQuery,
@@ -976,6 +978,21 @@ function Layout() {
           <Outlet />
         </Container>
       </Box>
+      <Tooltip title="Ouvrir le copilote IA" placement="left">
+        <Fab
+          color="primary"
+          aria-label="Ouvrir le copilote IA"
+          onClick={() => navigate("/compliance#compliance-results")}
+          sx={{
+            position: "fixed",
+            right: { xs: 16, sm: 24 },
+            bottom: { xs: 16, sm: 24 },
+            zIndex: theme.zIndex.drawer + 1,
+          }}
+        >
+          <SmartToyOutlined />
+        </Fab>
+      </Tooltip>
     </Box>
   );
 }

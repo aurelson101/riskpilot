@@ -397,7 +397,11 @@ export function CompliancePage() {
               </Card>
             ))}
           </Stack>
-          <Card variant="outlined" sx={{ flex: 1, width: "100%" }}>
+          <Card
+            id="compliance-results"
+            variant="outlined"
+            sx={{ flex: 1, width: "100%", scrollMarginTop: 96 }}
+          >
             <CardContent>
               {selectedAssessment === null ? (
                 <Typography color="text.secondary">

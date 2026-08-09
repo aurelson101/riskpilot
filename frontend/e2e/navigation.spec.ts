@@ -224,3 +224,29 @@ test("les expérimentations orientent clairement vers le copilote IA", async ({
   await copilotLink.click();
   await expect(page).toHaveURL(/\/compliance$/);
 });
+
+test("le bouton flottant rend le copilote IA accessible partout", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+
+  await page.goto("/experiments", { waitUntil: "networkidle" });
+  const launcher = page.getByRole("button", {
+    name: /Ouvrir le copilote IA|Open AI copilot/,
+  });
+  await expect(launcher).toBeVisible();
+  await launcher.click();
+  await expect(page).toHaveURL(/\/compliance#compliance-results$/);
+  await expect(page.locator("#compliance-results")).toBeVisible();
+});
