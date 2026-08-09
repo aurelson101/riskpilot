@@ -171,11 +171,15 @@ describe("App", () => {
     expect(await screen.findByText("Registre des risques")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Pilotage" }));
     expect(await screen.findByText("Indicateurs")).toBeInTheDocument();
+    expect(riskMenu).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Registre des risques")).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Conformité et contrôles" }),
     );
     expect(await screen.findByText("Mesures de sécurité")).toBeInTheDocument();
-    expect(screen.getByText("Analyses de risques")).toBeInTheDocument();
+    expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Indicateurs")).not.toBeInTheDocument();
+    expect(screen.getByText("Conformité NIS2")).toBeInTheDocument();
     expect(screen.getByText("Actifs")).toBeInTheDocument();
     const assetsMenu = screen.getByRole("button", { name: "Actifs" });
     expect(assetsMenu).toHaveAttribute("aria-expanded", "false");
@@ -186,7 +190,7 @@ describe("App", () => {
     );
     expect(screen.getByText("Tous les actifs")).toBeInTheDocument();
     expect(await screen.findByText("Actifs matériels")).toBeInTheDocument();
-    expect(screen.getByText("Colonnes des actions")).toBeInTheDocument();
+    expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
     fireEvent.click(await screen.findByRole("option", { name: "Anglais" }));
     fireEvent.click(
@@ -200,11 +204,10 @@ describe("App", () => {
         locale: "en",
       }),
     );
-    expect(await screen.findByText("My profile and MFA")).toBeInTheDocument();
+    expect(
+      await screen.findByText("My profile", { selector: "h4" }),
+    ).toBeInTheDocument();
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
-    expect(screen.getByText("Email")).toBeInTheDocument();
-    expect(screen.getByText("Indicators")).toBeInTheDocument();
-    expect(screen.getByText("Risk analyses")).toBeInTheDocument();
     expect(screen.getByText("Compliance and controls")).toBeInTheDocument();
     expect(screen.getByText("All assets")).toBeInTheDocument();
     expect(screen.getByText("Hardware assets")).toBeInTheDocument();
@@ -219,7 +222,7 @@ describe("App", () => {
     expect(screen.getAllByText("Recent publications")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
     await waitFor(() =>
-      expect(screen.queryByText("My profile and MFA")).not.toBeInTheDocument(),
+      expect(screen.queryByText("Recent publications")).not.toBeInTheDocument(),
     );
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });

@@ -1428,7 +1428,6 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Enregistrer les permissions", "Save permissions"],
   ["EBIOS RM · Ateliers 1 à 5", "EBIOS RM · Workshops 1 to 5"],
-  ["Pilotage NIS2", "NIS2 management"],
 ];
 
 export const frToEn = new Map(pairs);

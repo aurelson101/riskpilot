@@ -268,7 +268,6 @@ function Layout() {
     "/threats",
     "/vulnerabilities",
   ].some((path) => location.pathname === path);
-  const [riskOpen, setRiskOpen] = useState(riskActive);
   const steeringActive = [
     "/actions",
     "/operations",
@@ -277,28 +276,37 @@ function Layout() {
     "/indicators",
     "/annual-reports",
   ].some((path) => location.pathname === path);
-  const [steeringOpen, setSteeringOpen] = useState(steeringActive);
   const complianceActive = [
     "/security-controls",
     "/compliance",
     "/nis2",
     "/regulatory",
   ].some((path) => location.pathname === path);
-  const [complianceOpen, setComplianceOpen] = useState(complianceActive);
   const settingsActive =
     location.pathname === "/profile" ||
     location.pathname.startsWith("/administration");
-  const [settingsOpen, setSettingsOpen] = useState(settingsActive);
   const assetsActive =
     location.pathname === "/assets" || location.pathname.startsWith("/assets/");
-  const [assetsOpen, setAssetsOpen] = useState(assetsActive);
   const ismsActive = location.pathname === "/isms-documents";
-  const [ismsOpen, setIsmsOpen] = useState(ismsActive);
+  const activeGroup = riskActive
+    ? "risk"
+    : steeringActive
+      ? "steering"
+      : assetsActive
+        ? "assets"
+        : complianceActive
+          ? "compliance"
+          : ismsActive
+            ? "isms"
+            : settingsActive
+              ? "settings"
+              : null;
+  const [openGroup, setOpenGroup] = useState<string | null>(activeGroup);
   const ismsDocuments = useQuery({
     queryKey: ["isms-documents"],
     queryFn: async () =>
       (await api.get<IsmsDocument[]>("/isms-documents")).data,
-    enabled: Boolean(user) && (ismsOpen || ismsActive),
+    enabled: Boolean(user) && (openGroup === "isms" || ismsActive),
     staleTime: 5 * 60 * 1000,
   });
   const ismsCategories = useMemo(
@@ -319,28 +327,8 @@ function Layout() {
   const currentDrawerWidth = collapsed ? collapsedDrawerWidth : drawerWidth;
 
   useEffect(() => {
-    if (settingsActive) setSettingsOpen(true);
-  }, [settingsActive]);
-
-  useEffect(() => {
-    if (riskActive) setRiskOpen(true);
-  }, [riskActive]);
-
-  useEffect(() => {
-    if (steeringActive) setSteeringOpen(true);
-  }, [steeringActive]);
-
-  useEffect(() => {
-    if (complianceActive) setComplianceOpen(true);
-  }, [complianceActive]);
-
-  useEffect(() => {
-    if (assetsActive) setAssetsOpen(true);
-  }, [assetsActive]);
-
-  useEffect(() => {
-    if (ismsActive) setIsmsOpen(true);
-  }, [ismsActive]);
+    if (activeGroup) setOpenGroup(activeGroup);
+  }, [activeGroup]);
 
   if (!user) {
     return (
@@ -558,8 +546,10 @@ function Layout() {
           label="Gestion des risques"
           icon={<AssessmentOutlined />}
           active={riskActive}
-          open={riskOpen}
-          onToggle={() => setRiskOpen((value) => !value)}
+          open={openGroup === "risk"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "risk" ? null : "risk"))
+          }
         >
           <NavItem
             nested
@@ -603,8 +593,10 @@ function Layout() {
           label="Pilotage"
           icon={<TaskAltOutlined />}
           active={steeringActive}
-          open={steeringOpen}
-          onToggle={() => setSteeringOpen((value) => !value)}
+          open={openGroup === "steering"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "steering" ? null : "steering"))
+          }
         >
           <NavItem
             nested
@@ -654,8 +646,10 @@ function Layout() {
           label="Actifs"
           icon={<Inventory2Outlined />}
           active={assetsActive}
-          open={assetsOpen}
-          onToggle={() => setAssetsOpen((value) => !value)}
+          open={openGroup === "assets"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "assets" ? null : "assets"))
+          }
         >
           <NavItem
             nested
@@ -687,8 +681,12 @@ function Layout() {
           label="Conformité et contrôles"
           icon={<VerifiedUserOutlined />}
           active={complianceActive}
-          open={complianceOpen}
-          onToggle={() => setComplianceOpen((value) => !value)}
+          open={openGroup === "compliance"}
+          onToggle={() =>
+            setOpenGroup((value) =>
+              value === "compliance" ? null : "compliance",
+            )
+          }
         >
           <NavItem
             nested
@@ -699,7 +697,7 @@ function Layout() {
           <NavItem
             nested
             path="/nis2"
-            label="Pilotage NIS2"
+            label="Conformité NIS2"
             icon={<ShieldOutlined fontSize="small" />}
           />
           <NavItem
@@ -730,8 +728,10 @@ function Layout() {
           label="Documents ISMS"
           icon={<FolderCopyOutlined />}
           active={ismsActive}
-          open={ismsOpen}
-          onToggle={() => setIsmsOpen((value) => !value)}
+          open={openGroup === "isms"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "isms" ? null : "isms"))
+          }
         >
           <NavItem
             nested
@@ -765,8 +765,10 @@ function Layout() {
           label="Paramètres"
           icon={<SettingsOutlined />}
           active={settingsActive}
-          open={settingsOpen}
-          onToggle={() => setSettingsOpen((value) => !value)}
+          open={openGroup === "settings"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "settings" ? null : "settings"))
+          }
         >
           <NavItem
             nested
