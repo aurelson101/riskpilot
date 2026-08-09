@@ -8,6 +8,7 @@ use App\Application\CurrentUser;
 use App\Application\PdfReportRenderer;
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\ComplianceAssessment;
 use App\Entity\ExecutiveGovernanceRecord;
 use App\Entity\OperationalRecord;
 use App\Entity\PlatformIntegration;
@@ -152,7 +153,7 @@ final readonly class DecisionWorkspaceController
         }
         $actor = $this->currentUser->get();
         $generatedAt = new \DateTimeImmutable();
-        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($template->getDetails()['version'] ?? '1'), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'blocks' => $template->getDetails()['blocks'] ?? [], 'snapshot' => $this->tenantSnapshot()];
+        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($template->getDetails()['version'] ?? '1'), 'reportType' => (string) ($template->getDetails()['reportType'] ?? 'MANAGEMENT_COMMITTEE'), 'approvedBy' => (string) ($template->getDetails()['approvedBy'] ?? ''), 'organization' => $actor->getOrganization()->getName(), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'generatedBy' => trim($actor->getFirstName().' '.$actor->getLastName()), 'blocks' => $template->getDetails()['blocks'] ?? [], 'snapshot' => $this->tenantSnapshot()];
         $run = new OperationalRecord($actor->getOrganization(), 'REPORT_RUN', $template->getTitle().' — '.$generatedAt->format('Y-m-d H:i'), $details);
         $run->update($run->getTitle(), 'COMPLETED', $details, $actor, null);
         $this->entityManager->persist($run);
@@ -170,7 +171,7 @@ final readonly class DecisionWorkspaceController
         }
         $format = strtolower((string) $request->query->get('format', 'pdf'));
         if ('pdf' === $format) {
-            return new Response($this->pdf->render($run->getTitle(), 'Rapport de décision gouverné', $run->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
+            return new Response($this->pdf->renderDecisionReport($run->getTitle(), $run->getDetails()), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
         }
         if ('json' !== $format) {
             return $this->error('UNSUPPORTED_FORMAT', 'Formats disponibles : PDF ou JSON.', 400);
@@ -283,8 +284,22 @@ final readonly class DecisionWorkspaceController
     private function tenantSnapshot(): array
     {
         $actor = $this->currentUser->get();
+        $risks = $this->risks->findVisibleTo($actor);
+        $actions = $this->actions->findVisibleTo($actor);
+        $assessments = $this->assessments->findVisibleTo($actor);
+        usort($risks, static fn (RiskScenario $left, RiskScenario $right): int => $right->getCurrentRiskScore() <=> $left->getCurrentRiskScore());
+        usort($actions, static fn (ActionPlan $left, ActionPlan $right): int => $left->getDueDate() <=> $right->getDueDate());
 
-        return ['risks' => count($this->risks->findVisibleTo($actor)), 'controls' => count($this->controls->findVisibleTo($actor)), 'assessments' => count($this->assessments->findVisibleTo($actor)), 'actions' => count($this->actions->findVisibleTo($actor)), 'thirdParties' => count($this->thirdParties->findVisibleTo($actor))];
+        return [
+            'risks' => count($risks),
+            'controls' => count($this->controls->findVisibleTo($actor)),
+            'assessments' => count($assessments),
+            'actions' => count($actions),
+            'thirdParties' => count($this->thirdParties->findVisibleTo($actor)),
+            'riskItems' => array_map(static fn (RiskScenario $risk): array => ['title' => $risk->getTitle(), 'status' => $risk->getStatus(), 'currentScore' => $risk->getCurrentRiskScore(), 'residualScore' => $risk->getResidualRiskScore(), 'treatment' => $risk->getTreatmentDecision(), 'owner' => trim($risk->getRiskOwner()->getFirstName().' '.$risk->getRiskOwner()->getLastName())], array_slice($risks, 0, 10)),
+            'actionItems' => array_map(static fn (ActionPlan $action): array => ['title' => $action->getTitle(), 'status' => $action->getStatus(), 'priority' => $action->getPriority(), 'progress' => $action->getProgress(), 'dueAt' => $action->getDueDate()->format('Y-m-d'), 'owner' => trim($action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName())], array_slice($actions, 0, 10)),
+            'complianceItems' => array_map(static fn (ComplianceAssessment $assessment): array => ['framework' => $assessment->getFramework()->getName().' '.$assessment->getFramework()->getVersion(), 'scope' => $assessment->getScope()->getName(), 'status' => $assessment->getStatus(), 'score' => $assessment->getGlobalScore(), 'assessedAt' => $assessment->getAssessmentDate()->format('Y-m-d')], array_slice($assessments, 0, 10)),
+        ];
     }
 
     /** @return list<string> */

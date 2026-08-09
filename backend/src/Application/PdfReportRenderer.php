@@ -21,6 +21,12 @@ final class PdfReportRenderer
         return $this->renderDocument($title, $this->annualDocument($title, $data));
     }
 
+    /** @param array<string, mixed> $data */
+    public function renderDecisionReport(string $title, array $data): string
+    {
+        return $this->renderDocument($title, $this->decisionDocument($title, $data));
+    }
+
     private function renderDocument(string $title, string $html): string
     {
         $options = new Options();
@@ -96,6 +102,59 @@ final class PdfReportRenderer
             '<footer>RiskPilot · Rapport annuel gouverné · '.$this->escape($organization).' · '.$year.'</footer></body></html>';
     }
 
+    /** @param array<string, mixed> $data */
+    private function decisionDocument(string $title, array $data): string
+    {
+        $snapshot = (array) ($data['snapshot'] ?? []);
+        $blocks = array_map('strtolower', array_map('strval', (array) ($data['blocks'] ?? [])));
+        $organization = (string) ($data['organization'] ?? 'Organisation non renseignée');
+        $cards = ['Risques' => (int) ($snapshot['risks'] ?? 0), 'Contrôles' => (int) ($snapshot['controls'] ?? 0), 'Évaluations' => (int) ($snapshot['assessments'] ?? 0), 'Actions' => (int) ($snapshot['actions'] ?? 0), 'Tiers' => (int) ($snapshot['thirdParties'] ?? 0)];
+        $cardHtml = '';
+        foreach ($cards as $label => $value) {
+            $cardHtml .= '<td class="card"><strong>'.$value.'</strong>'.$this->escape($label).'</td>';
+        }
+        $sections = '';
+        if (in_array('risks', $blocks, true)) {
+            $rows = '';
+            foreach ((array) ($snapshot['riskItems'] ?? []) as $item) {
+                $item = (array) $item;
+                $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.(int) ($item['currentScore'] ?? 0).'</td><td>'.(int) ($item['residualScore'] ?? 0).'</td><td>'.$this->escape($this->domainLabel((string) ($item['treatment'] ?? ''))).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
+            }
+            $sections .= '<h2>2. Risques prioritaires</h2>'.$this->decisionTable(['Risque', 'Statut', 'Actuel', 'Résiduel', 'Traitement', 'Responsable'], $rows, 'Aucun risque sélectionné.');
+        }
+        if (in_array('actions', $blocks, true)) {
+            $rows = '';
+            foreach ((array) ($snapshot['actionItems'] ?? []) as $item) {
+                $item = (array) $item;
+                $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['priority'] ?? ''))).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.(int) ($item['progress'] ?? 0).'%</td><td>'.$this->escape($this->date((string) ($item['dueAt'] ?? ''))).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
+            }
+            $sections .= '<h2>3. Plans d’action prioritaires</h2>'.$this->decisionTable(['Action', 'Priorité', 'Statut', 'Avancement', 'Échéance', 'Responsable'], $rows, 'Aucune action sélectionnée.');
+        }
+        if (in_array('compliance', $blocks, true)) {
+            $rows = '';
+            foreach ((array) ($snapshot['complianceItems'] ?? []) as $item) {
+                $item = (array) $item;
+                $rows .= '<tr><td>'.$this->escape((string) ($item['framework'] ?? '')).'</td><td>'.$this->escape((string) ($item['scope'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''))).'</td><td>'.$this->escape(number_format((float) ($item['score'] ?? 0), 1, ',', '').' %').'</td><td>'.$this->escape($this->date((string) ($item['assessedAt'] ?? ''))).'</td></tr>';
+            }
+            $sections .= '<h2>4. Situation de conformité</h2>'.$this->decisionTable(['Référentiel', 'Périmètre', 'Statut', 'Score', 'Évaluation'], $rows, 'Aucune évaluation sélectionnée.');
+        }
+        $css = '@page{margin:20mm 14mm 18mm}body{font-family:"DejaVu Sans",sans-serif;color:#17324d;font-size:9px;line-height:1.4}header{border-bottom:3px solid #0284c7;padding-bottom:11px;margin-bottom:14px}h1{font-size:21px;color:#075985;margin:0 0 4px}h2{font-size:14px;color:#075985;margin:18px 0 7px;page-break-after:avoid}.meta{color:#52677a}.cards{width:100%;border-collapse:separate;border-spacing:4px}.card{border:1px solid #bae6fd;background:#f0f9ff;padding:7px;text-align:center}.card strong{display:block;font-size:16px;color:#0369a1}table{width:100%;border-collapse:collapse;margin-bottom:9px}tr{page-break-inside:avoid}th,td{border:1px solid #cbd5e1;padding:5px;vertical-align:top}th{background:#eaf5fb;text-align:left;color:#164e63}.notice{background:#f8fafc;border-left:4px solid #38bdf8;padding:8px;margin:8px 0}.empty{color:#64748b;font-style:italic}footer{position:fixed;bottom:-11mm;left:0;right:0;border-top:1px solid #d8e1e8;padding-top:4px;color:#64748b;font-size:8px}';
+
+        return '<!doctype html><html lang="fr"><head><meta charset="UTF-8"><style>'.$css.'</style></head><body><header><h1>'.$this->escape($title).'</h1><div class="meta">'.$this->escape($organization).' · '.$this->escape($this->domainLabel((string) ($data['reportType'] ?? 'MANAGEMENT_COMMITTEE'))).'<br>Modèle v'.$this->escape((string) ($data['templateVersion'] ?? '1')).' · Généré le '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''))).' par '.$this->escape((string) ($data['generatedBy'] ?? 'RiskPilot')).' · Modèle approuvé par '.$this->escape((string) ($data['approvedBy'] ?? 'Non renseigné')).'</div></header>'.
+            '<h2>1. Synthèse exécutive</h2><table class="cards"><tr>'.$cardHtml.'</tr></table><div class="notice">Ce rapport fige les données visibles au moment de sa génération. Les éléments ci-dessous sont limités aux blocs approuvés dans le modèle.</div>'.$sections.
+            '<h2>5. Décisions et suites</h2><p>Les arbitrages, décisions et recommandations doivent être consignés dans le dossier de gouvernance associé. Ce rapport fournit les priorités factuelles et ne remplace pas la validation humaine du comité.</p>'.
+            '<h2>6. Méthodologie et limites</h2><p>Les dix premiers éléments sont classés par criticité pour les risques et par échéance pour les actions. Les scores de conformité proviennent des dernières évaluations visibles. Les données restent soumises à la qualité et à l’exhaustivité des enregistrements sources.</p>'.
+            '<footer>RiskPilot · Rapport de décision gouverné · '.$this->escape($organization).'</footer></body></html>';
+    }
+
+    /** @param list<string> $headers */
+    private function decisionTable(array $headers, string $rows, string $empty): string
+    {
+        $head = implode('', array_map(fn (string $header): string => '<th>'.$this->escape($header).'</th>', $headers));
+
+        return '<table><thead><tr>'.$head.'</tr></thead><tbody>'.('' === $rows ? '<tr><td colspan="'.count($headers).'" class="empty">'.$this->escape($empty).'</td></tr>' : $rows).'</tbody></table>';
+    }
+
     /** @param array<string, int> $items */
     private function rankingTable(array $items, string $heading): string
     {
@@ -124,7 +183,7 @@ final class PdfReportRenderer
     private function actionLabel(string $value): string
     {
         return match (strtoupper($value)) {
-            'CREATE' => 'Création', 'UPDATE' => 'Modification', 'DELETE' => 'Suppression', default => $this->domainLabel($value)
+            'CREATE' => 'Création', 'UPDATE' => 'Modification', 'DELETE' => 'Suppression', default => $this->domainLabel($value),
         };
     }
 
