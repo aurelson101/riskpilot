@@ -298,6 +298,7 @@ export function OperationsPage() {
                           % · cible {progress.target}%
                         </Typography>
                         <LinearProgress
+                          aria-label={`Progression ${item.title} : ${progress.current}%`}
                           variant="determinate"
                           value={progress.current}
                           color={progress.atRisk ? "warning" : "primary"}

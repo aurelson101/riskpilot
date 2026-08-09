@@ -97,6 +97,7 @@ export function Nis2Page() {
       <LinearProgress
         variant="determinate"
         value={current?.globalScore ?? 0}
+        aria-label="Conformité globale NIS2"
         sx={{ height: 12, borderRadius: 6 }}
       />
       {!current ? (

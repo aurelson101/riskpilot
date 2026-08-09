@@ -188,6 +188,7 @@ test("le copilote conformité explique sa configuration sans modifier les donné
     .first()
     .click();
   await page
+    .locator("main")
     .getByRole("button", { name: /Copilote IA|AI copilot/ })
     .first()
     .click();

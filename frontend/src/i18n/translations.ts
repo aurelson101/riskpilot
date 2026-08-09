@@ -1204,6 +1204,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Impossible de charger la configuration IA.", "Unable to load AI settings."],
   ["Copilote IA", "AI copilot"],
+  ["Conformité globale NIS2", "Overall NIS2 compliance"],
   ["Copilote conformité ·", "Compliance copilot ·"],
   ["Chargement du contexte IA", "Loading AI context"],
   [
