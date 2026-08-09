@@ -64,8 +64,11 @@ export function RiskMatrixPage() {
           </Typography>
         </Stack>
         <FormControl size="small" sx={{ minWidth: 210 }}>
-          <InputLabel>Type d’évaluation</InputLabel>
+          <InputLabel id="risk-matrix-score-type-label">
+            Type d’évaluation
+          </InputLabel>
           <Select
+            labelId="risk-matrix-score-type-label"
             label="Type d’évaluation"
             value={scoreType}
             onChange={(event) => {
