@@ -136,6 +136,14 @@ Les routes sont `GET /api/compliance-results/{id}/copilot/context` pour
 prévisualiser les données et `POST /api/compliance-results/{id}/copilot` pour
 poser une question avec consentement.
 
+Le bouton flottant ouvre également un copilote global. Une fois le fournisseur
+activé, `POST /api/copilot` répond aux questions de gouvernance et guide les
+parcours SMSI, risques, tiers, EBIOS RM, NIS2, RGPD et ISO 27001. Deux assistants
+structurés permettent de préparer un risque tiers ou un document ISMS : ils
+réutilisent les API métier, présentent un aperçu, respectent le RBAC et ne
+créent qu'un brouillon après confirmation humaine explicite. Le dialogue est
+chargé à la demande afin de ne pas alourdir le démarrage de l'application.
+
 ## Documents ISMS
 
 Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.

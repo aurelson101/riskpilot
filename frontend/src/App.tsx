@@ -77,6 +77,11 @@ import {
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
 );
+const GlobalCopilotDialog = lazy(() =>
+  import("./components/GlobalCopilotDialog").then((module) => ({
+    default: module.GlobalCopilotDialog,
+  })),
+);
 const LOCALE_STORAGE_KEY = "riskpilot.interfaceLocale";
 
 function initialInterfaceLocale(): "fr" | "en" {
@@ -257,6 +262,7 @@ const adminRoles = ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"] as const;
 function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const location = useLocation();
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -982,7 +988,7 @@ function Layout() {
         <Fab
           color="primary"
           aria-label="Ouvrir le copilote IA"
-          onClick={() => navigate("/compliance#compliance-results")}
+          onClick={() => setCopilotOpen(true)}
           sx={{
             position: "fixed",
             right: { xs: 16, sm: 24 },
@@ -993,6 +999,9 @@ function Layout() {
           <SmartToyOutlined />
         </Fab>
       </Tooltip>
+      {copilotOpen && (
+        <GlobalCopilotDialog open onClose={() => setCopilotOpen(false)} />
+      )}
     </Box>
   );
 }

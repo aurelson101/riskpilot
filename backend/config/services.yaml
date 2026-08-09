@@ -80,5 +80,9 @@ services:
         arguments:
             $aiCopilotLimiter: '@limiter.ai_copilot'
 
+    App\Controller\GlobalCopilotController:
+        arguments:
+            $aiCopilotLimiter: '@limiter.ai_copilot'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

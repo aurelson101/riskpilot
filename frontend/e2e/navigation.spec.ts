@@ -247,6 +247,101 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
   });
   await expect(launcher).toBeVisible();
   await launcher.click();
-  await expect(page).toHaveURL(/\/compliance#compliance-results$/);
-  await expect(page.locator("#compliance-results")).toBeVisible();
+  await expect(
+    page.getByRole("dialog", {
+      name: /Copilote IA RiskPilot|RiskPilot AI copilot/,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", {
+      name: /Risque tiers guidé|Guided third-party risk/,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: /Document ISMS guidé|Guided ISMS document/ }),
+  ).toBeVisible();
+});
+
+test("le copilote crée des brouillons risque et ISMS après confirmation", async ({
+  page,
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", {
+    data: {
+      email: "admin@riskpilot.local",
+      password: "ChangeMe123!",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page
+    .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const unique = Date.now();
+
+  await dialog
+    .getByRole("tab", { name: /Risque tiers guidé|Guided third-party risk/ })
+    .click();
+  await dialog
+    .getByRole("textbox", {
+      name: /Quel événement redouté|Which feared event/,
+    })
+    .fill(`Risque tiers guidé ${unique}`);
+  for (const name of [
+    /Périmètre concerné|Affected scope/,
+    /Actif ou service dépendant|Dependent asset or service/,
+    /Menace principale|Main threat/,
+    /Responsable du risque|Risk owner/,
+  ]) {
+    await dialog.getByRole("combobox", { name }).click();
+    await page
+      .getByRole("option")
+      .filter({ hasNotText: /Créez|Create|Aucun|No owner/ })
+      .first()
+      .click();
+  }
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’ai relu le brouillon|I reviewed the draft/,
+    })
+    .check();
+  await dialog
+    .getByRole("button", {
+      name: /Confirmer et créer le risque|Confirm and create risk/,
+    })
+    .click();
+  await expect(
+    dialog.getByText(
+      new RegExp(`Risque créé.*${unique}|Risk created.*${unique}`),
+    ),
+  ).toBeVisible();
+
+  await dialog
+    .getByRole("tab", { name: /Document ISMS guidé|Guided ISMS document/ })
+    .click();
+  await dialog
+    .getByRole("textbox", { name: /Titre du document|Document title/ })
+    .fill(`Document ISMS guidé ${unique}`);
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’ai relu le brouillon|I reviewed the draft/,
+    })
+    .check();
+  await dialog
+    .getByRole("button", {
+      name: /Confirmer et créer le document ISMS|Confirm and create ISMS document/,
+    })
+    .click();
+  await expect(
+    dialog.getByText(
+      new RegExp(
+        `Document ISMS créé.*${unique}|ISMS document created.*${unique}`,
+      ),
+    ),
+  ).toBeVisible();
 });
