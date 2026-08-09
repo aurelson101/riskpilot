@@ -28,7 +28,16 @@ import {
   TextField,
 } from "@mui/material";
 import { Add } from "@mui/icons-material";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 import { api } from "../api/client";
 import type {
   ComplianceAssessment,
@@ -147,6 +156,31 @@ export function CompliancePage() {
       client.invalidateQueries({ queryKey: ["compliance-assessments"] });
     },
   });
+  const resultSummary = useMemo(() => {
+    const items = results.data ?? [];
+    const assessed = items.filter(
+      (item) => item.complianceStatus !== "NOT_ASSESSED",
+    );
+    const average = assessed.length
+      ? assessed.reduce((sum, item) => sum + item.maturityLevel, 0) /
+        assessed.length
+      : null;
+
+    return {
+      radar: items.map((item) => ({
+        requirement: item.requirement.reference,
+        title: item.requirement.title,
+        maturity: item.maturityLevel,
+        fullMark: 5,
+      })),
+      average,
+      weak: assessed.filter((item) => item.maturityLevel <= 2),
+      strong: assessed.filter((item) => item.maturityLevel >= 4),
+      remaining: items.filter(
+        (item) => item.complianceStatus === "NOT_ASSESSED",
+      ),
+    };
+  }, [results.data]);
   if (frameworks.isLoading || assessments.isLoading)
     return <CircularProgress aria-label="Chargement de la page" />;
   if (frameworks.isError || assessments.isError)
@@ -304,6 +338,104 @@ export function CompliancePage() {
                   <Typography variant="h6" fontWeight={750}>
                     Résultats par exigence
                   </Typography>
+                  {resultSummary.radar.length > 0 && (
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          justifyContent="space-between"
+                          spacing={2}
+                        >
+                          <Box>
+                            <Typography variant="h6" fontWeight={750}>
+                              Toile d’araignée des résultats · 0 à 5
+                            </Typography>
+                            <Typography color="text.secondary">
+                              Les creux indiquent les exigences à renforcer ;
+                              les sommets mettent en évidence les points forts.
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: { md: "right" } }}>
+                            <Typography variant="h4" fontWeight={800}>
+                              {resultSummary.average === null
+                                ? "—"
+                                : `${resultSummary.average.toFixed(1)} / 5`}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {resultSummary.remaining.length} à terminer
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        <Box
+                          role="img"
+                          aria-label="Toile d’araignée des résultats de conformité, échelle de 0 à 5"
+                          sx={{ height: { xs: 340, md: 430 }, mt: 2 }}
+                        >
+                          <ResponsiveContainer>
+                            <RadarChart
+                              data={resultSummary.radar}
+                              outerRadius="70%"
+                            >
+                              <PolarGrid />
+                              <PolarAngleAxis
+                                dataKey="requirement"
+                                tick={{ fontSize: 11 }}
+                              />
+                              <PolarRadiusAxis domain={[0, 5]} tickCount={6} />
+                              <Tooltip
+                                formatter={(value) => [
+                                  `${value} / 5`,
+                                  "Maturité",
+                                ]}
+                                labelFormatter={(reference) => {
+                                  const item = resultSummary.radar.find(
+                                    (entry) => entry.requirement === reference,
+                                  );
+                                  return item
+                                    ? `${reference} · ${item.title}`
+                                    : reference;
+                                }}
+                              />
+                              <Radar
+                                name="Maturité"
+                                dataKey="maturity"
+                                stroke="#1769e0"
+                                fill="#1769e0"
+                                fillOpacity={0.32}
+                              />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </Box>
+                        <Stack spacing={1}>
+                          <Alert severity="error">
+                            Points faibles (0–2) : {resultSummary.weak.length}
+                            {resultSummary.weak.length > 0 &&
+                              ` · ${resultSummary.weak
+                                .map((item) => item.requirement.reference)
+                                .join(", ")}`}
+                          </Alert>
+                          <Alert severity="success">
+                            Points forts (4–5) : {resultSummary.strong.length}
+                            {resultSummary.strong.length > 0 &&
+                              ` · ${resultSummary.strong
+                                .map((item) => item.requirement.reference)
+                                .join(", ")}`}
+                          </Alert>
+                          {resultSummary.remaining.length > 0 && (
+                            <Alert severity="warning">
+                              À terminer : {resultSummary.remaining.length}
+                              {` · ${resultSummary.remaining
+                                .map((item) => item.requirement.reference)
+                                .join(", ")}`}
+                            </Alert>
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  )}
                   {results.data?.map((result) => (
                     <Box
                       key={result.id}

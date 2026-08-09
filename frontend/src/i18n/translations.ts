@@ -1153,6 +1153,19 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Rapport généré :", "Report generated:"],
   ["Télécharger JSON", "Download JSON"],
   ["Télécharger PDF", "Download PDF"],
+  ["Toile d’araignée des résultats · 0 à 5", "Results radar chart · 0 to 5"],
+  [
+    "Les creux indiquent les exigences à renforcer ; les sommets mettent en évidence les points forts.",
+    "Low points identify requirements to strengthen; peaks highlight strengths.",
+  ],
+  ["à terminer", "remaining"],
+  [
+    "Toile d’araignée des résultats de conformité, échelle de 0 à 5",
+    "Compliance results radar chart, scale from 0 to 5",
+  ],
+  ["Points faibles (0–2) :", "Weak points (0–2):"],
+  ["Points forts (4–5) :", "Strong points (4–5):"],
+  ["À terminer :", "Remaining:"],
   ["Analyses et capitalisation", "Analyses and knowledge reuse"],
   [
     "Analyses versionnées, méthodes guidées, preuves, simulations, roadmaps et qualité",
