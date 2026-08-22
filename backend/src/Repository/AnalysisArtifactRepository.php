@@ -27,6 +27,6 @@ use Doctrine\Persistence\ManagerRegistry;
             $c['kind'] = $kind;
         }
 
-return $this->findBy($c, ['createdAt' => 'DESC'], min(100, max(1, $limit)), (max(1, $page) - 1) * $limit);
+        return $this->findBy($c, ['createdAt' => 'DESC'], min(100, max(1, $limit)), (max(1, $page) - 1) * $limit);
     }
 }

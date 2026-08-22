@@ -24,6 +24,6 @@ final class RiskAnalysisTest extends TestCase
         self::assertSame([1], $a->getBaseline()['scenarioIds']);
         $e = new AnalysisArtifact($o, $a, $author, 'EVIDENCE', 'Audit evidence', ['sha256' => 'abc'], 'evidence-1');
         $e->approve($approver);
-        self::assertSame('APPROVED',$e->getStatus());
+        self::assertSame('APPROVED', $e->getStatus());
     }
 }
