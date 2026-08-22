@@ -98,8 +98,15 @@ final class AnnualReportControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
         $pdf = (string) $client->getResponse()->getContent();
+        $pdfHash = hash('sha256', $pdf);
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertGreaterThan(10_000, strlen($pdf));
         self::assertGreaterThanOrEqual(2, substr_count($pdf, '/Type /Page'));
+        self::assertSame($pdfHash, $client->getResponse()->headers->get('X-RiskPilot-Document-SHA256'));
+        self::assertSame('"'.$pdfHash.'"', $client->getResponse()->headers->get('ETag'));
+        self::assertSame((string) strlen($pdf), $client->getResponse()->headers->get('Content-Length'));
+        $client->request('GET', '/api/annual-reports/saved/'.$saved['id'].'/export?format=pdf');
+        self::assertResponseIsSuccessful();
+        self::assertSame($pdf, (string) $client->getResponse()->getContent(), 'A frozen annual snapshot must produce a byte-stable PDF.');
     }
 }

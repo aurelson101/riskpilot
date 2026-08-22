@@ -23,7 +23,7 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $tool->dropSchema($manager->getMetadataFactory()->getAllMetadata());
         $tool->createSchema($manager->getMetadataFactory()->getAllMetadata());
         $organization = new Organization('Primary');
-        $managerUser = new User('manager@example.test', 'Risk', 'Manager', $organization, [User::ROLE_RISK_MANAGER]);
+        $managerUser = (new User('manager@example.test', 'Risk', 'Manager', $organization, [User::ROLE_RISK_MANAGER]))->setLocale('en');
         $reader = new User('reader@example.test', 'View', 'Reader', $organization, [User::ROLE_VIEWER]);
         $manager->persist($organization);
         $manager->persist($managerUser);
@@ -63,12 +63,19 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         self::assertArrayHasKey('snapshot', $run['details']);
         self::assertSame('Primary', $run['details']['organization']);
         self::assertSame('Risk Manager', $run['details']['generatedBy']);
+        self::assertSame('en', $run['details']['locale']);
         $client->request('GET', '/api/decision/reports/'.$run['id'].'/export?format=pdf');
         self::assertResponseIsSuccessful();
         self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
+        self::assertSame('en', $client->getResponse()->headers->get('Content-Language'));
         $pdf = (string) $client->getResponse()->getContent();
+        $pdfHash = hash('sha256', $pdf);
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertGreaterThan(20_000, strlen($pdf));
+        self::assertSame($pdfHash, $client->getResponse()->headers->get('X-RiskPilot-Document-SHA256'));
+        $client->request('GET', '/api/decision/reports/'.$run['id'].'/export?format=pdf');
+        self::assertResponseIsSuccessful();
+        self::assertSame($pdf, (string) $client->getResponse()->getContent(), 'A governed report run must produce a byte-stable PDF.');
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($reader));
         $client->request('GET', '/api/decision/views/'.$privateView['id'].'/snapshot');

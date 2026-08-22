@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { PrintOutlined } from "@mui/icons-material";
+import { DownloadOutlined } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -136,6 +136,17 @@ export function ExecutiveReportPage() {
     ["Échéances à 30 jours", data.summary.dueActions],
     ["Conformité", `${data.summary.globalCompliance}%`],
   ];
+  const downloadPdf = async () => {
+    const response = await api.get<Blob>("/dashboard/export", {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "riskpilot-executive-report.pdf";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   return (
     <Stack className="executive-report" spacing={3}>
       <Stack
@@ -163,10 +174,10 @@ export function ExecutiveReportPage() {
         <Button
           className="no-print"
           variant="contained"
-          startIcon={<PrintOutlined />}
-          onClick={() => window.print()}
+          startIcon={<DownloadOutlined />}
+          onClick={() => void downloadPdf()}
         >
-          Imprimer / Enregistrer en PDF
+          Télécharger le rapport PDF gouverné
         </Button>
       </Stack>
       <Box

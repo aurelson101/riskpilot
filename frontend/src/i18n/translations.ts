@@ -610,6 +610,7 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Impossible d’ouvrir ce document.", "Unable to open this document."],
   ["Imprimer / Enregistrer en PDF", "Print / Save as PDF"],
+  ["Télécharger le rapport PDF gouverné", "Download governed PDF report"],
   ["Incidents et continuité", "Incidents and continuity"],
   ["Indicateur", "Indicator"],
   [

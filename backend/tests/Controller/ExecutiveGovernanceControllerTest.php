@@ -49,6 +49,13 @@ final class ExecutiveGovernanceControllerTest extends WebTestCase
         $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertCount(1, $payload['financialScenarios']);
         self::assertSame(0, $payload['risks']['total']);
+        $client->request('GET', '/api/dashboard/export');
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
+        $pdf = (string) $client->getResponse()->getContent();
+        self::assertStringStartsWith('%PDF-', $pdf);
+        self::assertGreaterThan(15_000, strlen($pdf));
+        self::assertSame(hash('sha256', $pdf), $client->getResponse()->headers->get('X-RiskPilot-Document-SHA256'));
     }
 
     public function testAuditorCanReadButCannotCreateGovernanceRecord(): void

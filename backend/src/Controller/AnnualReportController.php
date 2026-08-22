@@ -146,7 +146,7 @@ final readonly class AnnualReportController
         $details = [...$snapshot, 'version' => $version, 'generatedBy' => [
             'id' => $actor->getId(),
             'name' => trim($actor->getFirstName().' '.$actor->getLastName()),
-        ]];
+        ], 'locale' => $actor->getLocale()];
         $report = new OperationalRecord($actor->getOrganization(), 'ANNUAL_REPORT', sprintf('Rapport annuel %d — v%d', $year, $version), $details);
         $report->update($report->getTitle(), 'COMPLETED', $details, $actor, null);
         $this->entityManager->persist($report);
@@ -168,7 +168,9 @@ final readonly class AnnualReportController
         $details['organization'] ??= $record->getOrganization()->getName();
         $filename = sprintf('riskpilot-rapport-annuel-%d-v%d', (int) ($details['year'] ?? 0), (int) ($details['version'] ?? 1));
         if ('pdf' === $format) {
-            return new Response($this->pdf->renderAnnualReport($record->getTitle(), $details), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+            $locale = (string) ($details['locale'] ?? $actor->getLocale());
+
+            return $this->pdfResponse($this->pdf->renderAnnualReport($record->getTitle(), $details, $locale), $filename, $locale);
         }
         if ('json' !== $format) {
             return new JsonResponse(['code' => 'UNSUPPORTED_FORMAT', 'message' => 'Formats disponibles : PDF ou JSON.'], 400);
@@ -176,6 +178,22 @@ final readonly class AnnualReportController
         $payload = json_encode($details, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
         return new Response($payload, 200, ['Content-Type' => 'application/json; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="%s.json"', $filename), 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    private function pdfResponse(string $content, string $filename, string $locale): Response
+    {
+        $hash = hash('sha256', $content);
+
+        return new Response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename),
+            'Content-Length' => (string) strlen($content),
+            'Content-Language' => 'en' === $locale ? 'en' : 'fr',
+            'Digest' => 'sha-256='.base64_encode(hex2bin($hash)),
+            'ETag' => '"'.$hash.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-RiskPilot-Document-SHA256' => $hash,
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -216,7 +234,9 @@ final readonly class AnnualReportController
             'contributors' => $contributors,
             'activities' => $activities,
             'maturity' => $this->maturitySnapshot($year),
-            'methodology' => 'Classification exhaustive des changements consignés dans le journal d’audit du tenant sur la période. Les consultations sans modification ne sont pas comptabilisées.',
+            'methodology' => 'en' === $this->currentUser->get()->getLocale()
+                ? 'Exhaustive classification of tenant audit-log changes during the period. Read-only consultations are not counted.'
+                : 'Classification exhaustive des changements consignés dans le journal d’audit du tenant sur la période. Les consultations sans modification ne sont pas comptabilisées.',
         ];
     }
 

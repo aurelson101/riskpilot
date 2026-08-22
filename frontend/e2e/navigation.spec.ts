@@ -1,4 +1,24 @@
-import { expect, test } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
+
+async function authenticate(
+  page: Page,
+  request: APIRequestContext,
+  email: string,
+) {
+  const login = await request.post("/api/auth/login", {
+    data: { email, password: "ChangeMe123!" },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = (await login.json()) as { token: string };
+  await page.addInitScript((accessToken) => {
+    sessionStorage.setItem("riskpilot.accessToken", accessToken);
+  }, token);
+}
 
 test("un seul groupe reste ouvert entre Pilotage et NIS2", async ({
   page,
@@ -266,6 +286,23 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
   await expect(
     page.getByRole("tab", { name: /Document ISMS guidé|Guided ISMS document/ }),
   ).toBeVisible();
+});
+
+test("le rapport exécutif télécharge un PDF gouverné", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page, request, "admin@riskpilot.local");
+  await page.goto("/reports/executive");
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", {
+      name: /Télécharger le rapport PDF gouverné|Download governed PDF report/,
+    })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("riskpilot-executive-report.pdf");
+  expect(await download.failure()).toBeNull();
 });
 
 test("le copilote crée des brouillons risque, conformité et ISMS après confirmation", async ({

@@ -153,7 +153,7 @@ final readonly class DecisionWorkspaceController
         }
         $actor = $this->currentUser->get();
         $generatedAt = new \DateTimeImmutable();
-        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($template->getDetails()['version'] ?? '1'), 'reportType' => (string) ($template->getDetails()['reportType'] ?? 'MANAGEMENT_COMMITTEE'), 'approvedBy' => (string) ($template->getDetails()['approvedBy'] ?? ''), 'organization' => $actor->getOrganization()->getName(), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'generatedBy' => trim($actor->getFirstName().' '.$actor->getLastName()), 'blocks' => $template->getDetails()['blocks'] ?? [], 'snapshot' => $this->tenantSnapshot()];
+        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($template->getDetails()['version'] ?? '1'), 'reportType' => (string) ($template->getDetails()['reportType'] ?? 'MANAGEMENT_COMMITTEE'), 'approvedBy' => (string) ($template->getDetails()['approvedBy'] ?? ''), 'organization' => $actor->getOrganization()->getName(), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'generatedBy' => trim($actor->getFirstName().' '.$actor->getLastName()), 'locale' => $actor->getLocale(), 'blocks' => $template->getDetails()['blocks'] ?? [], 'snapshot' => $this->tenantSnapshot()];
         $run = new OperationalRecord($actor->getOrganization(), 'REPORT_RUN', $template->getTitle().' — '.$generatedAt->format('Y-m-d H:i'), $details);
         $run->update($run->getTitle(), 'COMPLETED', $details, $actor, null);
         $this->entityManager->persist($run);
@@ -174,13 +174,31 @@ final readonly class DecisionWorkspaceController
         $details['organization'] ??= $run->getOrganization()->getName();
         $details['generatedBy'] ??= null === $run->getOwner() ? 'RiskPilot' : trim($run->getOwner()->getFirstName().' '.$run->getOwner()->getLastName());
         if ('pdf' === $format) {
-            return new Response($this->pdf->renderDecisionReport($run->getTitle(), $details), 200, ['Content-Type' => 'application/pdf', 'Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.pdf"', $id), 'X-Content-Type-Options' => 'nosniff']);
+            $locale = (string) ($details['locale'] ?? $this->currentUser->get()->getLocale());
+
+            return $this->pdfResponse($this->pdf->renderDecisionReport($run->getTitle(), $details, $locale), sprintf('riskpilot-report-%d', $id), $locale);
         }
         if ('json' !== $format) {
             return $this->error('UNSUPPORTED_FORMAT', 'Formats disponibles : PDF ou JSON.', 400);
         }
 
         return new JsonResponse([...$this->serialize($run), 'details' => $details], 200, ['Content-Disposition' => sprintf('attachment; filename="riskpilot-report-%d.json"', $id)]);
+    }
+
+    private function pdfResponse(string $content, string $filename, string $locale): Response
+    {
+        $hash = hash('sha256', $content);
+
+        return new Response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => sprintf('attachment; filename="%s.pdf"', $filename),
+            'Content-Length' => (string) strlen($content),
+            'Content-Language' => 'en' === $locale ? 'en' : 'fr',
+            'Digest' => 'sha-256='.base64_encode(hex2bin($hash)),
+            'ETag' => '"'.$hash.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-RiskPilot-Document-SHA256' => $hash,
+        ]);
     }
 
     #[Route('/connectors/{id<\d+>}/reconcile', methods: ['POST'])]

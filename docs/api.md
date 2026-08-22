@@ -74,7 +74,8 @@ Les types disponibles sont `TASK`, `RESPONSIBILITY_RULE`, `COMPLIANCE_PROGRAM`, 
 - `GET /api/annual-reports/{year}` produit la vue annuelle courante depuis le journal d’audit du tenant ;
 - `GET|PUT /api/annual-reports/{year}/maturity` consulte ou met à jour l'évaluation annuelle de maturité cyber sur dix services, de 0 à 5 par pas de 0,5 ;
 - `POST /api/annual-reports/{year}/generate` crée une nouvelle version immuable (`ROLE_RISK_MANAGER` minimum) ;
-- `GET /api/annual-reports/saved/{id}/export?format=json|html` exporte un instantané reproductible, dont la version HTML est imprimable en PDF.
+- `GET /api/annual-reports/saved/{id}/export?format=json|pdf` exporte un instantané reproductible en JSON ou en PDF gouverné.
+- `GET /api/dashboard/export` génère le rapport exécutif gouverné au format PDF dans la langue du profil.
 
 La classification agrège les changements par mois, domaine, action et contributeur. Le journal complet des activités mutantes de la période est inclus, sans exposer les anciennes/nouvelles valeurs ni les données techniques du client.
 
@@ -93,7 +94,7 @@ pilotage opérationnel. Les traitements spécialisés sont exposés sous
 - `POST /api/decision/financial-scenarios/{id}/simulate` : simulation déterministe de 1 000 observations, percentiles, intervalle à 90 % et sensibilité, uniquement après approbation finance ;
 - `GET /api/decision/views/{id}/snapshot` : exécution d'une vue enregistrée personnelle ou partagée sans copie des données sources ;
 - `GET /api/decision/platform-vision` : consolidation multi-organisations réservée au super-administrateur ;
-- `POST /api/decision/reports/{id}/run` et `GET /api/decision/reports/{runId}/export?format=json|html` : instantané reproductible d'un modèle versionné et export JSON ou HTML imprimable en PDF ;
+- `POST /api/decision/reports/{id}/run` et `GET /api/decision/reports/{runId}/export?format=json|pdf` : instantané reproductible d'un modèle versionné et export JSON ou PDF gouverné ;
 - `POST /api/decision/connectors/{id}/reconcile` : rapprochement Jira ou ServiceNow idempotent, journalisé et exécutable en simulation ;
 - `GET /api/decision/tprm/portfolio` : segmentation légère, standard ou approfondie, cyberscores, réévaluations, échéances contractuelles, dépendances et plans de sortie.
 
@@ -210,7 +211,9 @@ Une mesure exige `value`, `measuredAt` au format ISO 8601 et `idempotencyKey`. U
 
 Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralisent les cellules susceptibles d’être interprétées comme des formules par un tableur et appliquent les mêmes contrôles JWT et tenant que les écrans.
 
-Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports contiennent les libellés français et les codes métier bruts afin de rester à la fois lisibles et exploitables. Les graphiques et styles ne faisant pas partie du format CSV, `/reports/executive` fournit le rapport visuel imprimable ou enregistrable en PDF depuis le navigateur.
+Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports CSV conservent les codes métier bruts afin de rester exploitables ; les PDF utilisent les libellés localisés du profil.
+
+Les exports PDF gouvernés (annuel, décision et exécutif) sont générés côté serveur. Ils indiquent leur classification, leur identifiant documentaire et exposent leur empreinte via `Digest`, `ETag` et `X-RiskPilot-Document-SHA256`. Un instantané annuel ou décisionnel inchangé produit un fichier PDF identique octet par octet.
 
 ## Résilience et continuité
 
