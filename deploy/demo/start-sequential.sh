@@ -31,14 +31,25 @@ until [ "$(docker inspect -f '{{.State.Status}}' riskpilot_demo-jwt-init-1 2>/de
 done
 [ "$(docker inspect -f '{{.State.ExitCode}}' riskpilot_demo-jwt-init-1)" = "0" ]
 
-$compose up -d --no-build --no-deps backend frontend
+$compose up -d --no-build --force-recreate --no-deps backend frontend
 wait_healthy riskpilot_demo-backend-1
 wait_healthy riskpilot_demo-frontend-1
 
-$compose up -d --no-build --no-deps nginx
+# Nginx résout les noms Docker au démarrage. Le recréer après le backend évite
+# qu'il conserve l'ancienne adresse du conteneur et serve temporairement des 502.
+$compose up -d --no-build --force-recreate --no-deps nginx
 $compose up -d --no-build --no-deps worker scheduler demo-reset-scheduler
 wait_healthy riskpilot_demo-worker-1
 wait_healthy riskpilot_demo-scheduler-1
 wait_healthy riskpilot_demo-demo-reset-scheduler-1
 
-curl -fsS http://127.0.0.1:18081/api/health >/dev/null
+attempts=0
+until curl -fsS http://127.0.0.1:18081/api/health >/dev/null; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 30 ]; then
+        $compose logs --tail 80 nginx backend || true
+        echo "RiskPilot API did not become reachable through Nginx" >&2
+        exit 1
+    fi
+    sleep 2
+done
