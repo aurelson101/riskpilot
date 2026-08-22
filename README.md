@@ -144,6 +144,14 @@ réutilisent les API métier, présentent un aperçu, respectent le RBAC et ne
 créent qu'un brouillon après confirmation humaine explicite. Le dialogue est
 chargé à la demande afin de ne pas alourdir le démarrage de l'application.
 
+Dans l'assistant risque, une demande en langage naturel peut être envoyée à
+`POST /api/copilot/risk-draft`. L'IA propose un titre, une description, un
+périmètre, un actif, une menace et une cotation 1 à 5 en sélectionnant
+exclusivement des identifiants du tenant. RiskPilot rejette toute relation
+étrangère ou inventée, affiche la justification et laisse tous les champs
+éditables. Le prompt est expurgé du journal d'audit et cet endpoint ne crée
+aucun risque : seule la confirmation distincte appelle `POST /api/risks`.
+
 ## Documents ISMS
 
 Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.

@@ -36,6 +36,21 @@ Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié 
 
 La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le rôle Risk Manager ou un rôle supérieur. Les relations vers un parent, un responsable, un périmètre ou un actif sont résolues exclusivement dans l’organisation courante.
 
+## Copilote IA et brouillon de risque
+
+- `GET /api/copilot/context` expose l'état et les capacités du copilote sans secret ;
+- `POST /api/copilot` répond à une question après consentement explicite ;
+- `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.
+
+La génération de risque exige `ROLE_RISK_MANAGER`, consomme le quota partagé du
+copilote et transmet uniquement la demande ainsi que les noms et identifiants
+des périmètres, actifs et menaces visibles dans le tenant. La réponse contient
+`title`, `description`, `scopeId`, `assetId`, `threatId`, `likelihood`, `impact`
+et `rationale`. Les relations et les notes sont revalidées côté serveur. Cette
+route n'écrit aucune entité (`automaticWrite: false`) ; l'interface affiche un
+brouillon modifiable, puis appelle séparément `POST /api/risks` après relecture
+et confirmation humaine. Le texte du prompt n'est pas conservé dans l'audit.
+
 ## Plans d’action et notifications
 
 - `GET|POST /api/actions` et `GET|PUT /api/actions/{id}` ;

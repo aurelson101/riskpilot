@@ -1346,9 +1346,20 @@ const pairs: Array<[fr: string, en: string]> = [
     "For example, ask: “Help me build my ISMS” or “What questions should I ask for a third-party risk?”",
   ],
   [
-    "Répondez aux questions ci-dessous. Le risque sera créé en brouillon avec un traitement « Réduire » et restera modifiable.",
-    "Answer the questions below. The risk will be created as an editable draft with the “Reduce” treatment.",
+    "Décrivez la situation : l’IA prépare les champs et rapproche la demande de vos périmètres, actifs et menaces. Relisez ensuite le brouillon avant de le créer avec le traitement « Réduire ».",
+    "Describe the situation: AI prepares the fields and matches the request with your scopes, assets and threats. Then review the draft before creating it with the “Reduce” treatment.",
   ],
+  ["Décrivez le risque à créer", "Describe the risk to create"],
+  [
+    "Ex. Notre prestataire de paie héberge des données personnelles. Une compromission pourrait interrompre les salaires et exposer les dossiers employés.",
+    "E.g. Our payroll provider hosts personal data. A compromise could disrupt payroll and expose employee records.",
+  ],
+  [
+    "J’autorise l’envoi de cette demande et des noms du référentiel au fournisseur IA configuré.",
+    "I authorize sending this request and catalog names to the configured AI provider.",
+  ],
+  ["Générer le brouillon avec l’IA", "Generate draft with AI"],
+  ["Justification IA", "AI rationale"],
   [
     "Ce parcours crée un premier document gouverné, pas un SMSI complet. Utilisez ensuite le chatbot pour construire périmètre, politiques, analyse de risques, SoA, indicateurs, audits et amélioration continue.",
     "This workflow creates an initial governed document, not a complete ISMS. Then use the chatbot to build the scope, policies, risk analysis, SoA, indicators, audits and continual improvement.",

@@ -70,4 +70,28 @@ final class AiCopilotClientTest extends TestCase
         self::assertSame('user', $body['contents'][0]['role']);
         self::assertSame('Help', $body['contents'][0]['parts'][0]['text']);
     }
+
+    public function testRiskDraftParsesAConstrainedStructuredResponse(): void
+    {
+        $http = new MockHttpClient(new MockResponse(json_encode(['output_text' => <<<'JSON'
+```json
+{"title":"Compromission du prestataire de paie","description":"Une compromission exposerait les dossiers employés et perturberait la paie.","scopeId":11,"assetId":22,"threatId":33,"likelihood":3,"impact":5,"rationale":"Impact élevé en raison des données personnelles ; vraisemblance à confirmer avec les contrôles du fournisseur."}
+```
+JSON], JSON_THROW_ON_ERROR), ['http_code' => 200]));
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new AiSettings(new Organization('Tenant'));
+        $settings->configure('OPENAI', 'https://api.openai.com/v1', 'gpt-test', 'MINIMAL', '', true);
+        $settings->setEncryptedApiKey($cipher->encrypt('provider-secret'));
+
+        $draft = (new AiCopilotClient($http, $cipher))->draftRisk($settings, 'Crée un risque pour notre prestataire de paie.', [
+            'scopes' => [['id' => 11, 'name' => 'Ressources humaines']],
+            'assets' => [['id' => 22, 'name' => 'Paie SaaS']],
+            'threats' => [['id' => 33, 'name' => 'Compromission fournisseur']],
+        ], 'fr', 'safety-user-1');
+
+        self::assertSame('Compromission du prestataire de paie', $draft['title']);
+        self::assertSame(11, $draft['scopeId']);
+        self::assertSame(15, $draft['likelihood'] * $draft['impact']);
+        self::assertStringContainsString('à confirmer', $draft['rationale']);
+    }
 }

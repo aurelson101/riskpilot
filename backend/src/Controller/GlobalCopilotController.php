@@ -7,11 +7,16 @@ namespace App\Controller;
 use App\Application\AiCopilotClient;
 use App\Application\CurrentUser;
 use App\Entity\AiSettings;
+use App\Entity\User;
 use App\Repository\AiSettingsRepository;
+use App\Repository\AssetRepository;
+use App\Repository\ScopeRepository;
+use App\Repository\ThreatRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/copilot')]
 final readonly class GlobalCopilotController
@@ -21,7 +26,55 @@ final readonly class GlobalCopilotController
         private AiSettingsRepository $settings,
         private AiCopilotClient $client,
         private RateLimiterFactory $aiCopilotLimiter,
+        private ScopeRepository $scopes,
+        private AssetRepository $assets,
+        private ThreatRepository $threats,
     ) {
+    }
+
+    #[Route('/risk-draft', methods: ['POST'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function riskDraft(Request $request): JsonResponse
+    {
+        $actor = $this->currentUser->get();
+        $settings = $this->findSettings();
+        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
+            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        }
+        if ('CUSTOM' === $settings->getProvider()) {
+            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
+        }
+        $input = $request->toArray();
+        $prompt = trim((string) ($input['prompt'] ?? ''));
+        if (true !== ($input['consent'] ?? false) || mb_strlen($prompt) < 10 || mb_strlen($prompt) > 2000) {
+            return $this->error('INVALID_REQUEST', 'Le consentement et une demande de 10 à 2 000 caractères sont obligatoires.', 422);
+        }
+        $catalog = [
+            'scopes' => $this->catalog($this->scopes->findVisibleTo($actor)),
+            'assets' => $this->catalog($this->assets->findVisibleTo($actor)),
+            'threats' => $this->catalog($this->threats->findVisibleTo($actor)),
+        ];
+        if ([] === $catalog['scopes'] || [] === $catalog['assets'] || [] === $catalog['threats']) {
+            return $this->error('RISK_CATALOG_INCOMPLETE', 'Créez au moins un périmètre, un actif et une menace avant de générer un risque.', 422);
+        }
+        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
+        if (!$limit->isAccepted()) {
+            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        }
+        try {
+            $draft = $this->client->draftRisk($settings, $prompt, $catalog, $actor->getLocale(), hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())));
+        } catch (\Throwable) {
+            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire un brouillon de risque valide.', 502);
+        }
+        if (!$this->catalogContains($catalog['scopes'], $draft['scopeId']) || !$this->catalogContains($catalog['assets'], $draft['assetId']) || !$this->catalogContains($catalog['threats'], $draft['threatId'])) {
+            return $this->error('AI_DRAFT_INVALID_RELATION', 'Le fournisseur IA a proposé une relation qui ne fait pas partie de votre organisation.', 502);
+        }
+        $request->attributes->set('_audit_after', [[
+            'provider' => $settings->getProvider(), 'model' => $settings->getModel(), 'dataPolicy' => $settings->getDataPolicy(),
+            'requestHash' => hash('sha256', $prompt), 'workflow' => 'RISK_DRAFT', 'automaticWrite' => false,
+        ]]);
+
+        return new JsonResponse(['draft' => $draft, 'automaticWrite' => false, 'notice' => 'Brouillon généré : relisez et confirmez avant création.']);
     }
 
     #[Route('/context', methods: ['GET'])]
@@ -124,5 +177,19 @@ final readonly class GlobalCopilotController
     private function error(string $code, string $message, int $status): JsonResponse
     {
         return new JsonResponse(['code' => $code, 'message' => $message], $status);
+    }
+
+    /** @param list<object> $entities
+     * @return list<array{id: int, name: string}>
+     */
+    private function catalog(array $entities): array
+    {
+        return array_map(static fn (object $entity): array => ['id' => (int) $entity->getId(), 'name' => mb_substr($entity->getName(), 0, 180)], array_slice($entities, 0, 200));
+    }
+
+    /** @param list<array{id: int, name: string}> $catalog */
+    private function catalogContains(array $catalog, int $id): bool
+    {
+        return in_array($id, array_column($catalog, 'id'), true);
     }
 }

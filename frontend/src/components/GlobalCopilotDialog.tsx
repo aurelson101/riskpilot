@@ -34,6 +34,16 @@ type Context = {
   notice: string;
 };
 type Option = { id: number; name: string };
+type RiskDraft = {
+  title: string;
+  description: string;
+  scopeId: number;
+  assetId: number;
+  threatId: number;
+  likelihood: number;
+  impact: number;
+  rationale: string;
+};
 
 function errorMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -54,6 +64,9 @@ export function GlobalCopilotDialog({
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
   const [consent, setConsent] = useState(false);
+  const [riskRequest, setRiskRequest] = useState("");
+  const [riskConsent, setRiskConsent] = useState(false);
+  const [riskRationale, setRiskRationale] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [success, setSuccess] = useState<{
     label: string;
@@ -155,6 +168,30 @@ export function GlobalCopilotDialog({
       setConfirmed(false);
     },
   });
+  const generateRisk = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{ draft: RiskDraft }>("/copilot/risk-draft", {
+          prompt: riskRequest,
+          consent: riskConsent,
+        })
+      ).data,
+    onSuccess: ({ draft }) => {
+      setRisk((current) => ({
+        ...current,
+        title: draft.title,
+        description: draft.description,
+        scopeId: String(draft.scopeId),
+        assetId: String(draft.assetId),
+        threatId: String(draft.threatId),
+        likelihood: draft.likelihood,
+        impact: draft.impact,
+      }));
+      setRiskRationale(draft.rationale);
+      setRiskConsent(false);
+      setConfirmed(false);
+    },
+  });
   const createIsms = useMutation({
     mutationFn: async () =>
       (
@@ -200,8 +237,10 @@ export function GlobalCopilotDialog({
     risk.threatId &&
     risk.riskOwnerId,
   );
-  const pending = createRisk.isPending || createIsms.isPending;
-  const failure = chat.error || createRisk.error || createIsms.error;
+  const pending =
+    generateRisk.isPending || createRisk.isPending || createIsms.isPending;
+  const failure =
+    chat.error || generateRisk.error || createRisk.error || createIsms.error;
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
@@ -320,9 +359,47 @@ export function GlobalCopilotDialog({
                 </Alert>
               )}
               <Alert severity="info">
-                Répondez aux questions ci-dessous. Le risque sera créé en
-                brouillon avec un traitement « Réduire » et restera modifiable.
+                Décrivez la situation : l’IA prépare les champs et rapproche la
+                demande de vos périmètres, actifs et menaces. Relisez ensuite le
+                brouillon avant de le créer avec le traitement « Réduire ».
               </Alert>
+              <TextField
+                label="Décrivez le risque à créer"
+                placeholder="Ex. Notre prestataire de paie héberge des données personnelles. Une compromission pourrait interrompre les salaires et exposer les dossiers employés."
+                multiline
+                minRows={3}
+                value={riskRequest}
+                inputProps={{ maxLength: 2000 }}
+                onChange={(event) => setRiskRequest(event.target.value)}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={riskConsent}
+                    onChange={(event) => setRiskConsent(event.target.checked)}
+                  />
+                }
+                label="J’autorise l’envoi de cette demande et des noms du référentiel au fournisseur IA configuré."
+              />
+              <Button
+                variant="outlined"
+                disabled={
+                  !canCreateRisk ||
+                  !context.data?.enabled ||
+                  !riskConsent ||
+                  riskRequest.trim().length < 10 ||
+                  pending
+                }
+                onClick={() => generateRisk.mutate()}
+              >
+                Générer le brouillon avec l’IA
+              </Button>
+              {riskRationale && (
+                <Alert severity="warning">
+                  <Typography fontWeight={600}>Justification IA</Typography>
+                  {riskRationale}
+                </Alert>
+              )}
               <TextField
                 label="Quel événement redouté souhaitez-vous traiter ?"
                 value={risk.title}
