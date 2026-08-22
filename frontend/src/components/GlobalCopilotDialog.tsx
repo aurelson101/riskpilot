@@ -44,6 +44,28 @@ type RiskDraft = {
   impact: number;
   rationale: string;
 };
+type ComplianceOption = {
+  id: number;
+  label: string;
+  status: string;
+  requirementId: number;
+  frameworkId: number;
+};
+type ComplianceActionDraft = {
+  title: string;
+  description: string;
+  complianceResultId: number;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  actionType:
+    | "TECHNICAL"
+    | "ORGANIZATIONAL"
+    | "HUMAN"
+    | "PHYSICAL"
+    | "CONTRACTUAL"
+    | "OTHER";
+  dueInDays: number;
+  rationale: string;
+};
 
 function errorMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -60,13 +82,18 @@ export function GlobalCopilotDialog({
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"chat" | "risk" | "isms">("chat");
+  const [tab, setTab] = useState<"chat" | "risk" | "compliance" | "isms">(
+    "chat",
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
   const [consent, setConsent] = useState(false);
   const [riskRequest, setRiskRequest] = useState("");
   const [riskConsent, setRiskConsent] = useState(false);
   const [riskRationale, setRiskRationale] = useState("");
+  const [complianceRequest, setComplianceRequest] = useState("");
+  const [complianceConsent, setComplianceConsent] = useState(false);
+  const [complianceRationale, setComplianceRationale] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [success, setSuccess] = useState<{
     label: string;
@@ -87,6 +114,15 @@ export function GlobalCopilotDialog({
     category: "Gouvernance",
     content:
       "# Objet\n\nDéfinir le périmètre et les objectifs du SMSI.\n\n# Gouvernance\n\nRôles, responsabilités et instances de décision.\n\n# Gestion des risques\n\nMéthode, critères d’acceptation et plan de traitement.\n\n# Amélioration continue\n\nIndicateurs, audits, revues et actions correctives.",
+  });
+  const [complianceAction, setComplianceAction] = useState({
+    title: "",
+    description: "",
+    complianceResultId: "",
+    ownerId: user?.id ? String(user.id) : "",
+    priority: "MEDIUM",
+    actionType: "ORGANIZATIONAL",
+    dueDate: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
   });
   const canCreateRisk = user?.roles.some((role) =>
     ["ROLE_RISK_MANAGER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
@@ -111,9 +147,22 @@ export function GlobalCopilotDialog({
     enabled: open && tab === "risk" && Boolean(canCreateRisk),
     queryFn: async () => (await api.get<Threat[]>("/threats")).data,
   });
+  const complianceCatalog = useQuery({
+    queryKey: ["global-copilot-compliance-catalog"],
+    enabled: open && tab === "compliance" && Boolean(canCreateRisk),
+    queryFn: async () =>
+      (
+        await api.get<{ items: ComplianceOption[] }>(
+          "/copilot/compliance-catalog",
+        )
+      ).data.items,
+  });
   const users = useQuery({
     queryKey: ["users"],
-    enabled: open && tab === "risk" && Boolean(canCreateRisk),
+    enabled:
+      open &&
+      (tab === "risk" || tab === "compliance") &&
+      Boolean(canCreateRisk),
     queryFn: async () => (await api.get<User[]>("/users")).data,
   });
   const chat = useMutation({
@@ -192,6 +241,77 @@ export function GlobalCopilotDialog({
       setConfirmed(false);
     },
   });
+  const generateComplianceAction = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{ draft: ComplianceActionDraft }>(
+          "/copilot/compliance-action-draft",
+          { prompt: complianceRequest, consent: complianceConsent },
+        )
+      ).data,
+    onSuccess: ({ draft }) => {
+      const dueDate = new Date(Date.now() + draft.dueInDays * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      setComplianceAction((current) => ({
+        ...current,
+        title: draft.title,
+        description: draft.description,
+        complianceResultId: String(draft.complianceResultId),
+        priority: draft.priority,
+        actionType: draft.actionType,
+        dueDate,
+      }));
+      setComplianceRationale(draft.rationale);
+      setComplianceConsent(false);
+      setConfirmed(false);
+    },
+  });
+  const createComplianceAction = useMutation({
+    mutationFn: async () => {
+      const source = complianceCatalog.data?.find(
+        (item) => item.id === Number(complianceAction.complianceResultId),
+      );
+      if (!source) throw new Error("Compliance source is unavailable.");
+
+      return (
+        await api.post<{ id: number; title: string }>("/actions", {
+          title: complianceAction.title,
+          description: complianceAction.description || null,
+          relatedRiskId: null,
+          relatedControlId: null,
+          ownerId: Number(complianceAction.ownerId),
+          priority: complianceAction.priority,
+          status: "OPEN",
+          startDate: new Date().toISOString().slice(0, 10),
+          dueDate: complianceAction.dueDate,
+          completionDate: null,
+          progress: 0,
+          estimatedCost: null,
+          estimatedEffortDays: null,
+          actualCost: null,
+          expectedRiskReduction: null,
+          evidence: [],
+          ticketNumber: null,
+          ticketUrl: null,
+          origin: "NON_CONFORMITY",
+          actionType: complianceAction.actionType,
+          frameworkIds: [source.frameworkId],
+          requirementIds: [source.requirementId],
+          customFields: {},
+          nonConformities: [{ type: "COMPLIANCE_RESULT", id: source.id }],
+        })
+      ).data;
+    },
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ["actions"] });
+      setSuccess({
+        label: `Action conformité créée : ${created.title}`,
+        href: "/actions",
+      });
+      setConfirmed(false);
+    },
+  });
   const createIsms = useMutation({
     mutationFn: async () =>
       (
@@ -237,10 +357,26 @@ export function GlobalCopilotDialog({
     risk.threatId &&
     risk.riskOwnerId,
   );
+  const complianceActionReady = Boolean(
+    complianceAction.title.trim() &&
+    complianceAction.description.trim() &&
+    complianceAction.complianceResultId &&
+    complianceAction.ownerId &&
+    complianceAction.dueDate,
+  );
   const pending =
-    generateRisk.isPending || createRisk.isPending || createIsms.isPending;
+    generateRisk.isPending ||
+    createRisk.isPending ||
+    generateComplianceAction.isPending ||
+    createComplianceAction.isPending ||
+    createIsms.isPending;
   const failure =
-    chat.error || generateRisk.error || createRisk.error || createIsms.error;
+    chat.error ||
+    generateRisk.error ||
+    createRisk.error ||
+    generateComplianceAction.error ||
+    createComplianceAction.error ||
+    createIsms.error;
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
@@ -263,9 +399,18 @@ export function GlobalCopilotDialog({
             Le copilote prépare des conseils et brouillons. Une confirmation
             humaine reste obligatoire avant toute création.
           </Alert>
-          <Tabs value={tab} onChange={(_, value) => setTab(value)}>
+          <Tabs
+            value={tab}
+            variant="scrollable"
+            scrollButtons="auto"
+            onChange={(_, value) => {
+              setTab(value);
+              setConfirmed(false);
+            }}
+          >
             <Tab value="chat" label="Discussion" />
             <Tab value="risk" label="Risque tiers guidé" />
+            <Tab value="compliance" label="Action conformité guidée" />
             <Tab value="isms" label="Document ISMS guidé" />
           </Tabs>
           {success && (
@@ -504,6 +649,228 @@ export function GlobalCopilotDialog({
                 onClick={() => createRisk.mutate()}
               >
                 Confirmer et créer le risque
+              </Button>
+            </Stack>
+          )}
+          {tab === "compliance" && (
+            <Stack spacing={2}>
+              {!canCreateRisk && (
+                <Alert severity="error">
+                  Votre rôle ne permet pas de créer une action de conformité.
+                </Alert>
+              )}
+              <Alert severity="info">
+                Décrivez le besoin, l’écart ou le résultat attendu. L’IA formule
+                une action mesurable et la relie uniquement à une exigence
+                partielle, non conforme ou non évaluée de votre organisation.
+              </Alert>
+              <TextField
+                label="Décrivez la demande de conformité"
+                placeholder="Ex. Nous devons formaliser la revue trimestrielle des accès privilégiés et conserver les preuves de validation."
+                multiline
+                minRows={3}
+                value={complianceRequest}
+                inputProps={{ maxLength: 2000 }}
+                onChange={(event) => setComplianceRequest(event.target.value)}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={complianceConsent}
+                    onChange={(event) =>
+                      setComplianceConsent(event.target.checked)
+                    }
+                  />
+                }
+                label="J’autorise l’envoi de cette demande et du catalogue de conformité au fournisseur IA configuré."
+              />
+              <Button
+                variant="outlined"
+                disabled={
+                  !canCreateRisk ||
+                  !context.data?.enabled ||
+                  !complianceConsent ||
+                  complianceRequest.trim().length < 10 ||
+                  !complianceCatalog.data?.length ||
+                  pending
+                }
+                onClick={() => generateComplianceAction.mutate()}
+              >
+                Formuler l’action avec l’IA
+              </Button>
+              {complianceCatalog.isSuccess &&
+                complianceCatalog.data.length === 0 && (
+                  <Alert severity="warning">
+                    Aucune exigence partielle, non conforme ou non évaluée n’est
+                    disponible.
+                  </Alert>
+                )}
+              {complianceRationale && (
+                <Alert severity="warning">
+                  <Typography fontWeight={600}>Justification IA</Typography>
+                  {complianceRationale}
+                </Alert>
+              )}
+              <TextField
+                label="Titre de l’action"
+                value={complianceAction.title}
+                inputProps={{ maxLength: 255 }}
+                onChange={(event) =>
+                  setComplianceAction({
+                    ...complianceAction,
+                    title: event.target.value,
+                  })
+                }
+              />
+              <TextField
+                label="Description et résultat attendu"
+                multiline
+                minRows={4}
+                value={complianceAction.description}
+                inputProps={{ maxLength: 10000 }}
+                onChange={(event) =>
+                  setComplianceAction({
+                    ...complianceAction,
+                    description: event.target.value,
+                  })
+                }
+              />
+              <FormControl fullWidth>
+                <InputLabel id="global-copilot-compliance-result-label">
+                  Exigence ou écart concerné
+                </InputLabel>
+                <Select
+                  labelId="global-copilot-compliance-result-label"
+                  label="Exigence ou écart concerné"
+                  value={complianceAction.complianceResultId}
+                  onChange={(event) =>
+                    setComplianceAction({
+                      ...complianceAction,
+                      complianceResultId: event.target.value,
+                    })
+                  }
+                >
+                  {complianceCatalog.data?.map((item) => (
+                    <MenuItem key={item.id} value={String(item.id)}>
+                      {item.label} · {item.status.replaceAll("_", " ")}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="global-copilot-compliance-owner-label">
+                  Responsable de l’action
+                </InputLabel>
+                <Select
+                  labelId="global-copilot-compliance-owner-label"
+                  label="Responsable de l’action"
+                  value={complianceAction.ownerId}
+                  onChange={(event) =>
+                    setComplianceAction({
+                      ...complianceAction,
+                      ownerId: event.target.value,
+                    })
+                  }
+                >
+                  {options(
+                    users.data?.map((item) => ({
+                      id: item.id,
+                      name: `${item.firstName} ${item.lastName}`,
+                    })),
+                    "Aucun responsable disponible",
+                  )}
+                </Select>
+              </FormControl>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <FormControl fullWidth>
+                  <InputLabel id="global-copilot-compliance-priority-label">
+                    Priorité
+                  </InputLabel>
+                  <Select
+                    labelId="global-copilot-compliance-priority-label"
+                    label="Priorité"
+                    value={complianceAction.priority}
+                    onChange={(event) =>
+                      setComplianceAction({
+                        ...complianceAction,
+                        priority: event.target.value,
+                      })
+                    }
+                  >
+                    {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel id="global-copilot-compliance-type-label">
+                    Type d’action
+                  </InputLabel>
+                  <Select
+                    labelId="global-copilot-compliance-type-label"
+                    label="Type d’action"
+                    value={complianceAction.actionType}
+                    onChange={(event) =>
+                      setComplianceAction({
+                        ...complianceAction,
+                        actionType: event.target.value,
+                      })
+                    }
+                  >
+                    {[
+                      "TECHNICAL",
+                      "ORGANIZATIONAL",
+                      "CONTRACTUAL",
+                      "HUMAN",
+                      "PHYSICAL",
+                      "OTHER",
+                    ].map((value) => (
+                      <MenuItem key={value} value={value}>
+                        {value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Échéance"
+                  InputLabelProps={{ shrink: true }}
+                  value={complianceAction.dueDate}
+                  onChange={(event) =>
+                    setComplianceAction({
+                      ...complianceAction,
+                      dueDate: event.target.value,
+                    })
+                  }
+                />
+              </Stack>
+              <Typography>
+                Aperçu : action ouverte, origine Écart de conformité,
+                progression 0 %. Aucune preuve n’est ajoutée automatiquement.
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={confirmed}
+                    onChange={(event) => setConfirmed(event.target.checked)}
+                  />
+                }
+                label="J’ai relu le brouillon et je confirme sa création."
+              />
+              <Button
+                variant="contained"
+                disabled={
+                  !canCreateRisk ||
+                  !complianceActionReady ||
+                  !confirmed ||
+                  pending
+                }
+                onClick={() => createComplianceAction.mutate()}
+              >
+                Confirmer et créer l’action de conformité
               </Button>
             </Stack>
           )}

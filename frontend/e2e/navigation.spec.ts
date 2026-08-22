@@ -259,11 +259,16 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
     }),
   ).toBeVisible();
   await expect(
+    page.getByRole("tab", {
+      name: /Action conformité guidée|Guided compliance action/,
+    }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("tab", { name: /Document ISMS guidé|Guided ISMS document/ }),
   ).toBeVisible();
 });
 
-test("le copilote crée des brouillons risque et ISMS après confirmation", async ({
+test("le copilote crée des brouillons risque, conformité et ISMS après confirmation", async ({
   page,
   request,
 }) => {
@@ -319,6 +324,44 @@ test("le copilote crée des brouillons risque et ISMS après confirmation", asyn
   await expect(
     dialog.getByText(
       new RegExp(`Risque créé.*${unique}|Risk created.*${unique}`),
+    ),
+  ).toBeVisible();
+
+  await dialog
+    .getByRole("tab", {
+      name: /Action conformité guidée|Guided compliance action/,
+    })
+    .click();
+  await dialog
+    .getByRole("textbox", { name: /Titre de l’action|Action title/ })
+    .fill(`Action conformité guidée ${unique}`);
+  await dialog
+    .getByRole("textbox", {
+      name: /Description et résultat attendu|Description and expected outcome/,
+    })
+    .fill("Formaliser le contrôle, son responsable et les preuves attendues.");
+  for (const name of [
+    /Exigence ou écart concerné|Related requirement or gap/,
+    /Responsable de l’action|Action owner/,
+  ]) {
+    await dialog.getByRole("combobox", { name }).click();
+    await page.getByRole("option").first().click();
+  }
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’ai relu le brouillon|I reviewed the draft/,
+    })
+    .check();
+  await dialog
+    .getByRole("button", {
+      name: /Confirmer et créer l’action de conformité|Confirm and create compliance action/,
+    })
+    .click();
+  await expect(
+    dialog.getByText(
+      new RegExp(
+        `Action conformité créée.*${unique}|Compliance action created.*${unique}`,
+      ),
     ),
   ).toBeVisible();
 
