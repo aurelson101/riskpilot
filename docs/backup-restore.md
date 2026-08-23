@@ -24,3 +24,5 @@ Vérifier chaque sauvegarde avec `scripts/restore-verify.sh /chemin/dédié/risk
 7. Consigner la durée, les écarts au RPO/RTO et les actions correctives dans une preuve d’audit.
 
 Une restauration est destructive : elle n’est volontairement pas automatisée par le script de vérification. Tester trimestriellement sur un environnement isolé avant toute restauration de production.
+
+L'exercice trimestriel non destructif est automatisable avec `scripts/quarterly-restore-drill.sh`. Il sélectionne la dernière sauvegarde, exécute la restauration isolée et produit une preuve JSON avec les écarts RPO/RTO. Les unités `deploy/demo/restore-drill.{service,timer}` fournissent une planification systemd persistante ; adapter impérativement les chemins avant installation.

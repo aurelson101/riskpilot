@@ -1,0 +1,10 @@
+[Unit]
+Description=Run RiskPilot restore verification quarterly
+
+[Timer]
+OnCalendar=*-01,04,07,10-01 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=6h
+
+[Install]
+WantedBy=timers.target

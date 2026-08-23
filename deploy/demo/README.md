@@ -37,6 +37,14 @@ deploy/demo/install-vps-1gb.sh
 
 Pour les commandes Compose ultérieures, ajouter `-f deploy/demo/compose.vps-1gb.yaml` après les trois fichiers habituels.
 
+Les livraisons suivantes utilisent des images immuables et un retour arrière automatique :
+
+```bash
+deploy/demo/deploy-atomic.sh "$(git rev-parse --short=12 HEAD)"
+```
+
+La commande conserve les volumes et ne recharge jamais les fixtures. Les migrations doivent rester compatibles avec la version précédente afin que le rollback applicatif soit possible.
+
 ## Reset automatique
 
 Le service `demo-reset-scheduler` attend deux heures, puis recharge les fixtures, vide Redis et supprime les fichiers documentaires déposés pendant la démonstration. Il recommence toutes les deux heures et redémarre avec le projet. Le reset manuel utilise exactement le même périmètre via `deploy/demo/reset-demo.sh`.

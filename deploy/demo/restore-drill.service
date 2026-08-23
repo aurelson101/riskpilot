@@ -1,0 +1,8 @@
+[Unit]
+Description=RiskPilot quarterly isolated restore verification
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/son/demo.riskpilot.site
+ExecStart=/home/son/demo.riskpilot.site/scripts/quarterly-restore-drill.sh /srv/backups/riskpilot /var/lib/riskpilot/restore-drills

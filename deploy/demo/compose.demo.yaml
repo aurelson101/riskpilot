@@ -2,18 +2,19 @@ name: riskpilot_demo
 
 services:
   backend:
-    image: riskpilot-demo-backend:local
+    image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-demo-backend:local}
 
   worker:
-    image: riskpilot-demo-backend:local
+    image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-demo-backend:local}
 
   scheduler:
-    image: riskpilot-demo-backend:local
+    image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-demo-backend:local}
 
   jwt-init:
-    image: riskpilot-demo-backend:local
+    image: ${RISKPILOT_BACKEND_IMAGE:-riskpilot-demo-backend:local}
 
   frontend:
+    image: ${RISKPILOT_FRONTEND_IMAGE:-riskpilot-demo-frontend:local}
     build:
       args:
         VITE_DEMO_MODE: "true"
@@ -23,6 +24,7 @@ services:
       - "127.0.0.1:18081:80"
 
   demo-reset-scheduler:
+    image: ${RISKPILOT_DEMO_RESET_IMAGE:-riskpilot-demo-reset:local}
     build:
       context: ./backend
       target: development
