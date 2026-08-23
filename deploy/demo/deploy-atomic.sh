@@ -29,9 +29,15 @@ rollback() {
 }
 trap 'rollback' INT TERM HUP
 
-RISKPILOT_BACKEND_IMAGE=$backend_candidate $compose build backend
-RISKPILOT_FRONTEND_IMAGE=$frontend_candidate $compose build frontend
-RISKPILOT_DEMO_RESET_IMAGE=$reset_candidate $compose build demo-reset-scheduler
+if [ "${RISKPILOT_SKIP_BUILD:-0}" = 1 ]; then
+  for image in "$backend_candidate" "$frontend_candidate" "$reset_candidate"; do
+    docker image inspect "$image" >/dev/null 2>&1 || { echo "Image préchargée absente : $image" >&2; exit 66; }
+  done
+else
+  RISKPILOT_BACKEND_IMAGE=$backend_candidate $compose build backend
+  RISKPILOT_FRONTEND_IMAGE=$frontend_candidate $compose build frontend
+  RISKPILOT_DEMO_RESET_IMAGE=$reset_candidate $compose build demo-reset-scheduler
+fi
 
 # Les migrations doivent être rétrocompatibles avec la version précédente.
 RISKPILOT_BACKEND_IMAGE=$backend_candidate $compose run --rm backend php bin/console doctrine:migrations:migrate --no-interaction

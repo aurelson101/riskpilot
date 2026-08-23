@@ -44,6 +44,7 @@ deploy/demo/deploy-atomic.sh "$(git rev-parse --short=12 HEAD)"
 ```
 
 La commande conserve les volumes et ne recharge jamais les fixtures. Les migrations doivent rester compatibles avec la version précédente afin que le rollback applicatif soit possible.
+Sur un VPS contraint, construire et charger préalablement les trois images nommées par commit, puis définir `RISKPILOT_SKIP_BUILD=1` afin d'éviter toute compilation distante. Le script vérifie alors que chaque image est réellement présente avant la bascule.
 
 ## Reset automatique
 
