@@ -52,6 +52,8 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $client->jsonRequest('POST', '/api/operations/records', ['type' => 'SAVED_VIEW', 'title' => 'Private board', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['shared' => false]]);
         self::assertResponseStatusCodeSame(201);
         $privateView = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $client->jsonRequest('POST', '/api/operations/records', ['type' => 'REPORT_TEMPLATE', 'title' => 'Unsafe report', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['version' => '1', 'blocks' => ['risks', '<script>alert(1)</script>'], 'approved' => true, 'approvedBy' => 'Risk Manager']]);
+        self::assertResponseStatusCodeSame(422);
         $client->jsonRequest('POST', '/api/operations/records', ['type' => 'REPORT_TEMPLATE', 'title' => 'Management report', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['version' => '1', 'blocks' => ['risks'], 'approved' => true, 'approvedBy' => 'Risk Manager']]);
         self::assertResponseStatusCodeSame(201);
         $template = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

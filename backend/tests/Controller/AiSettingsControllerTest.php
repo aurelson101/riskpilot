@@ -49,6 +49,14 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertArrayNotHasKey('apiKey', $payload);
         self::assertSame('https://api.openai.com/v1', $payload['baseUrl']);
 
+        $client->jsonRequest('PUT', '/api/settings/ai', [
+            'provider' => 'CUSTOM', 'baseUrl' => 'https://127.0.0.1/internal', 'model' => 'local-model',
+            'apiKey' => 'custom-test-key', 'dataPolicy' => 'MINIMAL', 'enabled' => true,
+        ]);
+        self::assertResponseStatusCodeSame(422);
+        $customError = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('endpoints personnalisés', $customError['message']);
+
         $stored = $manager->getRepository(AiSettings::class)->findOneBy(['organization' => $first]);
         self::assertInstanceOf(AiSettings::class, $stored);
         self::assertNotSame('sk-test-not-a-real-key', $stored->getEncryptedApiKey());

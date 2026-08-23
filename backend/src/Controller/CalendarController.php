@@ -88,7 +88,7 @@ final readonly class CalendarController
                 "Priorité : %s\nStatut : %s\nRisque : %s%s",
                 $action->getPriority(),
                 $action->getStatus(),
-                $action->getRelatedRisk()->getTitle(),
+                $action->getRelatedRisk()?->getTitle() ?? 'Sans risque lié',
                 null === $action->getDescription() ? '' : "\n\n".$action->getDescription(),
             );
             array_push($lines,

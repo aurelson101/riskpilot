@@ -511,4 +511,22 @@ final class TenantIsolationTest extends WebTestCase
         self::assertStringStartsWith('PK', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('Action B', (string) $this->client->getResponse()->getContent());
     }
+
+    public function testCalendarFeedSupportsRisklessActionsAndEscapesInjectedLines(): void
+    {
+        $token = str_repeat('a', 43);
+        $this->adminA->enableCalendarSubscription(hash('sha256', $token));
+        $action = new ActionPlan("Action\r\nX-INJECTED:yes", $this->adminA->getOrganization(), null, $this->adminA, new \DateTimeImmutable('+15 days'));
+        $this->entityManager->persist($action);
+        $this->entityManager->flush();
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->request('GET', '/api/calendar/'.$token.'.ics');
+        self::assertResponseIsSuccessful();
+        $content = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('Risque : Sans risque lié', $content);
+        self::assertStringContainsString('Action\\nX-INJECTED:yes', $content);
+        self::assertStringNotContainsString("\r\nX-INJECTED:yes", $content);
+        self::assertStringNotContainsString('Action B', $content);
+    }
 }

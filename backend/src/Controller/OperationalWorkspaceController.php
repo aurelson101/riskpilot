@@ -141,7 +141,40 @@ final readonly class OperationalWorkspaceController
         if (array_key_exists('dueAt', $data)) {
             $dueAt = empty($data['dueAt']) ? null : new \DateTimeImmutable((string) $data['dueAt']);
         }
-        $record->update((string) ($data['title'] ?? $record->getTitle()), (string) ($data['status'] ?? $record->getStatus()), $this->details($data, $record->getDetails()), $owner, $dueAt);
+        $details = $this->details($data, $record->getDetails());
+        if ('REPORT_TEMPLATE' === $record->getType()) {
+            $this->validateReportTemplate($details);
+        }
+        $record->update((string) ($data['title'] ?? $record->getTitle()), (string) ($data['status'] ?? $record->getStatus()), $details, $owner, $dueAt);
+    }
+
+    /** @param array<string, mixed> $details */
+    private function validateReportTemplate(array $details): void
+    {
+        $allowedBlocks = ['risks', 'actions', 'compliance'];
+        $blocks = array_values(array_unique(array_map('strval', is_array($details['blocks'] ?? null) ? $details['blocks'] : [])));
+        if ([] === $blocks || [] !== array_diff($blocks, $allowedBlocks)) {
+            throw new \InvalidArgumentException('Report blocks must use risks, actions or compliance.');
+        }
+        $reportType = (string) ($details['reportType'] ?? 'MANAGEMENT_COMMITTEE');
+        if (!in_array($reportType, ['MANAGEMENT_COMMITTEE', 'ISMS_REVIEW', 'COMPLIANCE', 'RISK_ANALYSIS', 'TREATMENT_PLAN', 'THIRD_PARTY'], true)) {
+            throw new \InvalidArgumentException('Invalid report type.');
+        }
+        $version = trim((string) ($details['version'] ?? ''));
+        if ('' === $version || mb_strlen($version) > 40) {
+            throw new \InvalidArgumentException('A valid report version is required.');
+        }
+        if (true === ($details['approved'] ?? false) && '' === trim((string) ($details['approvedBy'] ?? ''))) {
+            throw new \InvalidArgumentException('An approved report template requires an approver.');
+        }
+        foreach (['decisionText', 'recommendations'] as $field) {
+            if (isset($details[$field]) && (!is_string($details[$field]) || mb_strlen($details[$field]) > 5000)) {
+                throw new \InvalidArgumentException('Report text is invalid.');
+            }
+        }
+        if (isset($details['filters']) && !is_array($details['filters'])) {
+            throw new \InvalidArgumentException('Report filters must be structured.');
+        }
     }
 
     /**

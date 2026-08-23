@@ -132,6 +132,9 @@ PROMPT;
     /** @param list<array{role: 'user'|'assistant', content: string}> $history */
     private function askWithSystem(AiSettings $settings, string $system, string $question, array $history, string $safetyIdentifier): string
     {
+        if ('CUSTOM' === $settings->getProvider()) {
+            throw new \RuntimeException('Custom AI endpoints are disabled until network safety is validated.');
+        }
         $encryptedKey = $settings->getEncryptedApiKey();
         if (null === $encryptedKey) {
             throw new \RuntimeException('AI API key is not configured.');

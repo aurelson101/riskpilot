@@ -60,6 +60,9 @@ final readonly class AiSettingsController
         if (!$this->validHttpsUrl($baseUrl) || '' === $model || mb_strlen($model) > 120 || !in_array($dataPolicy, AiSettings::DATA_POLICIES, true) || mb_strlen($systemPrompt) > 4000) {
             return $this->error('Vérifiez l’URL HTTPS, le modèle et la politique de données.');
         }
+        if ($enabled && 'CUSTOM' === $provider) {
+            return $this->error('Les endpoints personnalisés restent désactivés tant que leur sécurité réseau n’est pas validée.');
+        }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new AiSettings($user->getOrganization());
         $apiKey = trim((string) ($input['apiKey'] ?? ''));
         if ('' !== $apiKey) {

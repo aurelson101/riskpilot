@@ -14,6 +14,28 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class AiCopilotClientTest extends TestCase
 {
+    public function testCustomEndpointIsRejectedBeforeAnyNetworkRequest(): void
+    {
+        $called = false;
+        $http = new MockHttpClient(static function () use (&$called): MockResponse {
+            $called = true;
+
+            return new MockResponse('{}');
+        });
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new AiSettings(new Organization('Tenant'));
+        $settings->configure('CUSTOM', 'https://127.0.0.1/internal', 'local', 'MINIMAL', '', true);
+        $settings->setEncryptedApiKey($cipher->encrypt('provider-secret'));
+
+        try {
+            (new AiCopilotClient($http, $cipher))->ask($settings, [], 'Help', [], 'en', 'safety-user-1');
+            self::fail('A custom endpoint must be rejected.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('disabled', $error->getMessage());
+        }
+        self::assertFalse($called);
+    }
+
     public function testOpenAiCompatibleRequestUsesConfiguredModelAndGuardrails(): void
     {
         $captured = [];

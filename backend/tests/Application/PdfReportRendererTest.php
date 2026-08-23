@@ -39,6 +39,9 @@ final class PdfReportRendererTest extends TestCase
         $untrustedHtml = $decision->invoke($renderer, '<script>alert(1)</script>', ['organization' => 'Tenant', 'generatedAt' => '2026-08-22T12:00:00+00:00', 'snapshot' => []], 'en');
         self::assertStringContainsString('CONFIDENTIAL', $untrustedHtml);
         self::assertStringNotContainsString('<script>alert(1)</script>', $untrustedHtml);
+        $selectedBlocks = $decision->invoke($renderer, 'Board report', ['organization' => 'Tenant', 'generatedAt' => '2026-08-22T12:00:00+00:00', 'blocks' => ['risks'], 'snapshot' => []], 'en');
+        self::assertStringContainsString('Priority risks', $selectedBlocks);
+        self::assertStringNotContainsString('Priority action plans', $selectedBlocks);
     }
 
     public function testFrozenInputProducesByteStablePdfAndDocumentMetadata(): void
