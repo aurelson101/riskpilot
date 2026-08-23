@@ -1626,6 +1626,25 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Enregistrer les permissions", "Save permissions"],
   ["EBIOS RM · Ateliers 1 à 5", "EBIOS RM · Workshops 1 to 5"],
+  ["Jira", "Jira"],
+  ["ServiceNow", "ServiceNow"],
+  ["Terminer", "Complete"],
+  ["Déléguer", "Delegate"],
+  ["Moyenne", "Medium"],
+  ["Haute", "High"],
+  ["Déléguer temporairement la tâche", "Temporarily delegate the task"],
+  ["Recherche transverse", "Cross-module search"],
+  [
+    "Risques, actions, mesures, documents et tiers visibles selon vos droits",
+    "Risks, actions, controls, documents and third parties visible under your permissions",
+  ],
+  [
+    "La recherche n’a pas pu être effectuée.",
+    "The search could not be completed.",
+  ],
+  ["Aucun résultat accessible.", "No accessible results."],
+  ["% · écart", "% · gap"],
+  ["jours restants · source", "days remaining · source"],
 ];
 
 export const frToEn = new Map(pairs);

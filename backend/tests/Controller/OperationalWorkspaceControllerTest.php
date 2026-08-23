@@ -66,7 +66,38 @@ final class OperationalWorkspaceControllerTest extends WebTestCase
         self::assertSame(1, $tasks['total']);
         self::assertSame('/operations', $tasks['items'][0]['link']);
         self::assertSame('OPERATIONAL', $tasks['items'][0]['source']);
+        self::assertSame(['complete', 'delegate'], $tasks['items'][0]['quickActions']);
 
+        $client->jsonRequest('POST', '/api/operations/tasks/'.$task['id'].'/delegate', [
+            'email' => 'manager@example.test',
+            'until' => '2026-10-30T10:00:00+00:00',
+        ]);
+        self::assertResponseIsSuccessful();
+        $delegated = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame($riskManager->getId(), $delegated['owner']['id']);
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($riskManager));
+        $client->jsonRequest('POST', '/api/operations/tasks/'.$task['id'].'/complete');
+        self::assertResponseIsSuccessful();
+        self::assertSame('COMPLETED', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['status']);
+
+        $client->jsonRequest('POST', '/api/operations/records', [
+            'type' => 'RESPONSIBILITY_RULE',
+            'title' => 'Default task owner',
+            'status' => 'ACTIVE',
+            'details' => ['domain' => 'TASK', 'defaultRole' => User::ROLE_VIEWER],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $client->jsonRequest('POST', '/api/operations/records', [
+            'type' => 'TASK',
+            'title' => 'Automatically assigned',
+            'status' => 'ACTIVE',
+            'details' => ['priority' => 'HIGH'],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame($viewer->getId(), json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['owner']['id']);
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($viewer));
         $client->jsonRequest('POST', '/api/operations/records', ['type' => 'TASK', 'title' => 'Forbidden']);
         self::assertResponseStatusCodeSame(403);
 

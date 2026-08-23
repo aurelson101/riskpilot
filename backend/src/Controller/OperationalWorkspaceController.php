@@ -8,6 +8,10 @@ use App\Application\CurrentUser;
 use App\Entity\ActionPlan;
 use App\Entity\ComplianceAssessment;
 use App\Entity\OperationalRecord;
+use App\Entity\RiskScenario;
+use App\Entity\SecurityControl;
+use App\Entity\SecurityIncident;
+use App\Entity\ThirdParty;
 use App\Entity\User;
 use App\Repository\OperationalRecordRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -84,13 +88,13 @@ final readonly class OperationalWorkspaceController
     }
 
     #[Route('/my-tasks', methods: ['GET'])]
-    public function myTasks(): JsonResponse
+    public function myTasks(Request $request): JsonResponse
     {
         $user = $this->currentUser->get();
-        $tasks = array_map(fn (OperationalRecord $item): array => $this->task($item->getId(), $item->getTitle(), $item->getStatus(), $item->getDueAt(), '/operations', 'OPERATIONAL'), $this->records->findOpenTasks($user));
+        $tasks = array_map(fn (OperationalRecord $item): array => $this->task($item->getId(), $item->getTitle(), $item->getStatus(), $item->getDueAt(), '/operations', 'OPERATIONAL', $item->getDetails()['priority'] ?? 'MEDIUM'), $this->records->findOpenTasks($user));
         foreach ($this->entityManager->getRepository(ActionPlan::class)->findBy(['organization' => $user->getOrganization(), 'owner' => $user], ['dueDate' => 'ASC']) as $action) {
             if (!in_array($action->getStatus(), ['COMPLETED', 'CANCELLED'], true)) {
-                $tasks[] = $this->task($action->getId(), $action->getTitle(), $action->getStatus(), $action->getDueDate(), '/actions', 'ACTION');
+                $tasks[] = $this->task($action->getId(), $action->getTitle(), $action->getStatus(), $action->getDueDate(), '/actions', 'ACTION', $action->getPriority());
             }
         }
         foreach ($this->entityManager->getRepository(ComplianceAssessment::class)->findBy(['organization' => $user->getOrganization(), 'assessor' => $user], ['assessmentDate' => 'ASC']) as $assessment) {
@@ -98,20 +102,100 @@ final readonly class OperationalWorkspaceController
                 $tasks[] = $this->task($assessment->getId(), $assessment->getFramework()->getName(), $assessment->getStatus(), $assessment->getAssessmentDate(), '/compliance', 'ASSESSMENT');
             }
         }
+        foreach ($this->entityManager->getRepository(RiskScenario::class)->findBy(['organization' => $user->getOrganization(), 'riskOwner' => $user], ['reviewDate' => 'ASC']) as $risk) {
+            if (!in_array($risk->getStatus(), ['CLOSED', 'ARCHIVED'], true)) {
+                $tasks[] = $this->task($risk->getId(), $risk->getTitle(), $risk->getStatus(), $risk->getReviewDate(), '/risks', 'RISK', $risk->getCurrentRiskScore() >= 15 ? 'CRITICAL' : 'HIGH');
+            }
+        }
+        foreach ($this->entityManager->getRepository(SecurityControl::class)->findBy(['organization' => $user->getOrganization(), 'owner' => $user]) as $control) {
+            if ('IMPLEMENTED' !== $control->getImplementationStatus()) {
+                $tasks[] = $this->task($control->getId(), $control->getName(), $control->getImplementationStatus(), null, '/compliance', 'CONTROL', 'MEDIUM');
+            }
+        }
+        foreach ($this->entityManager->getRepository(ThirdParty::class)->findBy(['organization' => $user->getOrganization(), 'owner' => $user], ['nextAssessmentAt' => 'ASC']) as $thirdParty) {
+            $tasks[] = $this->task($thirdParty->getId(), $thirdParty->getName(), $thirdParty->getStatus(), $thirdParty->getNextAssessmentAt(), '/third-parties', 'THIRD_PARTY', 'HIGH');
+        }
+        foreach ($this->entityManager->getRepository(SecurityIncident::class)->findBy(['organization' => $user->getOrganization(), 'owner' => $user], ['detectedAt' => 'ASC']) as $incident) {
+            if ('CLOSED' !== $incident->getStatus()) {
+                $tasks[] = $this->task($incident->getId(), $incident->getTitle(), $incident->getStatus(), null, '/resilience', 'INCIDENT', $incident->getSeverity());
+            }
+        }
         usort($tasks, static fn (array $a, array $b): int => strcmp((string) ($a['dueAt'] ?? '9999'), (string) ($b['dueAt'] ?? '9999')));
 
-        return new JsonResponse(['items' => $tasks, 'total' => count($tasks)]);
+        $query = mb_strtolower(trim((string) $request->query->get('q', '')));
+        $source = strtoupper(trim((string) $request->query->get('source', '')));
+        $status = strtoupper(trim((string) $request->query->get('status', '')));
+        $tasks = array_values(array_filter($tasks, static fn (array $task): bool => ('' === $query || str_contains(mb_strtolower((string) $task['title']), $query))
+            && ('' === $source || $task['source'] === $source)
+            && ('' === $status || $task['status'] === $status)
+        ));
+        $page = max(1, $request->query->getInt('page', 1));
+        $limit = min(100, max(1, $request->query->getInt('limit', 20)));
+        $total = count($tasks);
+
+        return new JsonResponse(['items' => array_slice($tasks, ($page - 1) * $limit, $limit), 'page' => $page, 'limit' => $limit, 'total' => $total, 'pages' => max(1, (int) ceil($total / $limit))]);
+    }
+
+    #[Route('/tasks/{id<\d+>}/complete', methods: ['POST'])] #[IsGranted(User::ROLE_VIEWER)]
+    public function completeTask(int $id): JsonResponse
+    {
+        $record = $this->records->findOneVisible($id, $this->currentUser->get()->getOrganization());
+        if (null === $record || 'TASK' !== $record->getType() || $record->getOwner() !== $this->currentUser->get()) {
+            return $this->error('NOT_FOUND', 404);
+        }
+        $record->update($record->getTitle(), 'COMPLETED', $record->getDetails(), $record->getOwner(), $record->getDueAt());
+        $this->entityManager->flush();
+
+        return new JsonResponse($this->serialize($record));
+    }
+
+    #[Route('/tasks/{id<\d+>}/delegate', methods: ['POST'])] #[IsGranted(User::ROLE_VIEWER)]
+    public function delegateTask(int $id, Request $request): JsonResponse
+    {
+        $actor = $this->currentUser->get();
+        $record = $this->records->findOneVisible($id, $actor->getOrganization());
+        if (null === $record || 'TASK' !== $record->getType() || $record->getOwner() !== $actor) {
+            return $this->error('NOT_FOUND', 404);
+        }
+        $data = $request->toArray();
+        $criteria = ['organization' => $actor->getOrganization()];
+        if (!empty($data['email'])) {
+            $criteria['email'] = mb_strtolower(trim((string) $data['email']));
+        } else {
+            $criteria['id'] = (int) ($data['userId'] ?? 0);
+        }
+        $delegate = $this->entityManager->getRepository(User::class)->findOneBy($criteria);
+        $until = new \DateTimeImmutable((string) ($data['until'] ?? ''));
+        if (null === $delegate || $until <= new \DateTimeImmutable() || $until > new \DateTimeImmutable('+90 days')) {
+            return $this->error('INVALID_DELEGATION', 422);
+        }
+        $details = $record->getDetails() + ['delegatedFromId' => $actor->getId(), 'delegatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM)];
+        $details['delegatedUntil'] = $until->format(DATE_ATOM);
+        $record->update($record->getTitle(), $record->getStatus(), $details, $delegate, $record->getDueAt());
+        $this->entityManager->flush();
+
+        return new JsonResponse($this->serialize($record));
     }
 
     #[Route('/compliance-trajectory', methods: ['GET'])]
     public function trajectory(): JsonResponse
     {
         $programs = $this->records->findForOrganization($this->currentUser->get()->getOrganization(), 'COMPLIANCE_PROGRAM');
+        $assessments = $this->entityManager->getRepository(ComplianceAssessment::class)->findBy(['organization' => $this->currentUser->get()->getOrganization()], ['assessmentDate' => 'DESC']);
 
-        return new JsonResponse(array_map(function (OperationalRecord $program): array {
+        return new JsonResponse(array_map(function (OperationalRecord $program) use ($assessments): array {
             $details = $program->getDetails();
             $target = max(1, (int) ($details['targetScore'] ?? 100));
-            $current = max(0, min(100, (int) ($details['currentScore'] ?? 0)));
+            $frameworks = array_values(array_filter(array_map('strval', is_array($details['frameworks'] ?? null) ? $details['frameworks'] : [])));
+            $latest = [];
+            foreach ($assessments as $assessment) {
+                $name = $assessment->getFramework()->getName();
+                if (([] === $frameworks || in_array($name, $frameworks, true)) && !isset($latest[$name])) {
+                    $latest[$name] = $assessment->getGlobalScore();
+                }
+            }
+            $measured = [] === $latest ? null : (int) round(array_sum($latest) / count($latest));
+            $current = max(0, min(100, $measured ?? (int) ($details['currentScore'] ?? 0)));
             try {
                 $start = new \DateTimeImmutable((string) ($details['startDate'] ?? $program->getCreatedAt()->format('Y-m-d')));
             } catch (\Exception) {
@@ -121,7 +205,7 @@ final readonly class OperationalWorkspaceController
             $duration = max(1, $end->getTimestamp() - $start->getTimestamp());
             $expected = min($target, (int) round($target * max(0, min(1, (time() - $start->getTimestamp()) / $duration))));
 
-            return ['id' => $program->getId(), 'title' => $program->getTitle(), 'current' => $current, 'target' => $target, 'expected' => $expected, 'atRisk' => $current + 5 < $expected, 'dueAt' => $end->format(DATE_ATOM)];
+            return ['id' => $program->getId(), 'title' => $program->getTitle(), 'current' => $current, 'target' => $target, 'expected' => $expected, 'gap' => max(0, $target - $current), 'atRisk' => $current + 5 < $expected, 'remainingDays' => max(0, (int) ceil(($end->getTimestamp() - time()) / 86400)), 'frameworkScores' => $latest, 'source' => null === $measured ? 'DECLARED' : 'ASSESSMENTS', 'dueAt' => $end->format(DATE_ATOM)];
         }, $programs));
     }
 
@@ -142,10 +226,33 @@ final readonly class OperationalWorkspaceController
             $dueAt = empty($data['dueAt']) ? null : new \DateTimeImmutable((string) $data['dueAt']);
         }
         $details = $this->details($data, $record->getDetails());
+        if (null === $owner && !array_key_exists('ownerId', $data)) {
+            $owner = $this->automaticOwner($record, $details);
+        }
         if ('REPORT_TEMPLATE' === $record->getType()) {
             $this->validateReportTemplate($details);
         }
         $record->update((string) ($data['title'] ?? $record->getTitle()), (string) ($data['status'] ?? $record->getStatus()), $details, $owner, $dueAt);
+    }
+
+    /** @param array<string, mixed> $details */
+    private function automaticOwner(OperationalRecord $record, array $details): ?User
+    {
+        $domain = strtoupper((string) ($details['domain'] ?? $record->getType()));
+        foreach ($this->records->findForOrganization($this->currentUser->get()->getOrganization(), 'RESPONSIBILITY_RULE') as $rule) {
+            $configuration = $rule->getDetails();
+            if ('ACTIVE' !== $rule->getStatus() || strtoupper((string) ($configuration['domain'] ?? '')) !== $domain) {
+                continue;
+            }
+            $role = (string) ($configuration['defaultRole'] ?? '');
+            foreach ($this->entityManager->getRepository(User::class)->findBy(['organization' => $this->currentUser->get()->getOrganization(), 'status' => User::STATUS_ACTIVE], ['id' => 'ASC']) as $candidate) {
+                if (in_array($role, $candidate->getAssignedRoles(), true)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $details */
@@ -195,9 +302,9 @@ final readonly class OperationalWorkspaceController
     }
 
     /** @return array<string, mixed> */
-    private function task(?int $id, string $title, string $status, ?\DateTimeImmutable $dueAt, string $link, string $source): array
+    private function task(?int $id, string $title, string $status, ?\DateTimeImmutable $dueAt, string $link, string $source, mixed $priority = 'MEDIUM'): array
     {
-        return compact('id', 'title', 'status', 'link', 'source') + ['dueAt' => $dueAt?->format(DATE_ATOM), 'overdue' => null !== $dueAt && $dueAt < new \DateTimeImmutable()];
+        return compact('id', 'title', 'status', 'link', 'source') + ['priority' => strtoupper((string) $priority), 'dueAt' => $dueAt?->format(DATE_ATOM), 'overdue' => null !== $dueAt && $dueAt < new \DateTimeImmutable(), 'quickActions' => 'OPERATIONAL' === $source ? ['complete', 'delegate'] : []];
     }
 
     private function error(string $code, int $status): JsonResponse

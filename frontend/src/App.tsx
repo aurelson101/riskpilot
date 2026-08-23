@@ -25,6 +25,7 @@ import {
   ExpandMore,
   FolderCopyOutlined,
   SmartToyOutlined,
+  SearchOutlined,
 } from "@mui/icons-material";
 import {
   AppBar,
@@ -200,6 +201,11 @@ const OperationsPage = lazy(() =>
     default: module.OperationsPage,
   })),
 );
+const SearchPage = lazy(() =>
+  import("./pages/SearchPage").then((module) => ({
+    default: module.SearchPage,
+  })),
+);
 const DecisionWorkspacePage = lazy(() =>
   import("./pages/DecisionWorkspacePage").then((module) => ({
     default: module.DecisionWorkspacePage,
@@ -279,6 +285,7 @@ function Layout() {
   const steeringActive = [
     "/actions",
     "/operations",
+    "/search",
     "/decision",
     "/experiments",
     "/indicators",
@@ -617,6 +624,12 @@ function Layout() {
             path="/operations"
             label="Mes tâches et programmes"
             icon={<FactCheckOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/search"
+            label="Recherche transverse"
+            icon={<SearchOutlined fontSize="small" />}
           />
           <NavItem
             nested
@@ -1040,6 +1053,7 @@ export default function App() {
                 <Route path="risks" element={<RisksPage />} />
                 <Route path="actions" element={<ActionsPage />} />
                 <Route path="operations" element={<OperationsPage />} />
+                <Route path="search" element={<SearchPage />} />
                 <Route path="decision" element={<DecisionWorkspacePage />} />
                 <Route path="experiments" element={<ExperimentsPage />} />
                 <Route

@@ -22,7 +22,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { hasAnyRole } from "../auth/roles";
@@ -146,6 +146,15 @@ export function DecisionWorkspacePage() {
   const isFinancial = section === "FINANCIAL_SCENARIO";
   const isConnector = section === "CONNECTOR_SYNC";
   const canCreate = isConnector ? isAdmin : canContribute;
+  const parsedDetails = useMemo(
+    () => JSON.parse(form.details) as Record<string, unknown>,
+    [form.details],
+  );
+  const setDetail = (key: string, value: unknown) =>
+    setForm({
+      ...form,
+      details: JSON.stringify({ ...parsedDetails, [key]: value }, null, 2),
+    });
   const portfolio = useQuery({
     queryKey: ["decision-tprm"],
     enabled: section === "TPRM_PROGRAM",
@@ -604,16 +613,61 @@ export function DecisionWorkspacePage() {
                   {isFinancial ? "DRAFT" : "ACTIVE"}
                 </MenuItem>
               </TextField>
-              <TextField
-                required
-                multiline
-                minRows={14}
-                label="Configuration JSON versionnée"
-                value={form.details}
-                onChange={(event) =>
-                  setForm({ ...form, details: event.target.value })
-                }
-              />
+              {"version" in parsedDetails && (
+                <TextField
+                  required
+                  label="Version"
+                  value={String(parsedDetails.version ?? "")}
+                  onChange={(event) => setDetail("version", event.target.value)}
+                />
+              )}
+              {"reportType" in parsedDetails && (
+                <TextField
+                  select
+                  label="Type de rapport"
+                  value={String(parsedDetails.reportType)}
+                  onChange={(event) =>
+                    setDetail("reportType", event.target.value)
+                  }
+                >
+                  {[
+                    "MANAGEMENT_COMMITTEE",
+                    "ISMS_REVIEW",
+                    "COMPLIANCE",
+                    "RISK_ANALYSIS",
+                    "TREATMENT_PLAN",
+                    "THIRD_PARTY",
+                  ].map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {value}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {"provider" in parsedDetails && (
+                <TextField
+                  select
+                  label="Fournisseur"
+                  value={String(parsedDetails.provider)}
+                  onChange={(event) =>
+                    setDetail("provider", event.target.value)
+                  }
+                >
+                  <MenuItem value="JIRA">Jira</MenuItem>
+                  <MenuItem value="SERVICENOW">ServiceNow</MenuItem>
+                </TextField>
+              )}
+              {"decisionText" in parsedDetails && (
+                <TextField
+                  multiline
+                  minRows={3}
+                  label="Texte de décision"
+                  value={String(parsedDetails.decisionText ?? "")}
+                  onChange={(event) =>
+                    setDetail("decisionText", event.target.value)
+                  }
+                />
+              )}
             </Stack>
           </DialogContent>
           <DialogActions>

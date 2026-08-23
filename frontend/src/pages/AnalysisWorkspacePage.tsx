@@ -56,7 +56,9 @@ export function AnalysisWorkspacePage() {
   const [artifact, setArtifact] = useState({
     kind: "METHOD_STEP",
     title: "",
-    payload: "{}",
+    summary: "",
+    evidenceReference: "",
+    recommendation: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
   const analyses = useQuery({
@@ -88,27 +90,19 @@ export function AnalysisWorkspacePage() {
   const add = useMutation({
     mutationFn: () =>
       api.post(`/analysis-workspace/analyses/${selected}/artifacts`, {
-        ...artifact,
-        payload: JSON.parse(artifact.payload),
+        kind: artifact.kind,
+        title: artifact.title,
+        payload: {
+          summary: artifact.summary,
+          evidenceReference: artifact.evidenceReference || null,
+          recommendation: artifact.recommendation || null,
+        },
         idempotencyKey: crypto.randomUUID(),
       }),
   });
   const addArtifact = () => {
-    try {
-      const payload = JSON.parse(artifact.payload);
-      if (
-        typeof payload !== "object" ||
-        payload === null ||
-        Array.isArray(payload)
-      )
-        throw new Error("invalid payload");
-      setFormError(null);
-      add.mutate();
-    } catch {
-      setFormError(
-        "Les données de l’artefact doivent être un objet JSON valide.",
-      );
-    }
+    setFormError(null);
+    add.mutate();
   };
   return (
     <Stack spacing={3}>
@@ -232,16 +226,36 @@ export function AnalysisWorkspacePage() {
               />
               <TextField
                 multiline
-                minRows={5}
-                label="Données JSON"
-                value={artifact.payload}
+                minRows={3}
+                label="Synthèse"
+                required
+                value={artifact.summary}
                 onChange={(e) =>
-                  setArtifact({ ...artifact, payload: e.target.value })
+                  setArtifact({ ...artifact, summary: e.target.value })
+                }
+              />
+              <TextField
+                label="Référence de preuve"
+                value={artifact.evidenceReference}
+                onChange={(e) =>
+                  setArtifact({
+                    ...artifact,
+                    evidenceReference: e.target.value,
+                  })
+                }
+              />
+              <TextField
+                multiline
+                minRows={2}
+                label="Recommandation"
+                value={artifact.recommendation}
+                onChange={(e) =>
+                  setArtifact({ ...artifact, recommendation: e.target.value })
                 }
               />
               <Button
                 variant="contained"
-                disabled={!artifact.title || add.isPending}
+                disabled={!artifact.title || !artifact.summary || add.isPending}
                 onClick={addArtifact}
               >
                 Ajouter l’artefact

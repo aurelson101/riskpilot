@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogTitle,
   LinearProgress,
+  Pagination,
   CircularProgress,
   MenuItem,
   Stack,
@@ -52,6 +53,8 @@ type Task = {
   link: string;
   dueAt: string | null;
   overdue: boolean;
+  priority: string;
+  quickActions: string[];
 };
 type Trajectory = {
   id: number;
@@ -61,6 +64,10 @@ type Trajectory = {
   target: number;
   atRisk: boolean;
   dueAt: string;
+  gap: number;
+  remainingDays: number;
+  frameworkScores: Record<string, number>;
+  source: "ASSESSMENTS" | "DECLARED";
 };
 
 const sections: Array<{ type: RecordType | "MY_TASKS"; label: string }> = [
@@ -93,6 +100,15 @@ export function OperationsPage() {
     details: "{}",
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [taskQuery, setTaskQuery] = useState("");
+  const [taskSource, setTaskSource] = useState("");
+  const [taskStatus, setTaskStatus] = useState("");
+  const [taskPage, setTaskPage] = useState(1);
+  const [delegation, setDelegation] = useState({
+    taskId: 0,
+    email: "",
+    until: "",
+  });
   const closeDialog = () => {
     setOpen(false);
     setEditingId(null);
@@ -117,9 +133,21 @@ export function OperationsPage() {
     setOpen(true);
   };
   const tasks = useQuery({
-    queryKey: ["my-tasks"],
-    queryFn: async () =>
-      (await api.get<{ items: Task[] }>("/operations/my-tasks")).data.items,
+    queryKey: ["my-tasks", taskQuery, taskSource, taskStatus, taskPage],
+    queryFn: async () => {
+      const data = (
+        await api.get<{ items: Task[]; total: number; pages: number } | Task[]>(
+          `/operations/my-tasks?q=${encodeURIComponent(taskQuery)}&source=${taskSource}&status=${taskStatus}&page=${taskPage}&limit=10`,
+        )
+      ).data;
+      return Array.isArray(data)
+        ? { items: data, total: data.length, pages: 1 }
+        : {
+            items: data.items,
+            total: data.total ?? data.items.length,
+            pages: data.pages ?? 1,
+          };
+    },
   });
   const records = useQuery({
     queryKey: ["operations", section],
@@ -184,6 +212,33 @@ export function OperationsPage() {
       setFormError("La configuration JSON n’est pas valide.");
     }
   };
+  const completeTask = useMutation({
+    mutationFn: (id: number) => api.post(`/operations/tasks/${id}/complete`),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["my-tasks"] }),
+  });
+  const delegateTask = useMutation({
+    mutationFn: () =>
+      api.post(`/operations/tasks/${delegation.taskId}/delegate`, {
+        email: delegation.email,
+        until: delegation.until,
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["my-tasks"] });
+      setDelegation({ taskId: 0, email: "", until: "" });
+    },
+  });
+  const parsedDetails = useMemo(() => {
+    try {
+      return JSON.parse(form.details) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }, [form.details]);
+  const setDetail = (key: string, value: unknown) =>
+    setForm({
+      ...form,
+      details: JSON.stringify({ ...parsedDetails, [key]: value }, null, 2),
+    });
 
   return (
     <Stack spacing={3}>
@@ -226,7 +281,69 @@ export function OperationsPage() {
       )}
       {section === "MY_TASKS" ? (
         <Stack spacing={2}>
-          {tasks.data?.map((item) => (
+          <Stack direction={{ xs: "column", md: "row" }} gap={1}>
+            <TextField
+              size="small"
+              label="Rechercher"
+              value={taskQuery}
+              onChange={(e) => {
+                setTaskQuery(e.target.value);
+                setTaskPage(1);
+              }}
+            />
+            <TextField
+              size="small"
+              select
+              label="Source"
+              value={taskSource}
+              onChange={(e) => {
+                setTaskSource(e.target.value);
+                setTaskPage(1);
+              }}
+              sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="">Toutes</MenuItem>
+              {[
+                "OPERATIONAL",
+                "ACTION",
+                "ASSESSMENT",
+                "RISK",
+                "CONTROL",
+                "THIRD_PARTY",
+                "INCIDENT",
+              ].map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              size="small"
+              select
+              label="Statut"
+              value={taskStatus}
+              onChange={(e) => {
+                setTaskStatus(e.target.value);
+                setTaskPage(1);
+              }}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="">Tous</MenuItem>
+              {[
+                "ACTIVE",
+                "IN_PROGRESS",
+                "DRAFT",
+                "OPEN",
+                "PLANNED",
+                "PARTIAL",
+              ].map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+          {tasks.data?.items.map((item) => (
             <Card key={`${item.source}-${item.id}`}>
               <CardActionArea onClick={() => navigate(item.link)}>
                 <CardContent>
@@ -246,15 +363,42 @@ export function OperationsPage() {
                     </div>
                     <Chip
                       color={item.overdue ? "error" : "default"}
-                      label={item.status}
+                      label={`${item.priority} · ${item.status}`}
                     />
                   </Stack>
                 </CardContent>
               </CardActionArea>
+              {(item.quickActions ?? []).includes("complete") && (
+                <Button
+                  sx={{ m: 1 }}
+                  size="small"
+                  onClick={() => completeTask.mutate(item.id)}
+                >
+                  Terminer
+                </Button>
+              )}
+              {(item.quickActions ?? []).includes("delegate") && (
+                <Button
+                  sx={{ m: 1 }}
+                  size="small"
+                  onClick={() =>
+                    setDelegation({ taskId: item.id, email: "", until: "" })
+                  }
+                >
+                  Déléguer
+                </Button>
+              )}
             </Card>
           ))}
-          {tasks.data?.length === 0 && (
+          {tasks.data?.total === 0 && (
             <Alert severity="success">Aucune tâche ouverte.</Alert>
+          )}
+          {(tasks.data?.pages ?? 0) > 1 && (
+            <Pagination
+              page={taskPage}
+              count={tasks.data?.pages ?? 1}
+              onChange={(_, value) => setTaskPage(value)}
+            />
           )}
         </Stack>
       ) : (
@@ -295,8 +439,25 @@ export function OperationsPage() {
                       <>
                         <Typography variant="body2">
                           Réel {progress.current}% · attendu {progress.expected}
-                          % · cible {progress.target}%
+                          % · cible {progress.target}% · écart {progress.gap}
+                          points
                         </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {progress.remainingDays} jours restants · source{" "}
+                          {progress.source === "ASSESSMENTS"
+                            ? "dernières évaluations"
+                            : "déclarative"}
+                        </Typography>
+                        {Object.entries(progress.frameworkScores).map(
+                          ([framework, score]) => (
+                            <Chip
+                              key={framework}
+                              size="small"
+                              label={`${framework} · ${Math.round(score)}%`}
+                              sx={{ alignSelf: "flex-start" }}
+                            />
+                          ),
+                        )}
                         <LinearProgress
                           aria-label={`Progression ${item.title} : ${progress.current}%`}
                           variant="determinate"
@@ -364,6 +525,102 @@ export function OperationsPage() {
                   </MenuItem>
                 ))}
               </TextField>
+              {section === "TASK" && (
+                <>
+                  <TextField
+                    label="Description"
+                    value={String(parsedDetails.description ?? "")}
+                    onChange={(e) => setDetail("description", e.target.value)}
+                    multiline
+                    minRows={2}
+                  />
+                  <TextField
+                    select
+                    label="Priorité"
+                    value={String(parsedDetails.priority ?? "MEDIUM")}
+                    onChange={(e) => setDetail("priority", e.target.value)}
+                  >
+                    <MenuItem value="LOW">Faible</MenuItem>
+                    <MenuItem value="MEDIUM">Moyenne</MenuItem>
+                    <MenuItem value="HIGH">Haute</MenuItem>
+                    <MenuItem value="CRITICAL">Critique</MenuItem>
+                  </TextField>
+                </>
+              )}
+              {section === "RESPONSIBILITY_RULE" && (
+                <>
+                  <TextField
+                    label="Domaine"
+                    value={String(parsedDetails.domain ?? "")}
+                    onChange={(e) => setDetail("domain", e.target.value)}
+                  />
+                  <TextField
+                    select
+                    label="Rôle responsable par défaut"
+                    value={String(
+                      parsedDetails.defaultRole ?? "ROLE_RISK_MANAGER",
+                    )}
+                    onChange={(e) => setDetail("defaultRole", e.target.value)}
+                  >
+                    {[
+                      "ROLE_RISK_MANAGER",
+                      "ROLE_ACTION_OWNER",
+                      "ROLE_AUDITOR",
+                      "ROLE_ADMIN",
+                    ].map((role) => (
+                      <MenuItem key={role} value={role}>
+                        {role}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </>
+              )}
+              {section === "COMPLIANCE_PROGRAM" && (
+                <>
+                  <TextField
+                    type="date"
+                    label="Début"
+                    InputLabelProps={{ shrink: true }}
+                    value={String(parsedDetails.startDate ?? "")}
+                    onChange={(e) => setDetail("startDate", e.target.value)}
+                  />
+                  <TextField
+                    type="number"
+                    label="Score actuel (%)"
+                    value={Number(parsedDetails.currentScore ?? 0)}
+                    onChange={(e) =>
+                      setDetail("currentScore", Number(e.target.value))
+                    }
+                    inputProps={{ min: 0, max: 100 }}
+                  />
+                  <TextField
+                    type="number"
+                    label="Cible (%)"
+                    value={Number(parsedDetails.targetScore ?? 100)}
+                    onChange={(e) =>
+                      setDetail("targetScore", Number(e.target.value))
+                    }
+                    inputProps={{ min: 1, max: 100 }}
+                  />
+                  <TextField
+                    label="Référentiels (séparés par des virgules)"
+                    value={
+                      Array.isArray(parsedDetails.frameworks)
+                        ? parsedDetails.frameworks.join(", ")
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setDetail(
+                        "frameworks",
+                        e.target.value
+                          .split(",")
+                          .map((x) => x.trim())
+                          .filter(Boolean),
+                      )
+                    }
+                  />
+                </>
+              )}
               {!editingId && (
                 <TextField
                   select
@@ -446,6 +703,53 @@ export function OperationsPage() {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+      <Dialog
+        open={delegation.taskId > 0}
+        onClose={() => setDelegation({ taskId: 0, email: "", until: "" })}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Déléguer temporairement la tâche</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <TextField
+              required
+              type="email"
+              label="Email du délégataire"
+              value={delegation.email}
+              onChange={(e) =>
+                setDelegation({ ...delegation, email: e.target.value })
+              }
+            />
+            <TextField
+              required
+              type="datetime-local"
+              label="Fin de délégation"
+              InputLabelProps={{ shrink: true }}
+              value={delegation.until}
+              onChange={(e) =>
+                setDelegation({ ...delegation, until: e.target.value })
+              }
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDelegation({ taskId: 0, email: "", until: "" })}
+          >
+            Annuler
+          </Button>
+          <Button
+            variant="contained"
+            disabled={
+              !delegation.email || !delegation.until || delegateTask.isPending
+            }
+            onClick={() => delegateTask.mutate()}
+          >
+            Confirmer
+          </Button>
+        </DialogActions>
       </Dialog>
     </Stack>
   );

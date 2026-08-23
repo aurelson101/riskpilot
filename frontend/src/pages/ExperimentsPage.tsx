@@ -78,14 +78,18 @@ export function ExperimentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [proposalForm, setProposalForm] = useState({
     kind: "GAP_SUMMARY",
-    context: "{}",
+    objective: "",
+    scope: "",
+    constraints: "",
   });
   const [libraryForm, setLibraryForm] = useState({
     key: "",
     kind: "CONTROL",
     title: "",
-    content: "{}",
-    dependencies: "[]",
+    description: "",
+    guidance: "",
+    tags: "",
+    dependencies: "",
     source: "",
     license: "",
   });
@@ -169,25 +173,33 @@ export function ExperimentsPage() {
   });
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    try {
-      setError(null);
-      if (tab === "assistant")
-        createProposal.mutate(
-          JSON.parse(proposalForm.context) as Record<string, unknown>,
-        );
-      else
-        createLibrary.mutate({
-          key: libraryForm.key,
-          kind: libraryForm.kind,
-          title: libraryForm.title,
-          content: JSON.parse(libraryForm.content),
-          dependencies: JSON.parse(libraryForm.dependencies),
-          source: libraryForm.source || null,
-          license: libraryForm.license || null,
-        });
-    } catch {
-      setError("La configuration JSON n’est pas valide.");
-    }
+    setError(null);
+    if (tab === "assistant")
+      createProposal.mutate({
+        objective: proposalForm.objective,
+        scope: proposalForm.scope,
+        constraints: proposalForm.constraints.split("\n").filter(Boolean),
+      });
+    else
+      createLibrary.mutate({
+        key: libraryForm.key,
+        kind: libraryForm.kind,
+        title: libraryForm.title,
+        content: {
+          description: libraryForm.description,
+          guidance: libraryForm.guidance,
+          tags: libraryForm.tags
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+        },
+        dependencies: libraryForm.dependencies
+          .split(",")
+          .map((key) => ({ key: key.trim(), minVersion: 1 }))
+          .filter((item) => item.key),
+        source: libraryForm.source || null,
+        license: libraryForm.license || null,
+      });
   };
   const failed =
     settings.isError ||
@@ -467,14 +479,38 @@ export function ExperimentsPage() {
                     ))}
                   </TextField>
                   <TextField
+                    required
                     multiline
-                    minRows={8}
-                    label="Contexte JSON"
-                    value={proposalForm.context}
+                    minRows={3}
+                    label="Objectif attendu"
+                    value={proposalForm.objective}
                     onChange={(event) =>
                       setProposalForm({
                         ...proposalForm,
-                        context: event.target.value,
+                        objective: event.target.value,
+                      })
+                    }
+                  />
+                  <TextField
+                    required
+                    label="Périmètre analysé"
+                    value={proposalForm.scope}
+                    onChange={(event) =>
+                      setProposalForm({
+                        ...proposalForm,
+                        scope: event.target.value,
+                      })
+                    }
+                  />
+                  <TextField
+                    multiline
+                    minRows={2}
+                    label="Contraintes (une par ligne)"
+                    value={proposalForm.constraints}
+                    onChange={(event) =>
+                      setProposalForm({
+                        ...proposalForm,
+                        constraints: event.target.value,
                       })
                     }
                   />
@@ -521,20 +557,42 @@ export function ExperimentsPage() {
                     }
                   />
                   <TextField
+                    required
                     multiline
-                    minRows={8}
-                    label="Contenu JSON"
-                    value={libraryForm.content}
+                    minRows={3}
+                    label="Description métier"
+                    value={libraryForm.description}
                     onChange={(event) =>
                       setLibraryForm({
                         ...libraryForm,
-                        content: event.target.value,
+                        description: event.target.value,
                       })
                     }
                   />
                   <TextField
                     multiline
-                    label="Dépendances JSON"
+                    minRows={2}
+                    label="Guide d’utilisation"
+                    value={libraryForm.guidance}
+                    onChange={(event) =>
+                      setLibraryForm({
+                        ...libraryForm,
+                        guidance: event.target.value,
+                      })
+                    }
+                  />
+                  <TextField
+                    label="Étiquettes (séparées par des virgules)"
+                    value={libraryForm.tags}
+                    onChange={(event) =>
+                      setLibraryForm({
+                        ...libraryForm,
+                        tags: event.target.value,
+                      })
+                    }
+                  />
+                  <TextField
+                    label="Dépendances (clés séparées par des virgules)"
                     value={libraryForm.dependencies}
                     onChange={(event) =>
                       setLibraryForm({
