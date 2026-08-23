@@ -12,8 +12,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['organization_id', 'type', 'enabled'], name: 'idx_integration_tenant_type')]
 class PlatformIntegration
 {
-    public const TYPES = ['OIDC', 'SAML', 'SCIM', 'API_KEY', 'WEBHOOK', 'CONNECTOR'];
-    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'JIRA', 'SERVICENOW', 'GENERIC'];
+    public const TYPES = ['OIDC', 'SAML', 'SCIM', 'DIRECTORY', 'API_KEY', 'WEBHOOK', 'CONNECTOR'];
+    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'ACTIVE_DIRECTORY', 'JIRA', 'SERVICENOW', 'GENERIC'];
     public const SCOPES = ['risks:read', 'controls:read', 'actions:read', 'events:write', 'scim:write'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
@@ -25,6 +25,7 @@ class PlatformIntegration
     #[ORM\Column(type: 'json')] private array $configuration;
     #[ORM\Column(length: 16, nullable: true)] private ?string $credentialPrefix = null;
     #[ORM\Column(length: 64, nullable: true)] private ?string $secretHash = null;
+    #[ORM\Column(type: 'text', nullable: true)] private ?string $encryptedCredential = null;
     #[ORM\Column] private bool $enabled;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
@@ -82,6 +83,8 @@ class PlatformIntegration
     {
         return $this->credentialPrefix;
     }
+    public function getEncryptedCredential(): ?string { return $this->encryptedCredential; }
+    public function setEncryptedCredential(string $value): void { if ('DIRECTORY' !== $this->type || '' === $value) throw new \LogicException('Credential annuaire invalide.'); $this->encryptedCredential = $value; $this->updatedAt = new \DateTimeImmutable(); }
 
     public function isEnabled(): bool
     {
@@ -170,6 +173,12 @@ class PlatformIntegration
             $fieldOwnership = (array) ($configuration['fieldOwnership'] ?? []);
             if (!str_starts_with($url, 'https://') || !in_array($direction, ['IMPORT', 'EXPORT', 'BIDIRECTIONAL'], true) || !in_array($conflictStrategy, ['SOURCE_WINS', 'RISKPILOT_WINS', 'MANUAL'], true) || [] === $fieldOwnership) {
                 throw new \InvalidArgumentException('Le connecteur exige une URL HTTPS, un sens, une stratégie de conflit et la propriété des champs.');
+            }
+        }
+        if ('DIRECTORY' === $type) {
+            $host = strtolower(trim((string) ($configuration['host'] ?? ''))); $port = (int) ($configuration['port'] ?? 636); $baseDn = trim((string) ($configuration['baseDn'] ?? '')); $bindDn = trim((string) ($configuration['bindDn'] ?? '')); $userFilter = trim((string) ($configuration['userFilter'] ?? '')); $groupMappings = (array) ($configuration['groupMappings'] ?? []); $ca = trim((string) ($configuration['caCertificate'] ?? ''));
+            if (!str_starts_with($host, 'ldaps://') || 636 !== $port || '' === $baseDn || '' === $bindDn || !str_contains($userFilter, '{username}') || [] === $groupMappings || ('' !== $ca && (!str_contains($ca, 'BEGIN CERTIFICATE') || !str_contains($ca, 'END CERTIFICATE')))) {
+                throw new \InvalidArgumentException('LDAPS exige ldaps://, port 636, base DN, bind DN, filtre utilisateur, groupes et une CA PEM valide si fournie.');
             }
         }
     }

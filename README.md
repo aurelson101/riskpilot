@@ -88,13 +88,15 @@ Les principales API sont `GET|POST /api/risks`, `GET|PUT /api/risks/{id}`, `GET|
 
 L’écran `/actions` propose les vues tableau, Kanban et calendrier. Une action est associée à un risque, éventuellement à une mesure de sécurité, et suit son responsable, sa priorité, ses dates, sa progression, ses coûts, la réduction de risque attendue, ses preuves et ses commentaires. Le statut `OVERDUE` est calculé automatiquement lorsque l’échéance est dépassée.
 
-Les affectations, changements de responsable et alertes d’échéance produisent une notification dans `/notifications` et un email asynchrone traité par Symfony Messenger. La commande suivante génère les alertes d’échéance :
+Les affectations, changements de responsable et alertes d’échéance produisent une notification dans `/notifications`. Leur email est d’abord inscrit dans une boîte d’envoi transactionnelle tenant-scoped et idempotente, puis réclamé atomiquement avant traitement par Symfony Messenger. La commande suivante génère les alertes d’échéance :
 
 ```bash
 docker compose exec backend php bin/console app:actions:notify-deadlines
 ```
 
 Les API principales sont `GET|POST /api/actions`, `GET|PUT /api/actions/{id}`, `GET|POST /api/actions/{id}/comments`, `GET /api/notifications` et `PUT /api/notifications/{id}/read`.
+
+Le scheduler publie la boîte d’envoi avec `php bin/console app:notifications:dispatch-outbox`. Les erreurs sont conservées sans donnée d’authentification et replanifiées avec un délai progressif.
 
 ## Référentiels et conformité
 
@@ -107,6 +109,8 @@ NIS2 renvoient aux textes publics européens ; le pack ISO contient uniquement
 des métadonnées et exige une copie licenciée de la norme. Ils constituent une
 base de pilotage à adapter au périmètre et ne valent ni certification ni avis
 juridique.
+
+Le catalogue `/api/compliance/packs/catalog` permet aussi à chaque tenant d’adopter une version hachée en brouillon, puis de la faire approuver indépendamment. Le registre `/api/evidence` conserve les preuves versionnées, leur SHA-256, classification, validité et relations exigence–contrôle–résultat–action. Une preuve approuvée est immuable ; sa révision crée une version qui référence et remplace explicitement la précédente. La vue de couverture d’une exigence explique les éléments disponibles sans déduire automatiquement la conformité.
 
 L’écran `/compliance` regroupe les référentiels et les évaluations. Une évaluation porte sur un périmètre et génère un résultat pour chaque exigence active. Les évaluateurs saisissent un niveau de maturité de 0 à 5, un statut conforme, partiel, non conforme, non applicable ou non évalué, ainsi que des preuves et une action corrective facultative. Le score global exclut les exigences non applicables ou non évaluées.
 
@@ -202,12 +206,13 @@ Chaque année possède également un radar de maturité cyber de **0 à 5**, par
 
 La lecture reste limitée à l’organisation courante. La modification de la maturité et la génération d’un instantané exigent au minimum le rôle Risk Manager ; les lecteurs peuvent consulter et exporter les rapports existants.
 
-Les intégrations d’entreprise se configurent dans **Paramètres → Identité et intégrations** : fournisseurs OIDC/SAML Google Workspace, Microsoft Entra ou génériques, préparation SCIM, clés API à portées et webhooks HTTPS. Les secrets techniques ne sont affichés qu’à leur création et ne sont conservés que sous forme d’empreinte.
+Les intégrations d’entreprise se configurent dans **Paramètres → Identité et intégrations** : fournisseurs OIDC/SAML Google Workspace, Microsoft Entra ou génériques, préparation SCIM, annuaire Active Directory en LDAPS, clés API à portées et webhooks HTTPS. Le formulaire AD impose `ldaps://`, le port 636, un bind DN, une base DN, un filtre utilisateur échappé, des correspondances groupes–rôles et accepte une CA PEM. Le mot de passe de bind est chiffré et n’est jamais renvoyé ; le bouton de test réalise réellement le bind et la recherche lorsque l’infrastructure cible est joignable. Les autres secrets techniques ne sont affichés qu’à leur création et ne sont conservés que sous forme d’empreinte.
 
 **Paramètres → Rôles et permissions** permet à un administrateur de configurer
 la matrice RBAC de son organisation. Les rôles historiques conservent leurs
-permissions par défaut tant qu'aucune surcharge n'est enregistrée. LDAP/LDAPS
-n'est pas inclus dans cette phase et sera importé ultérieurement.
+permissions par défaut tant qu'aucune surcharge n'est enregistrée. Les groupes
+AD peuvent être associés aux rôles RiskPilot dans la configuration LDAPS ; leur
+validation opérationnelle exige un annuaire de préproduction et sa chaîne de CA.
 
 ## Tests
 

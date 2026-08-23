@@ -232,6 +232,15 @@ final readonly class OperationalWorkspaceController
         if ('REPORT_TEMPLATE' === $record->getType()) {
             $this->validateReportTemplate($details);
         }
+        if ('QUESTIONNAIRE_TEMPLATE' === $record->getType()) {
+            $this->validateQuestionnaireTemplate($details);
+        }
+        if ('QUESTIONNAIRE_CAMPAIGN' === $record->getType()) {
+            $this->validateQuestionnaireCampaign($details);
+        }
+        if ('REFERENCE_PACK' === $record->getType()) {
+            $this->validateReferencePack($details);
+        }
         $record->update((string) ($data['title'] ?? $record->getTitle()), (string) ($data['status'] ?? $record->getStatus()), $details, $owner, $dueAt);
     }
 
@@ -301,6 +310,46 @@ final readonly class OperationalWorkspaceController
                 throw new \InvalidArgumentException('Report period dates are inconsistent.');
             }
         }
+    }
+
+    /** @param array<string, mixed> $details */
+    private function validateQuestionnaireTemplate(array $details): void
+    {
+        if (!in_array(strtoupper((string) ($details['useCase'] ?? '')), ['EVIDENCE_COLLECTION', 'COMPLIANCE_SELF_ASSESSMENT', 'PROJECT_PREQUALIFICATION', 'EXCEPTION_REQUEST', 'CONTROL_REVIEW', 'THIRD_PARTY'], true) || (int) ($details['version'] ?? 0) < 1) {
+            throw new \InvalidArgumentException('Questionnaire use case and version are invalid.');
+        }
+        $questions = (array) ($details['questions'] ?? []);
+        if ([] === $questions) {
+            throw new \InvalidArgumentException('Questionnaire must contain at least one question.');
+        }
+        foreach ($questions as $question) {
+            if (!is_array($question) || '' === trim((string) ($question['id'] ?? '')) || '' === trim((string) ($question['label'] ?? '')) || !in_array(strtoupper((string) ($question['type'] ?? 'TEXT')), ['TEXT', 'BOOLEAN', 'SINGLE_CHOICE', 'MULTI_CHOICE', 'DATE', 'EVIDENCE'], true)) {
+                throw new \InvalidArgumentException('Questionnaire questions must be structured and typed.');
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $details */
+    private function validateQuestionnaireCampaign(array $details): void
+    {
+        $template = $this->records->findOneVisible((int) ($details['templateId'] ?? 0), $this->currentUser->get()->getOrganization());
+        if (null === $template || 'QUESTIONNAIRE_TEMPLATE' !== $template->getType() || 'ACTIVE' !== $template->getStatus()) {
+            throw new \InvalidArgumentException('An active tenant questionnaire template is required.');
+        }
+        $recipientIds = array_values(array_unique(array_map('intval', (array) ($details['recipientIds'] ?? []))));
+        if ([] === $recipientIds || count($recipientIds) !== count($this->entityManager->getRepository(User::class)->findBy(['id' => $recipientIds, 'organization' => $this->currentUser->get()->getOrganization(), 'status' => User::STATUS_ACTIVE]))) {
+            throw new \InvalidArgumentException('Campaign recipients must be active users of the tenant.');
+        }
+    }
+
+    /** @param array<string, mixed> $details */
+    private function validateReferencePack(array $details): void
+    {
+        foreach (['code', 'version', 'source', 'license', 'contentHash'] as $field) {
+            if ('' === trim((string) ($details[$field] ?? ''))) throw new \InvalidArgumentException('Governed pack metadata is incomplete.');
+        }
+        if (1 !== preg_match('/^[a-f0-9]{64}$/', strtolower((string) $details['contentHash']))) throw new \InvalidArgumentException('Pack content hash must be SHA-256.');
+        if (true === ($details['approved'] ?? false) && ('' === trim((string) ($details['approvedBy'] ?? '')) || empty($details['approvedAt']))) throw new \InvalidArgumentException('Approved pack requires approver and timestamp.');
     }
 
     /**

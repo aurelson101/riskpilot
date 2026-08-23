@@ -23,6 +23,7 @@ type Integration = {
   name: string;
   configuration: Record<string, unknown>;
   credentialPrefix: string | null;
+  credentialConfigured?: boolean;
   enabled: boolean;
 };
 const initial = {
@@ -31,6 +32,15 @@ const initial = {
   name: "",
   issuer: "",
   scopes: "risks:read",
+  host: "ldaps://",
+  port: "636",
+  baseDn: "",
+  bindDn: "",
+  credential: "",
+  userFilter: "(&(objectClass=user)(sAMAccountName={username}))",
+  groupDn: "",
+  groupRole: "ROLE_RISK_MANAGER",
+  caCertificate: "",
   enabled: false,
 };
 
@@ -43,6 +53,7 @@ export function IntegrationSettingsPage() {
   });
   const [form, setForm] = useState(initial);
   const [secret, setSecret] = useState<string | null>(null);
+  const [directoryResult, setDirectoryResult] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: async () => {
       const configuration =
@@ -55,6 +66,18 @@ export function IntegrationSettingsPage() {
             }
           : form.type === "WEBHOOK"
             ? { url: form.issuer, events: ["risk.updated", "action.overdue"] }
+            : form.type === "DIRECTORY"
+              ? {
+                  host: form.host,
+                  port: Number(form.port),
+                  baseDn: form.baseDn,
+                  bindDn: form.bindDn,
+                  userFilter: form.userFilter,
+                  groupMappings: { [form.groupDn]: form.groupRole },
+                  ...(form.caCertificate.trim()
+                    ? { caCertificate: form.caCertificate }
+                    : {}),
+                }
             : {
                 issuer: form.issuer,
                 groupRoleMappings: { "riskpilot-admins": "ROLE_ADMIN" },
@@ -67,6 +90,9 @@ export function IntegrationSettingsPage() {
             provider: form.provider,
             name: form.name,
             configuration,
+            ...(form.type === "DIRECTORY"
+              ? { credential: form.credential }
+              : {}),
             enabled: form.enabled,
           },
         )
@@ -89,7 +115,7 @@ export function IntegrationSettingsPage() {
           Identité et intégrations
         </Typography>
         <Typography color="text.secondary">
-          OIDC/SAML, provisioning SCIM, clés API limitées et webhooks signés.
+          OIDC/SAML, AD en LDAPS, provisioning SCIM, clés API limitées et webhooks signés.
         </Typography>
       </div>
       <AiCopilotSettingsPanel />
@@ -111,7 +137,7 @@ export function IntegrationSettingsPage() {
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 fullWidth
               >
-                {["OIDC", "SAML", "SCIM", "API_KEY", "WEBHOOK"].map((item) => (
+                {["OIDC", "SAML", "DIRECTORY", "SCIM", "API_KEY", "WEBHOOK"].map((item) => (
                   <MenuItem key={item} value={item}>
                     {item}
                   </MenuItem>
@@ -124,7 +150,7 @@ export function IntegrationSettingsPage() {
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
                 fullWidth
               >
-                {["GOOGLE_WORKSPACE", "MICROSOFT_ENTRA", "GENERIC"].map(
+                {["GOOGLE_WORKSPACE", "MICROSOFT_ENTRA", "ACTIVE_DIRECTORY", "GENERIC"].map(
                   (item) => (
                     <MenuItem key={item} value={item}>
                       {item}
@@ -139,7 +165,23 @@ export function IntegrationSettingsPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-            {form.type === "API_KEY" ? (
+            {form.type === "DIRECTORY" ? (
+              <Stack spacing={2}>
+                <TextField required label="Hôte LDAPS" value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} helperText="Format obligatoire : ldaps://ad.exemple.fr" />
+                <TextField required label="Port" type="number" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} helperText="636 uniquement" />
+                <TextField required label="Base DN" value={form.baseDn} onChange={(e) => setForm({ ...form, baseDn: e.target.value })} />
+                <TextField required label="Bind DN" value={form.bindDn} onChange={(e) => setForm({ ...form, bindDn: e.target.value })} />
+                <TextField required type="password" label="Mot de passe du compte de service" value={form.credential} onChange={(e) => setForm({ ...form, credential: e.target.value })} autoComplete="new-password" />
+                <TextField required label="Filtre utilisateur" value={form.userFilter} onChange={(e) => setForm({ ...form, userFilter: e.target.value })} helperText="Doit contenir {username}" />
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                  <TextField required fullWidth label="DN du groupe AD" value={form.groupDn} onChange={(e) => setForm({ ...form, groupDn: e.target.value })} />
+                  <TextField select fullWidth label="Rôle RiskPilot" value={form.groupRole} onChange={(e) => setForm({ ...form, groupRole: e.target.value })}>
+                    {["ROLE_VIEWER", "ROLE_RISK_MANAGER", "ROLE_ADMIN"].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}
+                  </TextField>
+                </Stack>
+                <TextField multiline minRows={4} label="CA PEM (recommandée)" value={form.caCertificate} onChange={(e) => setForm({ ...form, caCertificate: e.target.value })} helperText="La validation TLS est explicitement attestée lorsque la CA est fournie." />
+              </Stack>
+            ) : form.type === "API_KEY" ? (
               <TextField
                 label="Portées (séparées par des virgules)"
                 value={form.scopes}
@@ -203,6 +245,21 @@ export function IntegrationSettingsPage() {
                     {item.credentialPrefix}…
                   </Typography>
                 )}
+                {item.type === "DIRECTORY" && (
+                  <Button
+                    onClick={async () => {
+                      setDirectoryResult(null);
+                      try {
+                        const response = await api.post<{ matchedEntries: number }>(`/v1/integrations/${item.id}/directory-test`);
+                        setDirectoryResult(`LDAPS validé — ${response.data.matchedEntries} entrée(s) trouvée(s).`);
+                      } catch {
+                        setDirectoryResult("Échec de validation LDAPS. Vérifiez la CA, le bind, le filtre et le réseau.");
+                      }
+                    }}
+                  >
+                    Tester LDAPS
+                  </Button>
+                )}
                 <Button
                   color="error"
                   onClick={async () => {
@@ -219,6 +276,7 @@ export function IntegrationSettingsPage() {
           </Card>
         ))}
       </Stack>
+      {directoryResult && <Alert severity={directoryResult.startsWith("LDAPS validé") ? "success" : "error"}>{directoryResult}</Alert>}
     </Stack>
   );
 }

@@ -49,6 +49,7 @@ import type {
 import { useAuth } from "../auth/useAuth";
 import { ComplianceGovernancePanel } from "../components/compliance/ComplianceGovernancePanel";
 import { ComplianceCopilotDialog } from "../components/compliance/ComplianceCopilotDialog";
+import { EvidenceRegistryPanel } from "../components/compliance/EvidenceRegistryPanel";
 import { buildComplianceSummary } from "./complianceSummary";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
@@ -294,7 +295,9 @@ export function CompliancePage() {
         <Tab label="Évaluations" />
         <Tab label="Référentiels" />
         <Tab label="SoA & contrôles" />
+        <Tab label="Preuves" />
       </Tabs>
+      {tab === 3 && <EvidenceRegistryPanel />}
       {tab === 2 && <ComplianceGovernancePanel />}
       {tab === 1 && (
         <Card variant="outlined">

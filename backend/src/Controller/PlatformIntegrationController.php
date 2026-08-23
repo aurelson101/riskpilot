@@ -9,13 +9,15 @@ use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Security\SecretCipher;
+use App\Application\DirectoryConnectionTester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/v1/integrations')] final readonly class PlatformIntegrationController
 {
-    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager)
+    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager, private SecretCipher $cipher, private DirectoryConnectionTester $directoryTester)
     {
     }
 
@@ -39,6 +41,9 @@ use Symfony\Component\Routing\Attribute\Route;
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
                 $item->setCredential($plainSecret);
             }
+            if ('DIRECTORY' === $item->getType()) {
+                $password = (string) ($data['credential'] ?? ''); if ('' === $password) throw new \InvalidArgumentException('Le mot de passe de bind est obligatoire.'); $item->setEncryptedCredential($this->cipher->encrypt($password));
+            }
             $this->entityManager->persist($item);
             $this->entityManager->flush();
 
@@ -46,6 +51,15 @@ use Symfony\Component\Routing\Attribute\Route;
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
         }
+    }
+
+    #[Route('/{id}/directory-test', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function directoryTest(int $id): JsonResponse
+    {
+        $actor = $this->admin(); $item = $this->repository->find($id);
+        if (!$item instanceof PlatformIntegration || $item->getOrganization() !== $actor->getOrganization() || 'DIRECTORY' !== $item->getType()) return $this->notFound();
+        try { $result = $this->directoryTester->test($item); $item->markUsed(); $this->entityManager->flush(); return new JsonResponse($result); }
+        catch (\RuntimeException $e) { return new JsonResponse(['code' => 'DIRECTORY_TEST_FAILED', 'message' => $e->getMessage(), 'validated' => false], 422); }
     }
 
     #[Route('/{id}', requirements: ['id' => '\\d+'], methods: ['PUT'])]
@@ -109,7 +123,7 @@ use Symfony\Component\Routing\Attribute\Route;
     /** @return array<string, mixed> */
     private function response(PlatformIntegration $item): array
     {
-        return ['id' => $item->getId(), 'type' => $item->getType(), 'provider' => $item->getProvider(), 'name' => $item->getName(), 'configuration' => $item->getConfiguration(), 'credentialPrefix' => $item->getCredentialPrefix(), 'enabled' => $item->isEnabled(), 'lastUsedAt' => $item->getLastUsedAt()?->format(DATE_ATOM), 'updatedAt' => $item->getUpdatedAt()->format(DATE_ATOM)];
+        return ['id' => $item->getId(), 'type' => $item->getType(), 'provider' => $item->getProvider(), 'name' => $item->getName(), 'configuration' => $item->getConfiguration(), 'credentialPrefix' => $item->getCredentialPrefix(), 'credentialConfigured' => null !== $item->getEncryptedCredential(), 'enabled' => $item->isEnabled(), 'lastUsedAt' => $item->getLastUsedAt()?->format(DATE_ATOM), 'updatedAt' => $item->getUpdatedAt()->format(DATE_ATOM)];
     }
 
     private function admin(): User

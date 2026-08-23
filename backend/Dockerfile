@@ -2,9 +2,10 @@ FROM php:8.4-fpm-alpine AS base
 
 ARG PHP_BUILD_JOBS=1
 
-RUN apk add --no-cache fcgi git icu-libs libpq libxml2 libzip oniguruma \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libpq-dev libxml2-dev libzip-dev oniguruma-dev \
-    && docker-php-ext-install -j"${PHP_BUILD_JOBS}" dom intl mbstring opcache pdo_pgsql zip \
+RUN apk add --no-cache fcgi git icu-libs libpq libxml2 libzip oniguruma libldap \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libpq-dev libxml2-dev libzip-dev oniguruma-dev openldap-dev \
+    && docker-php-ext-configure ldap \
+    && docker-php-ext-install -j"${PHP_BUILD_JOBS}" dom intl ldap mbstring opcache pdo_pgsql zip \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps \

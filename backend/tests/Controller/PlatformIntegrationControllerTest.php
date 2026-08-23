@@ -51,6 +51,30 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $client->jsonRequest('POST', '/api/decision/connectors/'.$connector['id'].'/reconcile', ['dryRun' => false, 'idempotencyKey' => 'jira-test-1', 'items' => []]);
         self::assertResponseIsSuccessful();
         self::assertSame($sync['id'], json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['id']);
+
+        $client->jsonRequest('POST', '/api/v1/integrations', [
+            'type' => 'DIRECTORY',
+            'provider' => 'ACTIVE_DIRECTORY',
+            'name' => 'AD préproduction',
+            'credential' => 'not-returned-bind-password',
+            'configuration' => [
+                'host' => 'ldaps://ad.preprod.example.test',
+                'port' => 636,
+                'baseDn' => 'DC=preprod,DC=example,DC=test',
+                'bindDn' => 'CN=riskpilot,OU=Services,DC=preprod,DC=example,DC=test',
+                'userFilter' => '(&(objectClass=user)(sAMAccountName={username}))',
+                'groupMappings' => ['CN=Risk Managers,OU=Groups,DC=preprod,DC=example,DC=test' => User::ROLE_RISK_MANAGER],
+            ],
+            'enabled' => false,
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $directory = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertTrue($directory['credentialConfigured']);
+        self::assertNull($directory['secret']);
+        self::assertStringNotContainsString('not-returned-bind-password', (string) $client->getResponse()->getContent());
+
+        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'DIRECTORY', 'provider' => 'ACTIVE_DIRECTORY', 'name' => 'LDAP non chiffré', 'credential' => 'secret', 'configuration' => ['host' => 'ldap://ad.example.test', 'port' => 389]]);
+        self::assertResponseStatusCodeSame(422);
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->jsonRequest('PUT', '/api/v1/integrations/'.$created['id'], ['name' => 'Vol']);

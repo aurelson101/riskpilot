@@ -338,7 +338,10 @@ final readonly class DecisionWorkspaceController
         return ['annualLoss' => ['mean' => round($mean, 2), 'p50' => round($samples[499], 2), 'p90' => round($samples[899], 2), 'p95' => round($samples[949], 2)], 'confidenceInterval90' => ['low' => round($samples[49], 2), 'high' => round($samples[949], 2)], 'sensitivity' => ['frequency' => round(($frequencyMax - $frequencyMin) * $lossMode, 2), 'loss' => round(($lossMax - $lossMin) * (($frequencyMin + $frequencyMax) / 2), 2), 'indirectLossFactor' => $indirectFactor]];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $period
+     * @return array<string, mixed>
+     */
     private function tenantSnapshot(array $period = []): array
     {
         $actor = $this->currentUser->get();
