@@ -13,6 +13,8 @@ Exécuter `scripts/backup.sh /chemin/dédié/riskpilot`. Le script crée un rép
 
 Vérifier chaque sauvegarde avec `scripts/restore-verify.sh /chemin/dédié/riskpilot/<horodatage>`.
 
+Les unités `deploy/demo/backup.{service,timer}` automatisent la sauvegarde quotidienne de la pile de démonstration. Elles doivent être copiées dans `/etc/systemd/system`, adaptées à l'utilisateur et aux chemins réels, puis activées après un premier lancement manuel réussi.
+
 ## Restaurer lors d’un exercice planifié
 
 1. Isoler une plateforme de recette et vérifier le manifeste avec `restore-verify.sh`.

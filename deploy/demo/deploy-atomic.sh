@@ -47,5 +47,5 @@ if ! RISKPILOT_BACKEND_IMAGE=$backend_candidate RISKPILOT_FRONTEND_IMAGE=$fronte
   exit 70
 fi
 curl -fsS --max-time 10 http://127.0.0.1:18081/api/health >/dev/null || { rollback; exit 71; }
-printf '%s\n' "$release" > .deployed-release
+printf '%s\n' "$release" > .git/riskpilot-deployed-release
 echo "Livraison atomique active : $release"

@@ -7,15 +7,20 @@ if [ "$#" -ne 1 ] || [ -z "$1" ] || [ "$1" = "/" ]; then
 fi
 
 backup_root=$1
+compose_files=${RISKPILOT_COMPOSE_FILES:--f compose.yaml -f compose.prod.yaml}
+compose_project=${RISKPILOT_COMPOSE_PROJECT:-riskpilot}
+compose() {
+  docker compose -p "$compose_project" $compose_files "$@"
+}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 destination="$backup_root/$timestamp"
 mkdir -p "$destination"
 
-docker compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip -9 > "$destination/postgresql.sql.gz"
-docker compose exec -T backend sh -c 'if [ -d /app/var/isms-documents ]; then tar -C /app/var/isms-documents -czf - .; else tar -czf - --files-from /dev/null; fi' > "$destination/isms-documents.tar.gz"
-docker compose exec -T redis redis-cli --rdb /tmp/riskpilot.rdb >/dev/null
-docker compose cp redis:/tmp/riskpilot.rdb "$destination/redis.rdb" >/dev/null
-docker compose exec -T redis rm -f /tmp/riskpilot.rdb
+compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip -9 > "$destination/postgresql.sql.gz"
+compose exec -T backend sh -c 'if [ -d /app/var/isms-documents ]; then tar -C /app/var/isms-documents -czf - .; else tar -czf - --files-from /dev/null; fi' > "$destination/isms-documents.tar.gz"
+compose exec -T redis redis-cli --rdb /tmp/riskpilot.rdb >/dev/null
+compose cp redis:/tmp/riskpilot.rdb "$destination/redis.rdb" >/dev/null
+compose exec -T redis rm -f /tmp/riskpilot.rdb
 
 (cd "$destination" && sha256sum postgresql.sql.gz isms-documents.tar.gz redis.rdb > SHA256SUMS)
 cat > "$destination/metadata.json" <<EOF

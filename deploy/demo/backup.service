@@ -1,0 +1,10 @@
+[Unit]
+Description=RiskPilot daily backup
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/son/demo.riskpilot.site
+Environment=RISKPILOT_COMPOSE_PROJECT=riskpilot_demo
+Environment="RISKPILOT_COMPOSE_FILES=-f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.yaml -f deploy/demo/compose.vps-1gb.yaml -f deploy/demo/compose.sequential.yaml"
+ExecStart=/home/son/demo.riskpilot.site/scripts/backup.sh /srv/backups/riskpilot
