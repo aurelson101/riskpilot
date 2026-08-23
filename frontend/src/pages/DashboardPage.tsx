@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { DownloadOutlined, PrintOutlined } from "@mui/icons-material";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Cell,
@@ -22,6 +23,7 @@ import {
   Tooltip,
 } from "recharts";
 import { api } from "../api/client";
+import { downloadApiFile } from "../api/download";
 import type { Dashboard, RiskLevel } from "../api/types";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 
@@ -38,27 +40,10 @@ const levelLabels: Record<RiskLevel, string> = {
   CRITICAL: "Critique",
 };
 
-function download(path: string) {
-  const token = sessionStorage.getItem("riskpilot.accessToken");
-  fetch(`/api${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  }).then(async (response) => {
-    if (!response.ok) throw new Error("Export impossible");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download =
-      response.headers
-        .get("Content-Disposition")
-        ?.match(/filename="(.+)"/)?.[1] ?? "export.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  });
-}
-
 export function DashboardPage() {
   const locale = useInterfaceLocale();
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [exportError, setExportError] = useState(false);
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
@@ -81,6 +66,24 @@ export function DashboardPage() {
   const pieData = (
     Object.entries(data.riskLevels) as Array<[RiskLevel, number]>
   ).map(([name, value]) => ({ name: levelLabels[name], value, level: name }));
+  const download = async (
+    resource: "risks" | "actions",
+    format: "csv" | "xlsx",
+  ) => {
+    const key = `${resource}-${format}`;
+    setExporting(key);
+    setExportError(false);
+    try {
+      await downloadApiFile(
+        `/exports/${resource}.${format}`,
+        `${resource}.${format}`,
+      );
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(null);
+    }
+  };
   return (
     <Stack spacing={3}>
       <Stack
@@ -106,21 +109,63 @@ export function DashboardPage() {
             Rapport PDF
           </Button>
           <Button
-            variant="outlined"
+            variant="contained"
+            color="success"
             startIcon={<DownloadOutlined />}
-            onClick={() => download("/exports/risks.csv")}
+            disabled={exporting !== null}
+            onClick={() => void download("risks", "xlsx")}
           >
-            Risques CSV
+            {exporting === "risks-xlsx" ? "Export…" : "Risques Excel"}
           </Button>
           <Button
-            variant="outlined"
+            variant="contained"
+            color="success"
             startIcon={<DownloadOutlined />}
-            onClick={() => download("/exports/actions.csv")}
+            disabled={exporting !== null}
+            onClick={() => void download("actions", "xlsx")}
           >
-            Actions CSV
+            {exporting === "actions-xlsx" ? "Export…" : "Actions Excel"}
           </Button>
         </Stack>
       </Stack>
+      <Card variant="outlined" sx={{ bgcolor: "action.hover" }}>
+        <CardContent>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            alignItems={{ md: "center" }}
+            justifyContent="space-between"
+            gap={2}
+          >
+            <Box>
+              <Typography fontWeight={750}>Exports détaillés</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Excel propose un classeur mis en forme, filtrable et prêt à
+                présenter. CSV conserve un format brut interopérable.
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <Button
+                disabled={exporting !== null}
+                onClick={() => void download("risks", "csv")}
+              >
+                Risques CSV
+              </Button>
+              <Button
+                disabled={exporting !== null}
+                onClick={() => void download("actions", "csv")}
+              >
+                Actions CSV
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+      {exportError && (
+        <Alert severity="error">
+          L’export n’a pas pu être généré. Réessayez ou contactez un
+          administrateur.
+        </Alert>
+      )}
       <Box
         sx={{
           display: "grid",

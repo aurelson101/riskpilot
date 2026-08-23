@@ -86,6 +86,15 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Télécharger", "Download"],
   ["Importer", "Import"],
   ["Exporter", "Export"],
+  ["Exports détaillés", "Detailed exports"],
+  [
+    "Excel propose un classeur mis en forme, filtrable et prêt à présenter. CSV conserve un format brut interopérable.",
+    "Excel provides a styled, filterable workbook ready to present. CSV retains a raw interoperable format.",
+  ],
+  [
+    "L’export n’a pas pu être généré. Réessayez ou contactez un administrateur.",
+    "The export could not be generated. Try again or contact an administrator.",
+  ],
   ["Aucun", "None"],
   ["Tous", "All"],
   ["Oui", "Yes"],

@@ -491,4 +491,24 @@ final class TenantIsolationTest extends WebTestCase
         self::assertStringContainsString('Risque A', $content);
         self::assertStringNotContainsString('Risque B', $content);
     }
+
+    public function testActionExportsSupportActionsWithoutRiskAndProvideStyledExcel(): void
+    {
+        $action = new ActionPlan('Action issue audit', $this->adminA->getOrganization(), null, $this->adminA, new \DateTimeImmutable('+15 days'));
+        $action->configureGrc('AUD-42', 'https://tickets.example.test/AUD-42', 'AUDIT', 'ORGANIZATIONAL', [], [], ['lot' => 'A'], [], []);
+        $this->entityManager->persist($action);
+        $this->entityManager->flush();
+
+        $this->client->request('GET', '/api/exports/actions.csv');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Action issue audit', (string) $this->client->getResponse()->getContent());
+        self::assertStringContainsString('URL ticket', (string) $this->client->getResponse()->getContent());
+
+        $this->client->request('GET', '/api/exports/actions.xlsx');
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        self::assertStringContainsString('organisation-a-plans-actions-', (string) $this->client->getResponse()->headers->get('content-disposition'));
+        self::assertStringStartsWith('PK', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Action B', (string) $this->client->getResponse()->getContent());
+    }
 }

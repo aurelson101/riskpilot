@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\XlsxExporter;
 use App\Repository\ActionPlanRepository;
 use App\Repository\ComplianceAssessmentRepository;
 use App\Repository\ComplianceResultRepository;
@@ -32,11 +33,12 @@ final readonly class ExportController
         private ActionPlanRepository $actions,
         private ComplianceAssessmentRepository $assessments,
         private ComplianceResultRepository $results,
+        private XlsxExporter $xlsxExporter,
     ) {
     }
 
-    #[Route('/risks.csv', methods: ['GET'])]
-    public function risks(): Response
+    #[Route('/risks.{format<csv|xlsx>}', methods: ['GET'])]
+    public function risks(string $format): Response
     {
         $rows = [[
             'ID', 'Scénario', 'Description', 'Périmètre', 'Actif', 'Menace', 'Vulnérabilités',
@@ -59,33 +61,38 @@ final readonly class ExportController
             ];
         }
 
-        return $this->csv($this->filename('registre-risques'), $rows);
+        return $this->export($format, 'Registre des risques', 'registre-risques', $rows);
     }
 
-    #[Route('/actions.csv', methods: ['GET'])]
-    public function actions(): Response
+    #[Route('/actions.{format<csv|xlsx>}', methods: ['GET'])]
+    public function actions(string $format): Response
     {
         $rows = [[
             'ID', 'Action', 'Description', 'Risque lié', 'Mesure liée', 'Responsable', 'Email responsable',
             'Priorité', 'Statut', 'Code statut', 'Progression (%)', 'Date de début', 'Échéance',
-            'Date de fin', 'Coût estimé', 'Coût réel', 'Réduction de risque attendue', 'Preuves',
+            'Date de fin', 'Coût estimé', 'Coût réel', 'Réduction de risque attendue', 'Ticket', 'URL ticket',
+            'Origine', 'Type', 'Référentiels', 'Exigences', 'Non-conformités', 'Champs personnalisés', 'Preuves',
         ]];
         foreach ($this->actions->findVisibleTo($this->currentUser->get()) as $action) {
             $rows[] = [
-                $action->getId(), $action->getTitle(), $action->getDescription(), $action->getRelatedRisk()->getTitle(),
+                $action->getId(), $action->getTitle(), $action->getDescription(), $action->getRelatedRisk()?->getTitle(),
                 $action->getRelatedControl()?->getName(), $action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName(),
                 $action->getOwner()->getEmail(), $action->getPriority(), $this->statusLabel($action->getStatus()), $action->getStatus(),
                 $action->getProgress(), $action->getStartDate()?->format('d/m/Y'), $action->getDueDate()->format('d/m/Y'),
                 $action->getCompletionDate()?->format('d/m/Y'), $action->getEstimatedCost(), $action->getActualCost(),
-                $action->getExpectedRiskReduction(), implode(', ', $action->getEvidence()),
+                $action->getExpectedRiskReduction(), $action->getTicketNumber(), $action->getTicketUrl(), $action->getOrigin(),
+                $action->getActionType(), implode(', ', $action->getFrameworkIds()), implode(', ', $action->getRequirementIds()),
+                sprintf('%d audit · %d conformité', $action->getAuditFindings()->count(), $action->getComplianceResults()->count()),
+                json_encode($action->getCustomFields(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                implode(', ', $action->getEvidence()),
             ];
         }
 
-        return $this->csv($this->filename('plans-actions'), $rows);
+        return $this->export($format, 'Plans d’action', 'plans-actions', $rows);
     }
 
-    #[Route('/compliance/{id<\d+>}.csv', methods: ['GET'])]
-    public function compliance(int $id): Response
+    #[Route('/compliance/{id<\d+>}.{format<csv|xlsx>}', methods: ['GET'])]
+    public function compliance(int $id, string $format): Response
     {
         $assessment = $this->assessments->findOneVisibleTo($id, $this->currentUser->get());
         if (null === $assessment) {
@@ -105,7 +112,24 @@ final readonly class ExportController
             ];
         }
 
-        return $this->csv($this->filename('conformite-'.$id), $rows);
+        return $this->export($format, 'Évaluation de conformité', 'conformite-'.$id, $rows);
+    }
+
+    /** @param list<list<int|float|string|null>> $rows */
+    private function export(string $format, string $title, string $prefix, array $rows): Response
+    {
+        if ('xlsx' === $format) {
+            $content = $this->xlsxExporter->render($title, $this->currentUser->get()->getOrganization()->getName(), $rows);
+
+            return new Response($content, Response::HTTP_OK, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$this->filename($prefix, 'xlsx').'"',
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
+        return $this->csv($this->filename($prefix, 'csv'), $rows);
     }
 
     /** @param list<list<int|float|string|null>> $rows */
@@ -132,11 +156,11 @@ final readonly class ExportController
         ]);
     }
 
-    private function filename(string $prefix): string
+    private function filename(string $prefix, string $extension): string
     {
         $organization = preg_replace('/[^a-z0-9]+/i', '-', mb_strtolower($this->currentUser->get()->getOrganization()->getName()));
 
-        return trim((string) $organization, '-').'-'.$prefix.'-'.(new \DateTimeImmutable())->format('Y-m-d').'.csv';
+        return trim((string) $organization, '-').'-'.$prefix.'-'.(new \DateTimeImmutable())->format('Y-m-d').'.'.$extension;
     }
 
     private function statusLabel(string $status): string

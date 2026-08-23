@@ -205,13 +205,13 @@ Une mesure exige `value`, `measuredAt` au format ISO 8601 et `idempotencyKey`. U
   "idempotencyKey": "siem-availability-2026-07"
 }
 ```
-- `GET /api/exports/risks.csv` : registre des risques en CSV ;
-- `GET /api/exports/actions.csv` : plans d’action en CSV ;
-- `GET /api/exports/compliance/{id}.csv` : résultats d’une évaluation en CSV.
+- `GET /api/exports/risks.csv|xlsx` : registre des risques ;
+- `GET /api/exports/actions.csv|xlsx` : plans d’action, y compris les actions sans risque lié et leurs champs GRC ;
+- `GET /api/exports/compliance/{id}.csv|xlsx` : résultats d’une évaluation.
 
 Les exports sont encodés en UTF-8 avec séparateur point-virgule. Ils neutralisent les cellules susceptibles d’être interprétées comme des formules par un tableur et appliquent les mêmes contrôles JWT et tenant que les écrans.
 
-Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports CSV conservent les codes métier bruts afin de rester exploitables ; les PDF utilisent les libellés localisés du profil.
+Les noms de fichiers incluent l’organisation et la date d’extraction. Les exports CSV conservent un format brut interopérable. Les classeurs Excel utilisent un titre et une identité d’organisation, un en-tête contrasté, des lignes alternées, des largeurs adaptées, le gel des trois premières lignes et les filtres automatiques. Les deux formats neutralisent les cellules commençant par un marqueur de formule.
 
 Les exports PDF gouvernés (annuel, décision et exécutif) sont générés côté serveur. Ils indiquent leur classification, leur identifiant documentaire et exposent leur empreinte via `Digest`, `ETag` et `X-RiskPilot-Document-SHA256`. Un instantané annuel ou décisionnel inchangé produit un fichier PDF identique octet par octet.
 
