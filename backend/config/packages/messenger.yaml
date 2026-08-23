@@ -11,6 +11,7 @@ framework:
 
         routing:
             'App\Message\SendNotificationEmail': async
+            'App\Message\GenerateDecisionReport': async
 
 when@test:
     framework:

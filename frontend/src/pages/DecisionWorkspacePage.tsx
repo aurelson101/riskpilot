@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AddOutlined,
+  ArrowDownwardOutlined,
+  ArrowUpwardOutlined,
+  VisibilityOutlined,
   DownloadOutlined,
   PlayArrowOutlined,
 } from "@mui/icons-material";
@@ -103,6 +106,8 @@ const defaults: Record<Section, Record<string, unknown>> = {
     version: "1.0",
     reportType: "MANAGEMENT_COMMITTEE",
     blocks: ["risks", "actions", "compliance"],
+    period: { mode: "ROLLING_MONTHS", months: 12 },
+    classification: "CONFIDENTIAL",
     approved: false,
   },
   CONNECTOR_SYNC: {
@@ -138,6 +143,10 @@ export function DecisionWorkspacePage() {
   const [simulation, setSimulation] = useState<Record<string, unknown> | null>(
     null,
   );
+  const [reportPreview, setReportPreview] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [form, setForm] = useState({
     title: "",
     dueAt: "",
@@ -242,6 +251,15 @@ export function DecisionWorkspacePage() {
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["decision-records"] });
     },
+  });
+  const previewReport = useMutation({
+    mutationFn: async (id: number) =>
+      (
+        await api.get<Record<string, unknown>>(
+          `/decision/reports/${id}/preview`,
+        )
+      ).data,
+    onSuccess: setReportPreview,
   });
   const downloadReport = useMutation({
     mutationFn: async ({
@@ -384,6 +402,7 @@ export function DecisionWorkspacePage() {
         reconcile.isError ||
         transitionProject.isError ||
         approveReport.isError ||
+        previewReport.isError ||
         error) && (
         <Alert severity="error">
           {error ?? "L’opération n’a pas pu être terminée."}
@@ -391,41 +410,46 @@ export function DecisionWorkspacePage() {
       )}
       {runReport.data && (
         <Alert
-          severity="success"
+          severity={runReport.data.status === "COMPLETED" ? "success" : "info"}
           action={
-            <Stack direction="row" spacing={1}>
-              <Button
-                color="inherit"
-                size="small"
-                startIcon={<DownloadOutlined />}
-                disabled={downloadReport.isPending}
-                onClick={() =>
-                  downloadReport.mutate({
-                    id: runReport.data.id,
-                    format: "json",
-                  })
-                }
-              >
-                Télécharger JSON
-              </Button>
-              <Button
-                color="inherit"
-                size="small"
-                startIcon={<DownloadOutlined />}
-                disabled={downloadReport.isPending}
-                onClick={() =>
-                  downloadReport.mutate({
-                    id: runReport.data.id,
-                    format: "pdf",
-                  })
-                }
-              >
-                Télécharger PDF
-              </Button>
-            </Stack>
+            runReport.data.status === "COMPLETED" ? (
+              <Stack direction="row" spacing={1}>
+                <Button
+                  color="inherit"
+                  size="small"
+                  startIcon={<DownloadOutlined />}
+                  disabled={downloadReport.isPending}
+                  onClick={() =>
+                    downloadReport.mutate({
+                      id: runReport.data.id,
+                      format: "json",
+                    })
+                  }
+                >
+                  Télécharger JSON
+                </Button>
+                <Button
+                  color="inherit"
+                  size="small"
+                  startIcon={<DownloadOutlined />}
+                  disabled={downloadReport.isPending}
+                  onClick={() =>
+                    downloadReport.mutate({
+                      id: runReport.data.id,
+                      format: "pdf",
+                    })
+                  }
+                >
+                  Télécharger PDF
+                </Button>
+              </Stack>
+            ) : undefined
           }
         >
-          Rapport généré : {runReport.data.title}
+          {runReport.data.status === "COMPLETED"
+            ? "Rapport généré"
+            : "Rapport placé en file de génération"}{" "}
+          : {runReport.data.title}
         </Alert>
       )}
       {(records.isLoading ||
@@ -489,6 +513,15 @@ export function DecisionWorkspacePage() {
                   <Chip label={item.status} />
                 </Stack>
                 <RecordDetails details={item.details} />
+                {section === "REPORT_TEMPLATE" && (
+                  <Button
+                    startIcon={<VisibilityOutlined />}
+                    disabled={previewReport.isPending}
+                    onClick={() => previewReport.mutate(item.id)}
+                  >
+                    Aperçu métier
+                  </Button>
+                )}
                 {section === "REPORT_TEMPLATE" &&
                   item.details.approved !== true &&
                   isAdmin && (
@@ -574,6 +607,17 @@ export function DecisionWorkspacePage() {
           </CardContent>
         </Card>
       )}
+      {reportPreview && (
+        <Card>
+          <CardContent>
+            <Typography fontWeight={750}>Aperçu du rapport</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Aperçu tenant-scoped sans création d’une version officielle.
+            </Typography>
+            <RecordDetails details={reportPreview} />
+          </CardContent>
+        </Card>
+      )}
       <Dialog
         open={canCreate && open}
         onClose={() => setOpen(false)}
@@ -644,6 +688,152 @@ export function DecisionWorkspacePage() {
                   ))}
                 </TextField>
               )}
+              {section === "REPORT_TEMPLATE" &&
+                (() => {
+                  const blocks =
+                    (parsedDetails.blocks as string[] | undefined) ?? [];
+                  const period = (parsedDetails.period as
+                    Record<string, unknown> | undefined) ?? {
+                    mode: "ALL_TIME",
+                  };
+                  const moveBlock = (index: number, offset: number) => {
+                    const next = [...blocks];
+                    const target = index + offset;
+                    if (target < 0 || target >= next.length) return;
+                    [next[index], next[target]] = [next[target], next[index]];
+                    setDetail("blocks", next);
+                  };
+                  const updatePeriod = (key: string, value: unknown) =>
+                    setDetail("period", { ...period, [key]: value });
+                  return (
+                    <Stack spacing={2}>
+                      <Typography fontWeight={700}>
+                        Blocs et ordre d’affichage
+                      </Typography>
+                      {(["risks", "actions", "compliance"] as const).map(
+                        (block) => {
+                          const index = blocks.indexOf(block);
+                          return (
+                            <Stack
+                              key={block}
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                            >
+                              <Button
+                                variant={index >= 0 ? "contained" : "outlined"}
+                                onClick={() =>
+                                  setDetail(
+                                    "blocks",
+                                    index >= 0
+                                      ? blocks.filter((item) => item !== block)
+                                      : [...blocks, block],
+                                  )
+                                }
+                              >
+                                {block}
+                              </Button>
+                              {index >= 0 && (
+                                <>
+                                  <Button
+                                    aria-label={`Monter ${block}`}
+                                    disabled={index === 0}
+                                    onClick={() => moveBlock(index, -1)}
+                                  >
+                                    <ArrowUpwardOutlined />
+                                  </Button>
+                                  <Button
+                                    aria-label={`Descendre ${block}`}
+                                    disabled={index === blocks.length - 1}
+                                    onClick={() => moveBlock(index, 1)}
+                                  >
+                                    <ArrowDownwardOutlined />
+                                  </Button>
+                                </>
+                              )}
+                            </Stack>
+                          );
+                        },
+                      )}
+                      <TextField
+                        select
+                        label="Période"
+                        value={String(period.mode ?? "ALL_TIME")}
+                        onChange={(event) =>
+                          updatePeriod("mode", event.target.value)
+                        }
+                      >
+                        <MenuItem value="ALL_TIME">Toutes les données</MenuItem>
+                        <MenuItem value="CALENDAR_YEAR">Année civile</MenuItem>
+                        <MenuItem value="ROLLING_MONTHS">
+                          Mois glissants
+                        </MenuItem>
+                        <MenuItem value="CUSTOM">
+                          Période personnalisée
+                        </MenuItem>
+                      </TextField>
+                      {period.mode === "ROLLING_MONTHS" && (
+                        <TextField
+                          type="number"
+                          label="Nombre de mois"
+                          inputProps={{ min: 1, max: 120 }}
+                          value={Number(period.months ?? 12)}
+                          onChange={(event) =>
+                            updatePeriod("months", Number(event.target.value))
+                          }
+                        />
+                      )}
+                      {period.mode === "CUSTOM" && (
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={2}
+                        >
+                          <TextField
+                            fullWidth
+                            type="date"
+                            label="Du"
+                            InputLabelProps={{ shrink: true }}
+                            value={String(period.from ?? "")}
+                            onChange={(event) =>
+                              updatePeriod("from", event.target.value)
+                            }
+                          />
+                          <TextField
+                            fullWidth
+                            type="date"
+                            label="Au"
+                            InputLabelProps={{ shrink: true }}
+                            value={String(period.until ?? "")}
+                            onChange={(event) =>
+                              updatePeriod("until", event.target.value)
+                            }
+                          />
+                        </Stack>
+                      )}
+                      <TextField
+                        select
+                        label="Classification"
+                        value={String(
+                          parsedDetails.classification ?? "CONFIDENTIAL",
+                        )}
+                        onChange={(event) =>
+                          setDetail("classification", event.target.value)
+                        }
+                      >
+                        {[
+                          "PUBLIC",
+                          "INTERNAL",
+                          "CONFIDENTIAL",
+                          "RESTRICTED",
+                        ].map((value) => (
+                          <MenuItem key={value} value={value}>
+                            {value}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Stack>
+                  );
+                })()}
               {"provider" in parsedDetails && (
                 <TextField
                   select

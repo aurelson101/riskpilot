@@ -282,6 +282,25 @@ final readonly class OperationalWorkspaceController
         if (isset($details['filters']) && !is_array($details['filters'])) {
             throw new \InvalidArgumentException('Report filters must be structured.');
         }
+        $classification = strtoupper((string) ($details['classification'] ?? 'CONFIDENTIAL'));
+        if (!in_array($classification, ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'], true)) {
+            throw new \InvalidArgumentException('Invalid report classification.');
+        }
+        $period = (array) ($details['period'] ?? ['mode' => 'ALL_TIME']);
+        $mode = strtoupper((string) ($period['mode'] ?? 'ALL_TIME'));
+        if (!in_array($mode, ['ALL_TIME', 'CALENDAR_YEAR', 'ROLLING_MONTHS', 'CUSTOM'], true)) {
+            throw new \InvalidArgumentException('Invalid report period.');
+        }
+        if ('ROLLING_MONTHS' === $mode && ((int) ($period['months'] ?? 0) < 1 || (int) ($period['months'] ?? 0) > 120)) {
+            throw new \InvalidArgumentException('Rolling period must be between 1 and 120 months.');
+        }
+        if ('CUSTOM' === $mode) {
+            $from = new \DateTimeImmutable((string) ($period['from'] ?? ''));
+            $until = new \DateTimeImmutable((string) ($period['until'] ?? ''));
+            if ($from > $until) {
+                throw new \InvalidArgumentException('Report period dates are inconsistent.');
+            }
+        }
     }
 
     /**

@@ -54,9 +54,16 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $privateView = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         $client->jsonRequest('POST', '/api/operations/records', ['type' => 'REPORT_TEMPLATE', 'title' => 'Unsafe report', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['version' => '1', 'blocks' => ['risks', '<script>alert(1)</script>'], 'approved' => true, 'approvedBy' => 'Risk Manager']]);
         self::assertResponseStatusCodeSame(422);
-        $client->jsonRequest('POST', '/api/operations/records', ['type' => 'REPORT_TEMPLATE', 'title' => 'Management report', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['version' => '1', 'blocks' => ['risks'], 'approved' => true, 'approvedBy' => 'Risk Manager']]);
+        $client->jsonRequest('POST', '/api/operations/records', ['type' => 'REPORT_TEMPLATE', 'title' => 'Management report', 'status' => 'ACTIVE', 'ownerId' => $managerUser->getId(), 'details' => ['version' => '1', 'blocks' => ['actions', 'risks'], 'period' => ['mode' => 'ROLLING_MONTHS', 'months' => 12], 'classification' => 'CONFIDENTIAL', 'approved' => true, 'approvedBy' => 'Risk Manager']]);
         self::assertResponseStatusCodeSame(201);
         $template = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+
+        $client->request('GET', '/api/decision/reports/'.$template['id'].'/preview');
+        self::assertResponseIsSuccessful();
+        $preview = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertTrue($preview['preview']);
+        self::assertSame(['actions', 'risks'], $preview['blocks']);
+        self::assertSame('ROLLING_MONTHS', $preview['period']['mode']);
 
         $client->jsonRequest('POST', '/api/decision/reports/'.$template['id'].'/run');
         self::assertResponseStatusCodeSame(201);
@@ -66,6 +73,11 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         self::assertSame('Primary', $run['details']['organization']);
         self::assertSame('Risk Manager', $run['details']['generatedBy']);
         self::assertSame('en', $run['details']['locale']);
+        self::assertFalse($run['details']['comparison']['available']);
+        $client->request('GET', '/api/decision/reports/'.$template['id'].'/history');
+        self::assertResponseIsSuccessful();
+        $history = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(1, $history['items']);
         $client->request('GET', '/api/decision/reports/'.$run['id'].'/export?format=pdf');
         self::assertResponseIsSuccessful();
         self::assertSame('application/pdf', $client->getResponse()->headers->get('Content-Type'));
@@ -78,6 +90,16 @@ final class DecisionWorkspaceControllerTest extends WebTestCase
         $client->request('GET', '/api/decision/reports/'.$run['id'].'/export?format=pdf');
         self::assertResponseIsSuccessful();
         self::assertSame($pdf, (string) $client->getResponse()->getContent(), 'A governed report run must produce a byte-stable PDF.');
+
+        $client->setServerParameter('HTTP_PREFER', 'respond-async');
+        $client->jsonRequest('POST', '/api/decision/reports/'.$template['id'].'/run');
+        self::assertResponseStatusCodeSame(202);
+        self::assertSame('respond-async', $client->getResponse()->headers->get('Preference-Applied'));
+        $queued = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('IN_PROGRESS', $queued['status']);
+        $client->request('GET', '/api/decision/reports/'.$queued['id'].'/export?format=pdf');
+        self::assertResponseStatusCodeSame(409);
+        $client->setServerParameter('HTTP_PREFER', '');
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($reader));
         $client->request('GET', '/api/decision/views/'.$privateView['id'].'/snapshot');

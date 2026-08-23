@@ -42,6 +42,9 @@ final class PdfReportRendererTest extends TestCase
         $selectedBlocks = $decision->invoke($renderer, 'Board report', ['organization' => 'Tenant', 'generatedAt' => '2026-08-22T12:00:00+00:00', 'blocks' => ['risks'], 'snapshot' => []], 'en');
         self::assertStringContainsString('Priority risks', $selectedBlocks);
         self::assertStringNotContainsString('Priority action plans', $selectedBlocks);
+        self::assertStringContainsString('Table of contents', $selectedBlocks);
+        $orderedBlocks = $decision->invoke($renderer, 'Board report', ['organization' => 'Tenant', 'generatedAt' => '2026-08-22T12:00:00+00:00', 'blocks' => ['actions', 'risks'], 'snapshot' => []], 'en');
+        self::assertLessThan(strpos($orderedBlocks, 'Priority risks'), strpos($orderedBlocks, 'Priority action plans'));
     }
 
     public function testFrozenInputProducesByteStablePdfAndDocumentMetadata(): void

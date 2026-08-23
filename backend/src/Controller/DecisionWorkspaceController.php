@@ -16,6 +16,7 @@ use App\Entity\RiskScenario;
 use App\Entity\SupplierAssessment;
 use App\Entity\ThirdParty;
 use App\Entity\User;
+use App\Message\GenerateDecisionReport;
 use App\Repository\ActionPlanRepository;
 use App\Repository\ComplianceAssessmentRepository;
 use App\Repository\ExecutiveGovernanceRecordRepository;
@@ -31,6 +32,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 #[Route('/api/decision')]
 final readonly class DecisionWorkspaceController
@@ -48,6 +50,7 @@ final readonly class DecisionWorkspaceController
         private OrganizationRepository $organizations,
         private EntityManagerInterface $entityManager,
         private PdfReportRenderer $pdf,
+        private MessageBusInterface $messageBus,
     ) {
     }
 
@@ -145,7 +148,7 @@ final readonly class DecisionWorkspaceController
 
     #[Route('/reports/{id<\d+>}/run', methods: ['POST'])]
     #[IsGranted(User::ROLE_RISK_MANAGER)]
-    public function runReport(int $id): JsonResponse
+    public function runReport(int $id, Request $request): JsonResponse
     {
         $template = $this->record($id, 'REPORT_TEMPLATE');
         if (null === $template || 'ACTIVE' !== $template->getStatus() || true !== ($template->getDetails()['approved'] ?? false)) {
@@ -153,13 +156,44 @@ final readonly class DecisionWorkspaceController
         }
         $actor = $this->currentUser->get();
         $generatedAt = new \DateTimeImmutable();
-        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($template->getDetails()['version'] ?? '1'), 'reportType' => (string) ($template->getDetails()['reportType'] ?? 'MANAGEMENT_COMMITTEE'), 'approvedBy' => (string) ($template->getDetails()['approvedBy'] ?? ''), 'organization' => $actor->getOrganization()->getName(), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'generatedBy' => trim($actor->getFirstName().' '.$actor->getLastName()), 'locale' => $actor->getLocale(), 'blocks' => $template->getDetails()['blocks'] ?? [], 'snapshot' => $this->tenantSnapshot()];
+        $templateDetails = $template->getDetails();
+        $snapshot = $this->tenantSnapshot((array) ($templateDetails['period'] ?? []));
+        $details = ['templateId' => $template->getId(), 'templateVersion' => (string) ($templateDetails['version'] ?? '1'), 'reportType' => (string) ($templateDetails['reportType'] ?? 'MANAGEMENT_COMMITTEE'), 'approvedBy' => (string) ($templateDetails['approvedBy'] ?? ''), 'classification' => (string) ($templateDetails['classification'] ?? 'CONFIDENTIAL'), 'organization' => $actor->getOrganization()->getName(), 'generatedAt' => $generatedAt->format(DATE_ATOM), 'generatedBy' => trim($actor->getFirstName().' '.$actor->getLastName()), 'locale' => $actor->getLocale(), 'blocks' => $templateDetails['blocks'] ?? [], 'period' => $this->resolvedPeriod((array) ($templateDetails['period'] ?? [])), 'snapshot' => $snapshot];
+        $details['comparison'] = $this->comparison($template->getId(), $snapshot);
         $run = new OperationalRecord($actor->getOrganization(), 'REPORT_RUN', $template->getTitle().' — '.$generatedAt->format('Y-m-d H:i'), $details);
-        $run->update($run->getTitle(), 'COMPLETED', $details, $actor, null);
+        $async = $request->headers->contains('Prefer', 'respond-async') || (int) ($snapshot['risks'] ?? 0) + (int) ($snapshot['actions'] ?? 0) + (int) ($snapshot['assessments'] ?? 0) >= 100;
+        $run->update($run->getTitle(), $async ? 'IN_PROGRESS' : 'COMPLETED', $details, $actor, null);
         $this->entityManager->persist($run);
         $this->entityManager->flush();
+        if ($async) {
+            $this->messageBus->dispatch(new GenerateDecisionReport((int) $run->getId()));
+        }
 
-        return new JsonResponse($this->serialize($run), 201);
+        return new JsonResponse($this->serialize($run), $async ? 202 : 201, $async ? ['Preference-Applied' => 'respond-async'] : []);
+    }
+
+    #[Route('/reports/{id<\d+>}/preview', methods: ['GET'])]
+    public function previewReport(int $id): JsonResponse
+    {
+        $template = $this->record($id, 'REPORT_TEMPLATE');
+        if (null === $template) {
+            return $this->error('NOT_FOUND', 'Modèle de rapport introuvable.', 404);
+        }
+        $details = $template->getDetails();
+        $snapshot = $this->tenantSnapshot((array) ($details['period'] ?? []));
+
+        return new JsonResponse(['templateId' => $id, 'title' => $template->getTitle(), 'blocks' => $details['blocks'] ?? [], 'period' => $this->resolvedPeriod((array) ($details['period'] ?? [])), 'snapshot' => $snapshot, 'comparison' => $this->comparison($id, $snapshot), 'preview' => true]);
+    }
+
+    #[Route('/reports/{id<\d+>}/history', methods: ['GET'])]
+    public function reportHistory(int $id): JsonResponse
+    {
+        if (null === $this->record($id, 'REPORT_TEMPLATE')) {
+            return $this->error('NOT_FOUND', 'Modèle de rapport introuvable.', 404);
+        }
+        $runs = array_values(array_filter($this->records->findForOrganization($this->currentUser->get()->getOrganization(), 'REPORT_RUN'), static fn (OperationalRecord $run): bool => $id === (int) ($run->getDetails()['templateId'] ?? 0)));
+
+        return new JsonResponse(['templateId' => $id, 'items' => array_map($this->serialize(...), array_slice($runs, 0, 24))]);
     }
 
     #[Route('/reports/{id<\d+>}/export', methods: ['GET'])]
@@ -168,6 +202,9 @@ final readonly class DecisionWorkspaceController
         $run = $this->record($id, 'REPORT_RUN');
         if (null === $run) {
             return $this->error('NOT_FOUND', 'Rapport introuvable.', 404);
+        }
+        if ('COMPLETED' !== $run->getStatus()) {
+            return $this->error('REPORT_NOT_READY', 'Le rapport est encore en cours de génération.', 409);
         }
         $format = strtolower((string) $request->query->get('format', 'pdf'));
         $details = $run->getDetails();
@@ -302,12 +339,20 @@ final readonly class DecisionWorkspaceController
     }
 
     /** @return array<string, mixed> */
-    private function tenantSnapshot(): array
+    private function tenantSnapshot(array $period = []): array
     {
         $actor = $this->currentUser->get();
         $risks = $this->risks->findVisibleTo($actor);
         $actions = $this->actions->findVisibleTo($actor);
         $assessments = $this->assessments->findVisibleTo($actor);
+        $resolvedPeriod = $this->resolvedPeriod($period);
+        if (null !== $resolvedPeriod['from']) {
+            $from = new \DateTimeImmutable($resolvedPeriod['from']);
+            $until = new \DateTimeImmutable($resolvedPeriod['until'].' 23:59:59');
+            $risks = array_values(array_filter($risks, static fn (RiskScenario $item): bool => $item->getCreatedAt() <= $until && ($item->getReviewDate() ?? $item->getCreatedAt()) >= $from));
+            $actions = array_values(array_filter($actions, static fn (ActionPlan $item): bool => $item->getCreatedAt() <= $until && $item->getDueDate() >= $from));
+            $assessments = array_values(array_filter($assessments, static fn (ComplianceAssessment $item): bool => $item->getAssessmentDate() >= $from && $item->getAssessmentDate() <= $until));
+        }
         usort($risks, static fn (RiskScenario $left, RiskScenario $right): int => $right->getCurrentRiskScore() <=> $left->getCurrentRiskScore());
         usort($actions, static fn (ActionPlan $left, ActionPlan $right): int => $left->getDueDate() <=> $right->getDueDate());
 
@@ -317,10 +362,47 @@ final readonly class DecisionWorkspaceController
             'assessments' => count($assessments),
             'actions' => count($actions),
             'thirdParties' => count($this->thirdParties->findVisibleTo($actor)),
+            'period' => $resolvedPeriod,
             'riskItems' => array_map(static fn (RiskScenario $risk): array => ['title' => $risk->getTitle(), 'status' => $risk->getStatus(), 'currentScore' => $risk->getCurrentRiskScore(), 'residualScore' => $risk->getResidualRiskScore(), 'treatment' => $risk->getTreatmentDecision(), 'owner' => trim($risk->getRiskOwner()->getFirstName().' '.$risk->getRiskOwner()->getLastName())], array_slice($risks, 0, 10)),
             'actionItems' => array_map(static fn (ActionPlan $action): array => ['title' => $action->getTitle(), 'status' => $action->getStatus(), 'priority' => $action->getPriority(), 'progress' => $action->getProgress(), 'dueAt' => $action->getDueDate()->format('Y-m-d'), 'owner' => trim($action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName())], array_slice($actions, 0, 10)),
             'complianceItems' => array_map(static fn (ComplianceAssessment $assessment): array => ['framework' => $assessment->getFramework()->getName().' '.$assessment->getFramework()->getVersion(), 'scope' => $assessment->getScope()->getName(), 'status' => $assessment->getStatus(), 'score' => $assessment->getGlobalScore(), 'assessedAt' => $assessment->getAssessmentDate()->format('Y-m-d')], array_slice($assessments, 0, 10)),
         ];
+    }
+
+    /** @param array<string, mixed> $period
+     * @return array{mode: string, from: ?string, until: ?string}
+     */
+    private function resolvedPeriod(array $period): array
+    {
+        $mode = strtoupper((string) ($period['mode'] ?? 'ALL_TIME'));
+        $today = new \DateTimeImmutable('today');
+        return match ($mode) {
+            'CALENDAR_YEAR' => ['mode' => $mode, 'from' => $today->format('Y').'-01-01', 'until' => $today->format('Y').'-12-31'],
+            'ROLLING_MONTHS' => ['mode' => $mode, 'from' => $today->modify('-'.max(1, min(120, (int) ($period['months'] ?? 12))).' months')->format('Y-m-d'), 'until' => $today->format('Y-m-d')],
+            'CUSTOM' => ['mode' => $mode, 'from' => (string) ($period['from'] ?? ''), 'until' => (string) ($period['until'] ?? '')],
+            default => ['mode' => 'ALL_TIME', 'from' => null, 'until' => null],
+        };
+    }
+
+    /** @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private function comparison(int $templateId, array $snapshot): array
+    {
+        foreach ($this->records->findForOrganization($this->currentUser->get()->getOrganization(), 'REPORT_RUN') as $previous) {
+            $details = $previous->getDetails();
+            if ('COMPLETED' !== $previous->getStatus() || $templateId !== (int) ($details['templateId'] ?? 0)) {
+                continue;
+            }
+            $prior = (array) ($details['snapshot'] ?? []);
+            $deltas = [];
+            foreach (['risks', 'controls', 'assessments', 'actions', 'thirdParties'] as $metric) {
+                $deltas[$metric] = (int) ($snapshot[$metric] ?? 0) - (int) ($prior[$metric] ?? 0);
+            }
+            return ['available' => true, 'previousRunId' => $previous->getId(), 'previousGeneratedAt' => $details['generatedAt'] ?? null, 'deltas' => $deltas];
+        }
+
+        return ['available' => false, 'deltas' => []];
     }
 
     /** @return list<string> */

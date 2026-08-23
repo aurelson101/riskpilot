@@ -131,7 +131,7 @@ final class PdfReportRenderer
         foreach ($cards as $label => $value) {
             $cardHtml .= '<td class="card"><strong>'.$value.'</strong>'.$this->escape($label).'</td>';
         }
-        $sections = '';
+        $sectionBodies = [];
         if (in_array('risks', $blocks, true)) {
             $rows = '';
             foreach ((array) ($snapshot['riskItems'] ?? []) as $item) {
@@ -139,7 +139,7 @@ final class PdfReportRenderer
                 $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''), $locale)).'</td><td>'.(int) ($item['currentScore'] ?? 0).'</td><td>'.(int) ($item['residualScore'] ?? 0).'</td><td>'.$this->escape($this->domainLabel((string) ($item['treatment'] ?? ''), $locale)).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
             }
             $empty = !array_key_exists('riskItems', $snapshot) && (int) ($snapshot['risks'] ?? 0) > 0 ? $this->t('Détail non conservé dans cet instantané historique.', 'Details were not retained in this historical snapshot.', $locale) : $this->t('Aucun risque sélectionné.', 'No risk selected.', $locale);
-            $sections .= '<h2>2. '.$this->t('Risques prioritaires', 'Priority risks', $locale).'</h2>'.$this->decisionTable([$this->t('Risque', 'Risk', $locale), $this->t('Statut', 'Status', $locale), $this->t('Actuel', 'Current', $locale), $this->t('Résiduel', 'Residual', $locale), $this->t('Traitement', 'Treatment', $locale), $this->t('Responsable', 'Owner', $locale)], $rows, $empty);
+            $sectionBodies['risks'] = [$this->t('Risques prioritaires', 'Priority risks', $locale), $this->decisionTable([$this->t('Risque', 'Risk', $locale), $this->t('Statut', 'Status', $locale), $this->t('Actuel', 'Current', $locale), $this->t('Résiduel', 'Residual', $locale), $this->t('Traitement', 'Treatment', $locale), $this->t('Responsable', 'Owner', $locale)], $rows, $empty)];
         }
         if (in_array('actions', $blocks, true)) {
             $rows = '';
@@ -148,7 +148,7 @@ final class PdfReportRenderer
                 $rows .= '<tr><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['priority'] ?? ''), $locale)).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''), $locale)).'</td><td>'.(int) ($item['progress'] ?? 0).'%</td><td>'.$this->escape($this->date((string) ($item['dueAt'] ?? ''), $locale)).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td></tr>';
             }
             $empty = !array_key_exists('actionItems', $snapshot) && (int) ($snapshot['actions'] ?? 0) > 0 ? $this->t('Détail non conservé dans cet instantané historique.', 'Details were not retained in this historical snapshot.', $locale) : $this->t('Aucune action sélectionnée.', 'No action selected.', $locale);
-            $sections .= '<h2>3. '.$this->t('Plans d’action prioritaires', 'Priority action plans', $locale).'</h2>'.$this->decisionTable([$this->t('Action', 'Action', $locale), $this->t('Priorité', 'Priority', $locale), $this->t('Statut', 'Status', $locale), $this->t('Avancement', 'Progress', $locale), $this->t('Échéance', 'Due date', $locale), $this->t('Responsable', 'Owner', $locale)], $rows, $empty);
+            $sectionBodies['actions'] = [$this->t('Plans d’action prioritaires', 'Priority action plans', $locale), $this->decisionTable([$this->t('Action', 'Action', $locale), $this->t('Priorité', 'Priority', $locale), $this->t('Statut', 'Status', $locale), $this->t('Avancement', 'Progress', $locale), $this->t('Échéance', 'Due date', $locale), $this->t('Responsable', 'Owner', $locale)], $rows, $empty)];
         }
         if (in_array('compliance', $blocks, true)) {
             $rows = '';
@@ -157,16 +157,31 @@ final class PdfReportRenderer
                 $rows .= '<tr><td>'.$this->escape((string) ($item['framework'] ?? '')).'</td><td>'.$this->escape((string) ($item['scope'] ?? '')).'</td><td>'.$this->escape($this->domainLabel((string) ($item['status'] ?? ''), $locale)).'</td><td>'.$this->escape(number_format((float) ($item['score'] ?? 0), 1, 'en' === $locale ? '.' : ',', '').' %').'</td><td>'.$this->escape($this->date((string) ($item['assessedAt'] ?? ''), $locale)).'</td></tr>';
             }
             $empty = !array_key_exists('complianceItems', $snapshot) && (int) ($snapshot['assessments'] ?? 0) > 0 ? $this->t('Détail non conservé dans cet instantané historique.', 'Details were not retained in this historical snapshot.', $locale) : $this->t('Aucune évaluation sélectionnée.', 'No assessment selected.', $locale);
-            $sections .= '<h2>4. '.$this->t('Situation de conformité', 'Compliance position', $locale).'</h2>'.$this->decisionTable([$this->t('Référentiel', 'Framework', $locale), $this->t('Périmètre', 'Scope', $locale), $this->t('Statut', 'Status', $locale), $this->t('Score', 'Score', $locale), $this->t('Évaluation', 'Assessment', $locale)], $rows, $empty);
+            $sectionBodies['compliance'] = [$this->t('Situation de conformité', 'Compliance position', $locale), $this->decisionTable([$this->t('Référentiel', 'Framework', $locale), $this->t('Périmètre', 'Scope', $locale), $this->t('Statut', 'Status', $locale), $this->t('Score', 'Score', $locale), $this->t('Évaluation', 'Assessment', $locale)], $rows, $empty)];
         }
+        $sections = '';
+        $contents = '<ol class="toc"><li>'.$this->t('Synthèse exécutive', 'Executive summary', $locale).'</li>';
+        $number = 2;
+        foreach ($blocks as $block) {
+            if (!isset($sectionBodies[$block])) {
+                continue;
+            }
+            [$heading, $body] = $sectionBodies[$block];
+            $contents .= '<li>'.$this->escape($heading).'</li>';
+            $sections .= '<section><h2>'.$number.'. '.$this->escape($heading).'</h2>'.$body.'</section>';
+            ++$number;
+        }
+        $contents .= '<li>'.$this->t('Décisions et suites', 'Decisions and follow-up', $locale).'</li><li>'.$this->t('Méthodologie et limites', 'Methodology and limitations', $locale).'</li></ol>';
+        $decisionNumber = $number++;
+        $methodNumber = $number;
         $css = $this->sharedCss();
 
         return '<!doctype html><html lang="'.$locale.'"><head><meta charset="UTF-8"><title>'.$this->escape($title).'</title><style>'.$css.'</style></head><body>'.
             $this->brandHeader($title, $organization, $documentId, $this->t('CONFIDENTIEL', 'CONFIDENTIAL', $locale), $this->t('Modèle approuvé', 'Approved template', $locale)).
             '<div class="meta">'.$this->escape($this->domainLabel((string) ($data['reportType'] ?? 'MANAGEMENT_COMMITTEE'), $locale)).'<br>'.$this->t('Modèle', 'Template', $locale).' v'.$this->escape((string) ($data['templateVersion'] ?? '1')).' · '.$this->t('Généré le', 'Generated on', $locale).' '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''), $locale)).' '.$this->t('par', 'by', $locale).' '.$this->escape((string) ($data['generatedBy'] ?? 'RiskPilot')).' · '.$this->t('Modèle approuvé par', 'Template approved by', $locale).' '.$this->escape((string) ($data['approvedBy'] ?? $this->t('Non renseigné', 'Not provided', $locale))).'</div></header>'.
-            '<h2>1. '.$this->t('Synthèse exécutive', 'Executive summary', $locale).'</h2><table class="cards"><tr>'.$cardHtml.'</tr></table><div class="notice">'.$this->t('Ce rapport fige les données visibles au moment de sa génération. Les éléments ci-dessous sont limités aux blocs approuvés dans le modèle.', 'This report freezes the data visible at generation time. The sections below are limited to blocks approved in the template.', $locale).'</div>'.$sections.
-            '<div class="keep"><h2>5. '.$this->t('Décisions et suites', 'Decisions and follow-up', $locale).'</h2><p>'.$this->t('Les arbitrages, décisions et recommandations doivent être consignés dans le dossier de gouvernance associé. Ce rapport fournit les priorités factuelles et ne remplace pas la validation humaine du comité.', 'Arbitrations, decisions and recommendations must be recorded in the associated governance file. This report provides factual priorities and does not replace human committee approval.', $locale).'</p></div>'.
-            '<div class="keep"><h2>6. '.$this->t('Méthodologie et limites', 'Methodology and limitations', $locale).'</h2><p>'.$this->t('Les dix premiers éléments sont classés par criticité pour les risques et par échéance pour les actions. Les scores de conformité proviennent des dernières évaluations visibles. Les données restent soumises à la qualité et à l’exhaustivité des enregistrements sources.', 'The first ten items are ranked by risk criticality and action due date. Compliance scores come from the latest visible assessments. Data remains subject to the quality and completeness of source records.', $locale).'</p></div>'.
+            '<nav aria-label="'.$this->t('Sommaire', 'Table of contents', $locale).'"><h2>'.$this->t('Sommaire', 'Table of contents', $locale).'</h2>'.$contents.'</nav><h2>1. '.$this->t('Synthèse exécutive', 'Executive summary', $locale).'</h2><table class="cards"><tr>'.$cardHtml.'</tr></table><div class="notice">'.$this->t('Ce rapport fige les données visibles au moment de sa génération. Les éléments ci-dessous sont limités aux blocs approuvés dans le modèle.', 'This report freezes the data visible at generation time. The sections below are limited to blocks approved in the template.', $locale).'</div>'.$sections.
+            '<div class="keep"><h2>'.$decisionNumber.'. '.$this->t('Décisions et suites', 'Decisions and follow-up', $locale).'</h2><p>'.$this->t('Les arbitrages, décisions et recommandations doivent être consignés dans le dossier de gouvernance associé. Ce rapport fournit les priorités factuelles et ne remplace pas la validation humaine du comité.', 'Arbitrations, decisions and recommendations must be recorded in the associated governance file. This report provides factual priorities and does not replace human committee approval.', $locale).'</p></div>'.
+            '<div class="keep"><h2>'.$methodNumber.'. '.$this->t('Méthodologie et limites', 'Methodology and limitations', $locale).'</h2><p>'.$this->t('Les dix premiers éléments sont classés par criticité pour les risques et par échéance pour les actions. Les scores de conformité proviennent des dernières évaluations visibles. Les données restent soumises à la qualité et à l’exhaustivité des enregistrements sources.', 'The first ten items are ranked by risk criticality and action due date. Compliance scores come from the latest visible assessments. Data remains subject to the quality and completeness of source records.', $locale).'</p></div>'.
             $this->footer($this->t('Rapport de décision gouverné', 'Governed decision report', $locale), $organization, $documentId).'</body></html>';
     }
 
