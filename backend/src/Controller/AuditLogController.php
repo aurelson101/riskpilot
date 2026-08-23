@@ -54,7 +54,16 @@ final readonly class AuditLogController
     public function export(): Response
     {
         $data = array_map($this->serialize(...), $this->logs->findVisibleTo($this->currentUser->get()));
-        $payload = json_encode(['exportedAt' => (new \DateTimeImmutable())->format(DATE_ATOM), 'events' => $data], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $payload = json_encode([
+            'exportedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'chainMigration' => [
+                'currentHashVersion' => 2,
+                'legacyUnverifiableEvents' => $this->logs->countLegacySealedFor($this->currentUser->get()),
+                'legacyPolicy' => 'PRESERVED_NOT_RESEALED',
+                'statement' => 'Legacy v1 hashes are preserved as historical evidence but cannot be verified. The v2 chain starts without rewriting prior events.',
+            ],
+            'events' => $data,
+        ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $signature = hash_hmac('sha256', $payload, $this->appSecret);
 
         return new Response($payload, Response::HTTP_OK, [
