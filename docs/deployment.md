@@ -46,6 +46,6 @@ Sur la démo contrainte en mémoire, le consommateur Messenger recycle son proce
 
 ## Recette formelle et retour arrière
 
-La recette minimale comprend : `production-readiness.sh`, migration en préproduction, exercice de restauration trimestriel, test de charge avec rapport CSV, rotation annuelle des secrets/JWT, contrôle CSP/proxy, centralisation des logs, PRA et exercice de rollback. Conserver ces preuves avec l'identifiant Git livré.
+La recette minimale comprend : `production-readiness.sh`, migration en préproduction, exercice de restauration trimestriel, test de charge avec rapport CSV, rotation annuelle des secrets/JWT, contrôle CSP/proxy, centralisation des logs, PRA et exercice de rollback. Conserver ces preuves avec l'identifiant Git livré. Pour une superposition Compose, fournir `RISKPILOT_COMPOSE_PROJECT` et la liste des options `-f` dans `RISKPILOT_COMPOSE_FILES`.
 
 La démo se livre avec `deploy/demo/deploy-atomic.sh <commit>`. Le script construit des images immuables nommées par commit, conserve les références actives, applique les migrations, bascule séquentiellement et réactive automatiquement les anciennes images si un healthcheck échoue. Toute migration doit donc être rétrocompatible avec la version N-1.
