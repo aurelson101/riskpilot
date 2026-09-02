@@ -140,5 +140,6 @@ JSON], JSON_THROW_ON_ERROR), ['http_code' => 200]));
         self::assertStringContainsString('Answer in English', $body['instructions']);
         self::assertStringContainsString('/dashboard', $body['instructions']);
         self::assertStringContainsString('explicit confirmation', $body['instructions']);
+        self::assertStringContainsString('Never answer that you cannot create', $body['instructions']);
     }
 }

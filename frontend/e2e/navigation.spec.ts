@@ -305,6 +305,95 @@ test("le rapport exécutif télécharge un PDF gouverné", async ({
   expect(await download.failure()).toBeNull();
 });
 
+test("le mode pilotage prépare réellement le brouillon de risque proposé", async ({
+  page,
+  request,
+}) => {
+  let draftCalls = 0;
+  await page.route("**/api/copilot/context", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        enabled: true,
+        provider: "MISTRAL",
+        model: "codestral-latest",
+        notice: "Test",
+      }),
+    });
+  });
+  await page.route("**/api/copilot/risk-draft", async (route) => {
+    draftCalls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        draft: {
+          title: "Rançongiciel sur la plateforme cloud",
+          description: "Une indisponibilité pourrait interrompre le service.",
+          scopeId: 1,
+          assetId: 1,
+          threatId: 1,
+          likelihood: 3,
+          impact: 4,
+          rationale: "Valeurs à confirmer après revue des contrôles.",
+        },
+      }),
+    });
+  });
+  await page.route("**/api/copilot", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer: "Je prépare le brouillon de risque demandé.",
+        actions: [
+          {
+            type: "OPEN_RISK_DRAFT",
+            label: "Préparer un brouillon de risque",
+          },
+        ],
+      }),
+    });
+  });
+  await authenticate(page, request, "admin@riskpilot.local");
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page
+    .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: /Mode pilotage|Pilot mode/ })
+    .click();
+  await dialog
+    .getByRole("textbox", {
+      name: /Que voulez-vous accomplir|What do you want to accomplish/,
+    })
+    .fill("Crée un risque de rançongiciel sur notre plateforme cloud.");
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’autorise l’envoi|I authorize sending/,
+    })
+    .check();
+  await dialog.getByRole("button", { name: /Envoyer|Send/ }).click();
+  await dialog
+    .getByRole("button", {
+      name: /Préparer un brouillon de risque|Prepare a risk draft/,
+    })
+    .click();
+
+  await expect(
+    dialog.getByRole("textbox", {
+      name: /Quel événement redouté|Which feared event/,
+    }),
+  ).toHaveValue("Rançongiciel sur la plateforme cloud");
+  expect(draftCalls).toBe(1);
+});
+
 test("le copilote crée des brouillons risque, conformité et ISMS après confirmation", async ({
   page,
   request,

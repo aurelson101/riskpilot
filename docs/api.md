@@ -47,6 +47,11 @@ inexistant avant l'échec d'une génération.
 - `POST /api/copilot` répond à une question après consentement explicite. Le mode `ASSIST` conseille sans action ; le mode `PILOT` reçoit le chemin courant et peut proposer jusqu'à trois actions applicatives strictement inscrites sur liste blanche ;
 - `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.
 
+Dans l'interface, l'action `OPEN_RISK_DRAFT` réutilise automatiquement la
+demande pilotée pour appeler `POST /api/copilot/risk-draft` et préremplir le
+formulaire. Elle ne déclenche jamais `POST /api/risks`, qui reste réservé à la
+confirmation explicite du brouillon par un utilisateur autorisé.
+
 La génération de risque exige `ROLE_RISK_MANAGER`, consomme le quota partagé du
 copilote et transmet uniquement la demande ainsi que les noms et identifiants
 des périmètres, actifs et menaces visibles dans le tenant. La réponse contient

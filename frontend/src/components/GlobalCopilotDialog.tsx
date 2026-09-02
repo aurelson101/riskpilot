@@ -78,6 +78,7 @@ type ComplianceActionDraft = {
   dueInDays: number;
   rationale: string;
 };
+type DraftRequest = { request: string; consent: boolean };
 
 function errorMessage(error: unknown) {
   return axios.isAxiosError<{ message?: string }>(error)
@@ -239,11 +240,11 @@ export function GlobalCopilotDialog({
     },
   });
   const generateRisk = useMutation({
-    mutationFn: async () =>
+    mutationFn: async ({ request, consent }: DraftRequest) =>
       (
         await api.post<{ draft: RiskDraft }>("/copilot/risk-draft", {
-          prompt: riskRequest,
-          consent: riskConsent,
+          prompt: request,
+          consent,
         })
       ).data,
     onSuccess: ({ draft }) => {
@@ -263,11 +264,11 @@ export function GlobalCopilotDialog({
     },
   });
   const generateComplianceAction = useMutation({
-    mutationFn: async () =>
+    mutationFn: async ({ request, consent }: DraftRequest) =>
       (
         await api.post<{ draft: ComplianceActionDraft }>(
           "/copilot/compliance-action-draft",
-          { prompt: complianceRequest, consent: complianceConsent },
+          { prompt: request, consent },
         )
       ).data,
     onSuccess: ({ draft }) => {
@@ -367,11 +368,15 @@ export function GlobalCopilotDialog({
       return;
     }
     if (action.type === "OPEN_RISK_DRAFT") {
-      setRiskRequest(lastPilotRequest);
+      const request = lastPilotRequest;
+      setRiskRequest(request);
       setTab("risk");
+      generateRisk.mutate({ request, consent: true });
     } else if (action.type === "OPEN_COMPLIANCE_ACTION_DRAFT") {
-      setComplianceRequest(lastPilotRequest);
+      const request = lastPilotRequest;
+      setComplianceRequest(request);
       setTab("compliance");
+      generateComplianceAction.mutate({ request, consent: true });
     } else if (action.type === "OPEN_ISMS_DOCUMENT_DRAFT") {
       setTab("isms");
     }
@@ -611,7 +616,12 @@ export function GlobalCopilotDialog({
                   riskRequest.trim().length < 10 ||
                   pending
                 }
-                onClick={() => generateRisk.mutate()}
+                onClick={() =>
+                  generateRisk.mutate({
+                    request: riskRequest,
+                    consent: riskConsent,
+                  })
+                }
               >
                 Générer le brouillon avec l’IA
               </Button>
@@ -770,7 +780,12 @@ export function GlobalCopilotDialog({
                   !complianceCatalog.data?.length ||
                   pending
                 }
-                onClick={() => generateComplianceAction.mutate()}
+                onClick={() =>
+                  generateComplianceAction.mutate({
+                    request: complianceRequest,
+                    consent: complianceConsent,
+                  })
+                }
               >
                 Formuler l’action avec l’IA
               </Button>

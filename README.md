@@ -157,6 +157,10 @@ propose la prochaine destination et ouvre les assistants gouvernés adaptés.
 Toutes les réponses et actions sont en français ou en anglais selon la langue
 du profil. Une liste blanche serveur contrôle les destinations et capacités ;
 le fournisseur IA ne reçoit jamais un accès direct aux API RiskPilot.
+Lorsqu'un utilisateur choisit une action de brouillon proposée par le pilote,
+la demande de conversation est transmise directement au générateur structuré et
+les champs éditables sont préremplis. Il n'a pas à recopier sa demande ; la
+persistance reste déclenchée uniquement par la confirmation finale.
 
 Dans l'assistant risque, une demande en langage naturel peut être envoyée à
 `POST /api/copilot/risk-draft`. L'IA propose un titre, une description, un
