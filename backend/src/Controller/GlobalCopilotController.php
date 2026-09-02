@@ -137,7 +137,8 @@ final readonly class GlobalCopilotController
             'provider' => $settings?->getProvider(),
             'model' => $settings?->getModel(),
             'dataPolicy' => $settings?->getDataPolicy() ?? 'MINIMAL',
-            'capabilities' => ['GUIDANCE', 'RISK_DRAFT', 'COMPLIANCE_ACTION_DRAFT', 'ISMS_DOCUMENT_DRAFT'],
+            'modes' => ['ASSIST', 'PILOT'],
+            'capabilities' => ['GUIDANCE', 'NAVIGATION', 'RISK_DRAFT', 'COMPLIANCE_ACTION_DRAFT', 'ISMS_DOCUMENT_DRAFT'],
             'automaticWrite' => false,
             'notice' => 'Toute création passe par un brouillon relu et une confirmation humaine explicite.',
         ]);
@@ -156,6 +157,11 @@ final readonly class GlobalCopilotController
         }
         $input = $request->toArray();
         $question = trim((string) ($input['question'] ?? ''));
+        $mode = strtoupper(trim((string) ($input['mode'] ?? 'ASSIST')));
+        $currentPath = trim((string) ($input['currentPath'] ?? '/'));
+        if (!in_array($mode, ['ASSIST', 'PILOT'], true) || mb_strlen($currentPath) > 200) {
+            return $this->error('INVALID_MODE', 'Le mode ou le contexte de navigation est invalide.', 422);
+        }
         if (true !== ($input['consent'] ?? false) || mb_strlen($question) < 3 || mb_strlen($question) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une question de 3 à 2 000 caractères sont obligatoires.', 422);
         }
@@ -168,13 +174,10 @@ final readonly class GlobalCopilotController
             return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
         }
         try {
-            $answer = $this->client->askGlobal(
-                $settings,
-                $question,
-                $history,
-                $actor->getLocale(),
-                hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())),
-            );
+            $safetyIdentifier = hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId()));
+            $result = 'PILOT' === $mode
+                ? $this->client->pilot($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $currentPath, $this->pilotCapabilities())
+                : ['answer' => $this->client->askGlobal($settings, $question, $history, $actor->getLocale(), $safetyIdentifier), 'actions' => []];
         } catch (\Throwable) {
             return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire de réponse.', 502);
         }
@@ -184,11 +187,14 @@ final readonly class GlobalCopilotController
             'dataPolicy' => $settings->getDataPolicy(),
             'questionHash' => hash('sha256', $question),
             'workflow' => 'GLOBAL_COPILOT',
+            'mode' => $mode,
             'automaticWrite' => false,
         ]]);
 
         return new JsonResponse([
-            'answer' => $answer,
+            'answer' => $result['answer'],
+            'actions' => $this->validatedPilotActions($result['actions']),
+            'mode' => $mode,
             'provider' => $settings->getProvider(),
             'model' => $settings->getModel(),
             'automaticWrite' => false,
@@ -227,6 +233,49 @@ final readonly class GlobalCopilotController
     private function error(string $code, string $message, int $status): JsonResponse
     {
         return new JsonResponse(['code' => $code, 'message' => $message], $status);
+    }
+
+    /** @return list<array{type: string, label: string, path?: string}> */
+    private function pilotCapabilities(): array
+    {
+        $routes = [
+            '/' => 'Dashboard', '/risks' => 'Risks', '/risk-matrix' => 'Risk matrix', '/actions' => 'Action plans',
+            '/operations' => 'Operations', '/search' => 'Global search', '/decision' => 'Decision workspace',
+            '/experiments' => 'Governed proposals', '/ebios' => 'EBIOS RM', '/indicators' => 'Indicators',
+            '/annual-reports' => 'Annual reports', '/compliance' => 'Compliance', '/nis2' => 'NIS2',
+            '/third-parties' => 'Third parties', '/resilience' => 'Resilience and continuity',
+            '/regulatory' => 'GDPR and regulatory records', '/isms-documents' => 'ISMS documents',
+            '/notifications' => 'Notifications', '/profile' => 'User profile',
+        ];
+        $actions = [];
+        foreach ($routes as $path => $label) {
+            $actions[] = ['type' => 'NAVIGATE', 'label' => $label, 'path' => $path];
+        }
+        if ([] !== array_intersect([User::ROLE_RISK_MANAGER, User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $this->currentUser->get()->getRoles())) {
+            $actions[] = ['type' => 'OPEN_RISK_DRAFT', 'label' => 'Prepare a risk draft'];
+            $actions[] = ['type' => 'OPEN_COMPLIANCE_ACTION_DRAFT', 'label' => 'Prepare a compliance action draft'];
+        }
+        $actions[] = ['type' => 'OPEN_ISMS_DOCUMENT_DRAFT', 'label' => 'Prepare an ISMS document draft'];
+
+        return $actions;
+    }
+
+    /** @param list<array{type: string, label: string, path?: string}> $actions
+     * @return list<array{type: string, label: string, path?: string}>
+     */
+    private function validatedPilotActions(array $actions): array
+    {
+        $allowed = $this->pilotCapabilities();
+
+        return array_values(array_filter($actions, static function (array $action) use ($allowed): bool {
+            foreach ($allowed as $capability) {
+                if ($action['type'] === $capability['type'] && ('NAVIGATE' !== $action['type'] || ($action['path'] ?? null) === ($capability['path'] ?? null))) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
     }
 
     /** @param list<object> $entities

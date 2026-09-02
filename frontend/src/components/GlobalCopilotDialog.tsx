@@ -18,6 +18,8 @@ import {
   Tab,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useState, type FormEvent } from "react";
@@ -25,8 +27,18 @@ import axios from "axios";
 import { api } from "../api/client";
 import type { Asset, Scope, Threat, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type Message = { role: "user" | "assistant"; content: string };
+type PilotAction = {
+  type:
+    | "NAVIGATE"
+    | "OPEN_RISK_DRAFT"
+    | "OPEN_COMPLIANCE_ACTION_DRAFT"
+    | "OPEN_ISMS_DOCUMENT_DRAFT";
+  label: string;
+  path?: string;
+};
 type Context = {
   enabled: boolean;
   provider: string | null;
@@ -81,11 +93,16 @@ export function GlobalCopilotDialog({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"chat" | "risk" | "compliance" | "isms">(
     "chat",
   );
   const [messages, setMessages] = useState<Message[]>([]);
+  const [mode, setMode] = useState<"ASSIST" | "PILOT">("ASSIST");
+  const [pilotActions, setPilotActions] = useState<PilotAction[]>([]);
+  const [lastPilotRequest, setLastPilotRequest] = useState("");
   const [question, setQuestion] = useState("");
   const [consent, setConsent] = useState(false);
   const [riskRequest, setRiskRequest] = useState("");
@@ -168,13 +185,16 @@ export function GlobalCopilotDialog({
   const chat = useMutation({
     mutationFn: async () =>
       (
-        await api.post<{ answer: string }>("/copilot", {
+        await api.post<{ answer: string; actions: PilotAction[] }>("/copilot", {
           question,
           consent,
           history: messages.slice(-8),
+          mode,
+          currentPath: location.pathname,
         })
       ).data,
     onSuccess: (response) => {
+      if (mode === "PILOT") setLastPilotRequest(question);
       setMessages((current) => [
         ...current,
         { role: "user", content: question },
@@ -182,6 +202,7 @@ export function GlobalCopilotDialog({
       ]);
       setQuestion("");
       setConsent(false);
+      setPilotActions(response.actions ?? []);
     },
   });
   const createRisk = useMutation({
@@ -338,6 +359,23 @@ export function GlobalCopilotDialog({
     event.preventDefault();
     if (question.trim().length >= 3 && consent) chat.mutate();
   };
+  const runPilotAction = (action: PilotAction) => {
+    setConfirmed(false);
+    if (action.type === "NAVIGATE" && action.path) {
+      navigate(action.path);
+      onClose();
+      return;
+    }
+    if (action.type === "OPEN_RISK_DRAFT") {
+      setRiskRequest(lastPilotRequest);
+      setTab("risk");
+    } else if (action.type === "OPEN_COMPLIANCE_ACTION_DRAFT") {
+      setComplianceRequest(lastPilotRequest);
+      setTab("compliance");
+    } else if (action.type === "OPEN_ISMS_DOCUMENT_DRAFT") {
+      setTab("isms");
+    }
+  };
   const options = (values: Option[] | undefined, empty: string) =>
     values?.length ? (
       values.map((item) => (
@@ -428,6 +466,26 @@ export function GlobalCopilotDialog({
           {failure && <Alert severity="error">{errorMessage(failure)}</Alert>}
           {tab === "chat" && (
             <>
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                value={mode}
+                onChange={(_, value) => {
+                  if (value) {
+                    setMode(value);
+                    setPilotActions([]);
+                  }
+                }}
+                aria-label="Mode du copilote"
+              >
+                <ToggleButton value="ASSIST">Mode aide</ToggleButton>
+                <ToggleButton value="PILOT">Mode pilotage</ToggleButton>
+              </ToggleButtonGroup>
+              <Alert severity={mode === "PILOT" ? "warning" : "info"}>
+                {mode === "PILOT"
+                  ? "L’IA connaît l’écran courant, propose la prochaine destination et ouvre les assistants adaptés. Toute écriture reste modifiable et soumise à votre confirmation et à vos droits."
+                  : "L’IA répond, explique et vous aide à décider sans piloter la navigation."}
+              </Alert>
               <Stack
                 spacing={1}
                 sx={{ minHeight: 180, maxHeight: 360, overflowY: "auto" }}
@@ -462,10 +520,28 @@ export function GlobalCopilotDialog({
                     {message.content}
                   </Box>
                 ))}
+                {mode === "PILOT" && pilotActions.length > 0 && (
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    {pilotActions.map((action, index) => (
+                      <Button
+                        key={`${action.type}-${action.path ?? index}`}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => runPilotAction(action)}
+                      >
+                        {action.label}
+                      </Button>
+                    ))}
+                  </Stack>
+                )}
               </Stack>
               <Stack component="form" spacing={1} onSubmit={ask}>
                 <TextField
-                  label="Votre question"
+                  label={
+                    mode === "PILOT"
+                      ? "Que voulez-vous accomplir ?"
+                      : "Votre question"
+                  }
                   multiline
                   minRows={2}
                   value={question}

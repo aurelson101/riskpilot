@@ -115,6 +115,15 @@ en objet métier. L'assistant est désactivé par défaut et activable intégral
 par organisation. Les métriques de rejet et de couverture permettent de suivre
 les réponses non fiables sans envoyer de contenu à un service externe.
 
+Le copilote global distingue deux modes. `ASSIST` reste une conversation sans
+action. `PILOT` contextualise la réponse avec la route courante et le catalogue
+complet des écrans, puis transforme la réponse structurée du fournisseur en
+actions locales inscrites sur liste blanche. Le navigateur exécute uniquement
+une navigation interne ou ouvre un assistant de brouillon existant. Le backend
+revalide la route, la capacité et le RBAC ; aucune clé de session ni API métier
+n'est exposée au fournisseur. Les écritures restent des brouillons modifiables
+avec confirmation humaine explicite.
+
 `KnowledgeLibraryItem` représente une version immuable d'une ressource interne.
 Une révision crée une nouvelle ligne liée par `supersedes`; elle ne réécrit pas
 une analyse ou une version approuvée. Le workflow impose soumission, approbation

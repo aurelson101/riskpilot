@@ -1374,6 +1374,18 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Confirmer et créer le document ISMS", "Confirm and create ISMS document"],
   ["Document ISMS créé :", "ISMS document created:"],
   ["Conversation avec le copilote IA", "Conversation with the AI copilot"],
+  ["Mode du copilote", "Copilot mode"],
+  ["Mode aide", "Help mode"],
+  ["Mode pilotage", "Pilot mode"],
+  ["Que voulez-vous accomplir ?", "What do you want to accomplish?"],
+  [
+    "L’IA connaît l’écran courant, propose la prochaine destination et ouvre les assistants adaptés. Toute écriture reste modifiable et soumise à votre confirmation et à vos droits.",
+    "AI knows the current screen, suggests the next destination and opens the relevant assistants. Every write remains editable and subject to your confirmation and permissions.",
+  ],
+  [
+    "L’IA répond, explique et vous aide à décider sans piloter la navigation.",
+    "AI answers, explains and helps you decide without controlling navigation.",
+  ],
   [
     "Votre rôle ne permet pas de créer un risque.",
     "Your role does not allow you to create a risk.",

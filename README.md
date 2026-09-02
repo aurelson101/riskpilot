@@ -148,6 +148,13 @@ réutilisent les API métier, présentent un aperçu, respectent le RBAC et ne
 créent qu'un brouillon après confirmation humaine explicite. Le dialogue est
 chargé à la demande afin de ne pas alourdir le démarrage de l'application.
 
+Le dialogue distingue désormais le mode **Aide**, purement conversationnel, du
+mode **Pilotage**. Le pilotage connaît l'écran courant et tous les modules,
+propose la prochaine destination et ouvre les assistants gouvernés adaptés.
+Toutes les réponses et actions sont en français ou en anglais selon la langue
+du profil. Une liste blanche serveur contrôle les destinations et capacités ;
+le fournisseur IA ne reçoit jamais un accès direct aux API RiskPilot.
+
 Dans l'assistant risque, une demande en langage naturel peut être envoyée à
 `POST /api/copilot/risk-draft`. L'IA propose un titre, une description, un
 périmètre, un actif, une menace et une cotation 1 à 5 en sélectionnant

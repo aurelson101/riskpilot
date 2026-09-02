@@ -32,6 +32,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $client->disableReboot();
         self::getContainer()->set(HttpClientInterface::class, new MockHttpClient([
             new MockResponse(json_encode(['output_text' => 'Commençons par identifier le périmètre.'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
+            new MockResponse(json_encode(['output_text' => '{"answer":"Ouvrez le registre des risques.","actions":[{"type":"NAVIGATE","label":"Ouvrir les risques","path":"/risks"},{"type":"NAVIGATE","label":"Action interdite","path":"https://evil.test"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Rançongiciel chez le prestataire","description":"Le service externalisé pourrait être indisponible et les données exposées.","scopeId":1,"assetId":1,"threatId":1,"likelihood":3,"impact":4,"rationale":"Le niveau doit être confirmé après revue des contrôles du prestataire."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Formaliser la revue des accès","description":"Documenter une revue trimestrielle des accès privilégiés, son responsable, les écarts et les preuves de clôture.","complianceResultId":1,"priority":"HIGH","actionType":"ORGANIZATIONAL","dueInDays":60,"rationale":"L’exigence est partiellement satisfaite ; la fréquence et les preuves doivent être confirmées."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
         ]));
@@ -68,6 +69,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         self::assertFalse($context['enabled']);
         self::assertContains('RISK_DRAFT', $context['capabilities']);
         self::assertContains('COMPLIANCE_ACTION_DRAFT', $context['capabilities']);
+        self::assertContains('PILOT', $context['modes']);
         self::assertFalse($context['automaticWrite']);
         $client->jsonRequest('POST', '/api/copilot', ['question' => 'Aide-moi à créer un risque tiers', 'consent' => true]);
         self::assertResponseStatusCodeSame(409);
@@ -89,6 +91,15 @@ final class GlobalCopilotControllerTest extends WebTestCase
         self::assertInstanceOf(AuditLog::class, $audit);
         self::assertSame('[REDACTED]', $audit->getNewValues()['request']['question']);
         self::assertSame('GLOBAL_COPILOT', $audit->getNewValues()['entities'][0]['workflow']);
+
+        $client->jsonRequest('POST', '/api/copilot', ['question' => 'Montre-moi les risques', 'consent' => true, 'mode' => 'PILOT', 'currentPath' => '/']);
+        self::assertResponseIsSuccessful();
+        $pilot = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('PILOT', $pilot['mode']);
+        self::assertSame('/risks', $pilot['actions'][0]['path']);
+        self::assertCount(1, $pilot['actions'], 'A provider cannot inject a non-allowlisted destination.');
+        $pilotAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
+        self::assertSame('PILOT', $pilotAudit->getNewValues()['entities'][0]['mode']);
 
         $client->jsonRequest('POST', '/api/copilot/risk-draft', ['prompt' => 'Crée un risque de rançongiciel chez notre prestataire de paie.', 'consent' => true]);
         self::assertResponseIsSuccessful();

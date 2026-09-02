@@ -116,4 +116,29 @@ JSON], JSON_THROW_ON_ERROR), ['http_code' => 200]));
         self::assertSame(15, $draft['likelihood'] * $draft['impact']);
         self::assertStringContainsString('à confirmer', $draft['rationale']);
     }
+
+    public function testPilotReturnsStructuredActionsAndUsesRequestedLanguage(): void
+    {
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = compact('method', 'url', 'options');
+
+            return new MockResponse(json_encode(['output_text' => '{"answer":"Open the risk register.","actions":[{"type":"NAVIGATE","label":"Open risks","path":"/risks"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]);
+        });
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new AiSettings(new Organization('Tenant'));
+        $settings->configure('OPENAI', 'https://api.openai.com/v1', 'gpt-test', 'MINIMAL', '', true);
+        $settings->setEncryptedApiKey($cipher->encrypt('provider-secret'));
+
+        $result = (new AiCopilotClient($http, $cipher))->pilot($settings, 'Show me the risks', [], 'en', 'safety-user-1', '/dashboard', [
+            ['type' => 'NAVIGATE', 'label' => 'Risks', 'path' => '/risks'],
+        ]);
+
+        self::assertSame('Open the risk register.', $result['answer']);
+        self::assertSame('/risks', $result['actions'][0]['path']);
+        $body = json_decode($captured['options']['body'], true, 512, JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('Answer in English', $body['instructions']);
+        self::assertStringContainsString('/dashboard', $body['instructions']);
+        self::assertStringContainsString('explicit confirmation', $body['instructions']);
+    }
 }

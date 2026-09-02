@@ -39,7 +39,7 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 ## Copilote IA et brouillon de risque
 
 - `GET /api/copilot/context` expose l'état et les capacités du copilote sans secret ;
-- `POST /api/copilot` répond à une question après consentement explicite ;
+- `POST /api/copilot` répond à une question après consentement explicite. Le mode `ASSIST` conseille sans action ; le mode `PILOT` reçoit le chemin courant et peut proposer jusqu'à trois actions applicatives strictement inscrites sur liste blanche ;
 - `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.
 
 La génération de risque exige `ROLE_RISK_MANAGER`, consomme le quota partagé du
@@ -50,6 +50,13 @@ et `rationale`. Les relations et les notes sont revalidées côté serveur. Cett
 route n'écrit aucune entité (`automaticWrite: false`) ; l'interface affiche un
 brouillon modifiable, puis appelle séparément `POST /api/risks` après relecture
 et confirmation humaine. Le texte du prompt n'est pas conservé dans l'audit.
+
+En mode `PILOT`, la réponse ajoute `mode` et `actions`. Les actions autorisées
+sont la navigation interne et l'ouverture des assistants de risque, d'action de
+conformité ou de document ISMS. Le serveur revalide chaque type, chemin et rôle :
+une URL externe, une capacité inventée ou une action interdite est supprimée.
+Le fournisseur ne reçoit aucun jeton applicatif et ne peut appeler directement
+une API métier. La langue de réponse est celle du profil (`fr` ou `en`).
 
 ## Plans d’action et notifications
 
