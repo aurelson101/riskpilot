@@ -59,21 +59,11 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth/useAuth";
 import { hasAnyRole } from "./auth/roles";
-import { api } from "./api/client";
-import type { IsmsDocument } from "./api/types";
 import { LanguageBoundary } from "./i18n/LanguageBoundary";
 import { ConfirmationProvider } from "./components/ConfirmationProvider";
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
 const LoginPage = lazy(() =>
   import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
@@ -279,6 +269,7 @@ function Layout() {
     "/analysis-workspace",
     "/ebios",
     "/risk-matrix",
+    "/scopes",
     "/threats",
     "/vulnerabilities",
   ].some((path) => location.pathname === path);
@@ -290,52 +281,29 @@ function Layout() {
     "/experiments",
     "/indicators",
     "/annual-reports",
+    "/reports/executive",
   ].some((path) => location.pathname === path);
   const complianceActive = [
     "/security-controls",
     "/compliance",
     "/nis2",
     "/regulatory",
+    "/third-parties",
+    "/resilience",
   ].some((path) => location.pathname === path);
   const settingsActive =
     location.pathname === "/profile" ||
     location.pathname.startsWith("/administration");
-  const assetsActive =
-    location.pathname === "/assets" || location.pathname.startsWith("/assets/");
-  const ismsActive = location.pathname === "/isms-documents";
   const activeGroup = riskActive
     ? "risk"
     : steeringActive
       ? "steering"
-      : assetsActive
-        ? "assets"
-        : complianceActive
-          ? "compliance"
-          : ismsActive
-            ? "isms"
-            : settingsActive
-              ? "settings"
-              : null;
+      : complianceActive
+        ? "compliance"
+        : settingsActive
+          ? "settings"
+          : null;
   const [openGroup, setOpenGroup] = useState<string | null>(activeGroup);
-  const ismsDocuments = useQuery({
-    queryKey: ["isms-documents"],
-    queryFn: async () =>
-      (await api.get<IsmsDocument[]>("/isms-documents")).data,
-    enabled: Boolean(user) && (openGroup === "isms" || ismsActive),
-    staleTime: 5 * 60 * 1000,
-  });
-  const ismsCategories = useMemo(
-    () =>
-      [...new Set((ismsDocuments.data ?? []).map((item) => item.category))]
-        .filter(
-          (category) =>
-            Boolean(category) &&
-            category.trim().toLocaleLowerCase(user?.locale ?? "fr") !==
-              "publications récentes".toLocaleLowerCase(user?.locale ?? "fr"),
-        )
-        .sort((left, right) => left.localeCompare(right, "fr")),
-    [ismsDocuments.data, user?.locale],
-  );
   const isAdmin = user?.roles.some((role) =>
     ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
   );
@@ -592,6 +560,12 @@ function Layout() {
           />
           <NavItem
             nested
+            path="/scopes"
+            label="Périmètres"
+            icon={<AccountTreeOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
             path="/threats"
             label="Menaces"
             icon={<GppMaybeOutlined fontSize="small" />}
@@ -645,6 +619,12 @@ function Layout() {
           />
           <NavItem
             nested
+            path="/reports/executive"
+            label="Rapport exécutif"
+            icon={<DescriptionOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
             path="/decision"
             label="Décision et simulations"
             icon={<GridViewOutlined fontSize="small" />}
@@ -657,46 +637,7 @@ function Layout() {
           />
         </NavGroup>
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
-        <NavItem
-          path="/scopes"
-          label="Périmètres"
-          icon={<AccountTreeOutlined />}
-        />
-        <NavGroup
-          id="assets"
-          label="Actifs"
-          icon={<Inventory2Outlined />}
-          active={assetsActive}
-          open={openGroup === "assets"}
-          onToggle={() =>
-            setOpenGroup((value) => (value === "assets" ? null : "assets"))
-          }
-        >
-          <NavItem
-            nested
-            path="/assets"
-            label="Tous les actifs"
-            icon={<Inventory2Outlined fontSize="small" />}
-          />
-          <NavItem
-            nested
-            path="/assets/hardware"
-            label="Actifs matériels"
-            icon={<Inventory2Outlined fontSize="small" />}
-          />
-          <NavItem
-            nested
-            path="/assets/software"
-            label="Actifs logiciels"
-            icon={<Inventory2Outlined fontSize="small" />}
-          />
-          <NavItem
-            nested
-            path="/assets/information"
-            label="Actifs informationnels"
-            icon={<Inventory2Outlined fontSize="small" />}
-          />
-        </NavGroup>
+        <NavItem path="/assets" label="Actifs" icon={<Inventory2Outlined />} />
         <NavGroup
           id="compliance"
           label="Conformité et contrôles"
@@ -733,53 +674,29 @@ function Layout() {
             label="Vie privée et obligations"
             icon={<VerifiedUserOutlined fontSize="small" />}
           />
-        </NavGroup>
-        <NavItem
-          path="/third-parties"
-          label="Tiers"
-          icon={<BusinessOutlined />}
-        />
-        <NavItem
-          path="/resilience"
-          label="Résilience"
-          icon={<ShieldOutlined />}
-        />
-        <NavGroup
-          id="isms"
-          label="Documents ISMS"
-          icon={<FolderCopyOutlined />}
-          active={ismsActive}
-          open={openGroup === "isms"}
-          onToggle={() =>
-            setOpenGroup((value) => (value === "isms" ? null : "isms"))
-          }
-        >
           <NavItem
             nested
-            path="/isms-documents"
-            label="Publications récentes"
-            icon={<DescriptionOutlined fontSize="small" />}
+            path="/third-parties"
+            label="Tiers et fournisseurs"
+            icon={<BusinessOutlined fontSize="small" />}
           />
-          {ismsCategories.map((category) => (
-            <NavItem
-              key={category}
-              nested
-              path={`/isms-documents?category=${encodeURIComponent(category)}`}
-              label={category}
-              icon={<FolderCopyOutlined fontSize="small" />}
-            />
-          ))}
+          <NavItem
+            nested
+            path="/resilience"
+            label="Incidents et continuité"
+            icon={<ShieldOutlined fontSize="small" />}
+          />
         </NavGroup>
+        <NavItem
+          path="/isms-documents"
+          label="Documents ISMS"
+          icon={<FolderCopyOutlined />}
+        />
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavItem
           path="/notifications"
           label="Notifications"
           icon={<NotificationsOutlined />}
-        />
-        <NavItem
-          path="/reports/executive"
-          label="Rapport exécutif"
-          icon={<DescriptionOutlined />}
         />
         <NavGroup
           id="settings"

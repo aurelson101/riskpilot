@@ -78,7 +78,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("regroupe le profil dans les paramètres et permet de réduire le menu", async () => {
+  it("simplifie les menus, regroupe le profil et permet de réduire la navigation", async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "valid-token");
     vi.spyOn(api, "get").mockImplementation(async (url) => ({
       data:
@@ -169,6 +169,7 @@ describe("App", () => {
     expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(riskMenu);
     expect(await screen.findByText("Registre des risques")).toBeInTheDocument();
+    expect(screen.getByText("Périmètres")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Pilotage" }));
     expect(await screen.findByText("Indicateurs")).toBeInTheDocument();
     expect(riskMenu).toHaveAttribute("aria-expanded", "false");
@@ -180,17 +181,13 @@ describe("App", () => {
     expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Indicateurs")).not.toBeInTheDocument();
     expect(screen.getByText("Conformité NIS2")).toBeInTheDocument();
+    expect(screen.getByText("Tiers et fournisseurs")).toBeInTheDocument();
+    expect(screen.getByText("Incidents et continuité")).toBeInTheDocument();
     expect(screen.getByText("Actifs")).toBeInTheDocument();
-    const assetsMenu = screen.getByRole("button", { name: "Actifs" });
-    expect(assetsMenu).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(assetsMenu);
-    expect(screen.getByRole("button", { name: "Actifs" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Actifs" })).not.toHaveAttribute(
       "aria-expanded",
-      "true",
     );
-    expect(screen.getByText("Tous les actifs")).toBeInTheDocument();
-    expect(await screen.findByText("Actifs matériels")).toBeInTheDocument();
-    expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Tous les actifs")).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
     fireEvent.click(await screen.findByRole("option", { name: "Anglais" }));
     fireEvent.click(
@@ -209,21 +206,15 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
     expect(screen.getByText("Compliance and controls")).toBeInTheDocument();
-    expect(screen.getByText("All assets")).toBeInTheDocument();
-    expect(screen.getByText("Hardware assets")).toBeInTheDocument();
-    const ismsMenu = await screen.findByRole("button", {
+    expect(screen.getByText("Assets")).toBeInTheDocument();
+    expect(screen.queryByText("All assets")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hardware assets")).not.toBeInTheDocument();
+    const ismsItem = await screen.findByRole("button", {
       name: "ISMS documents",
     });
-    expect(ismsMenu).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(ismsMenu);
-    expect(
-      await screen.findByRole("button", { name: "ISMS documents" }),
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getAllByText("Recent publications")).toHaveLength(1);
+    expect(ismsItem).not.toHaveAttribute("aria-expanded");
+    expect(screen.queryByText("Recent publications")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
-    await waitFor(() =>
-      expect(screen.queryByText("Recent publications")).not.toBeInTheDocument(),
-    );
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });
 

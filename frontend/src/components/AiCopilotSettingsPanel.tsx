@@ -42,6 +42,12 @@ const presets: Record<
   },
 };
 
+const providerModels: Partial<Record<Provider, readonly string[]>> = {
+  MISTRAL: ["codestral-latest", "mistral-large-latest"],
+  OPENAI: ["gpt-5-mini"],
+  GEMINI: ["gemini-2.5-flash"],
+};
+
 export function AiCopilotSettingsPanel() {
   const cache = useQueryClient();
   const settings = useQuery({
@@ -134,6 +140,7 @@ export function AiCopilotSettingsPanel() {
               <MenuItem value="CUSTOM">Endpoint compatible</MenuItem>
             </TextField>
             <TextField
+              select={form.provider !== "CUSTOM"}
               fullWidth
               required
               label="Modèle"
@@ -141,7 +148,13 @@ export function AiCopilotSettingsPanel() {
               onChange={(event) =>
                 setForm({ ...form, model: event.target.value })
               }
-            />
+            >
+              {(providerModels[form.provider] ?? []).map((model) => (
+                <MenuItem key={model} value={model}>
+                  {model}
+                </MenuItem>
+              ))}
+            </TextField>
           </Stack>
           <TextField
             required

@@ -25,6 +25,8 @@ final readonly class AiSettingsController
         'GEMINI' => ['baseUrl' => 'https://generativelanguage.googleapis.com/v1beta', 'model' => 'gemini-2.5-flash'],
     ];
 
+    private const MISTRAL_MODELS = ['codestral-latest', 'mistral-large-latest'];
+
     public function __construct(
         private Security $security,
         private AiSettingsRepository $repository,
@@ -59,6 +61,9 @@ final readonly class AiSettingsController
         $enabled = (bool) ($input['enabled'] ?? false);
         if (!$this->validHttpsUrl($baseUrl) || '' === $model || mb_strlen($model) > 120 || !in_array($dataPolicy, AiSettings::DATA_POLICIES, true) || mb_strlen($systemPrompt) > 4000) {
             return $this->error('Vérifiez l’URL HTTPS, le modèle et la politique de données.');
+        }
+        if ('MISTRAL' === $provider && !in_array($model, self::MISTRAL_MODELS, true)) {
+            return $this->error('Sélectionnez un modèle Mistral pris en charge : Codestral ou Mistral Large.');
         }
         if ($enabled && 'CUSTOM' === $provider) {
             return $this->error('Les endpoints personnalisés restent désactivés tant que leur sécurité réseau n’est pas validée.');

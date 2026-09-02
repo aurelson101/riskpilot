@@ -38,6 +38,11 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 
 ## Copilote IA et brouillon de risque
 
+`PUT /api/settings/ai` accepte pour Mistral les modèles
+`codestral-latest` et `mistral-large-latest`. Une autre valeur est rejetée à
+l'enregistrement pour éviter qu'un test de clé réussisse avec un modèle
+inexistant avant l'échec d'une génération.
+
 - `GET /api/copilot/context` expose l'état et les capacités du copilote sans secret ;
 - `POST /api/copilot` répond à une question après consentement explicite. Le mode `ASSIST` conseille sans action ; le mode `PILOT` reçoit le chemin courant et peut proposer jusqu'à trois actions applicatives strictement inscrites sur liste blanche ;
 - `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.

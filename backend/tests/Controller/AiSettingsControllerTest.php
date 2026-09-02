@@ -40,6 +40,14 @@ final class AiSettingsControllerTest extends WebTestCase
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
         $client->jsonRequest('PUT', '/api/settings/ai', [
+            'provider' => 'MISTRAL', 'model' => 'codestrale', 'apiKey' => 'test-key',
+            'dataPolicy' => 'MINIMAL', 'enabled' => true,
+        ]);
+        self::assertResponseStatusCodeSame(422);
+        $invalidModel = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('modèle Mistral pris en charge', $invalidModel['message']);
+
+        $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'OPENAI', 'model' => 'gpt-5-mini', 'apiKey' => 'sk-test-not-a-real-key',
             'dataPolicy' => 'MINIMAL', 'systemPrompt' => 'Toujours citer les sources.', 'enabled' => true,
         ]);

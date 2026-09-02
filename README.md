@@ -52,7 +52,7 @@ La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de pr
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes et les tentatives sont limitées. `GET /api/me` retourne le profil courant. Chaque utilisateur peut activer un MFA TOTP compatible Google Authenticator et Microsoft Authenticator depuis **Paramètres → Mon profil et MFA**, avec QR code et codes de secours à usage unique. Les administrateurs gèrent les utilisateurs de leur organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
 
-La navigation est responsive : tiroir mobile sous `md`, barre latérale repliable sur ordinateur et sous-menu **Paramètres** regroupant profil/MFA, messagerie, utilisateurs, organisations et audit selon les droits.
+La navigation est responsive : tiroir mobile sous `md` et barre latérale repliable sur ordinateur. Elle limite les accès de premier niveau et regroupe les fonctions connexes : périmètres sous **Gestion des risques**, rapports sous **Pilotage**, tiers et continuité sous **Conformité et contrôles**. **Actifs** et **Documents ISMS** disposent chacun d'une entrée unique ; les filtres restent disponibles dans leurs écrans. Le sous-menu **Paramètres** regroupe profil/MFA, messagerie, utilisateurs, organisations et audit selon les droits.
 
 ## Messagerie SMTP et OAuth 2.0
 
@@ -135,6 +135,9 @@ sources, sans conserver le texte de la conversation dans le journal. Le quota
 est limité à 20 appels par utilisateur et par heure. Pour OpenAI, l'intégration
 utilise la Responses API avec `store: false`; les endpoints personnalisés sont
 refusés pour ce workflow tant que leur protection SSRF n'est pas validée.
+Pour Mistral, l'interface propose les identifiants exacts
+`codestral-latest` et `mistral-large-latest` afin qu'une faute de saisie ne
+passe pas le test de clé avant d'échouer lors de la première génération.
 
 Les routes sont `GET /api/compliance-results/{id}/copilot/context` pour
 prévisualiser les données et `POST /api/compliance-results/{id}/copilot` pour
@@ -165,9 +168,9 @@ aucun risque : seule la confirmation distincte appelle `POST /api/risks`.
 
 ## Documents ISMS
 
-Le menu **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.
+L'écran **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.
 
-La vue d’ensemble présente au maximum les 10 documents accessibles les plus récemment mis à jour, toutes catégories confondues. Les catégories utilisées par les documents deviennent automatiquement des sous-menus ; elles sont calculées après filtrage ACL et tenant, afin de ne jamais révéler une catégorie privée. Le formulaire accepte une catégorie existante ou la création directe d’un nouveau libellé.
+La vue d’ensemble présente au maximum les 10 documents accessibles les plus récemment mis à jour, toutes catégories confondues. Les catégories sont filtrées dans l'écran documentaire après application des ACL et du tenant ; elles ne sont plus dupliquées dans la navigation principale. Le formulaire accepte une catégorie existante ou la création directe d’un nouveau libellé.
 
 Un document naît en brouillon, peut être soumis à revue puis approuvé par un gestionnaire avec identité du valideur et date de prochaine revue. Toute modification ultérieure du contenu ou du fichier invalide automatiquement l’approbation. L’interface signale les revues arrivées à échéance.
 
