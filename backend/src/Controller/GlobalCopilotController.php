@@ -238,24 +238,29 @@ final readonly class GlobalCopilotController
     /** @return list<array{type: string, label: string, path?: string}> */
     private function pilotCapabilities(): array
     {
+        $english = 'en' === $this->currentUser->get()->getLocale();
         $routes = [
-            '/' => 'Dashboard', '/risks' => 'Risks', '/risk-matrix' => 'Risk matrix', '/actions' => 'Action plans',
-            '/operations' => 'Operations', '/search' => 'Global search', '/decision' => 'Decision workspace',
-            '/experiments' => 'Governed proposals', '/ebios' => 'EBIOS RM', '/indicators' => 'Indicators',
-            '/annual-reports' => 'Annual reports', '/compliance' => 'Compliance', '/nis2' => 'NIS2',
-            '/third-parties' => 'Third parties', '/resilience' => 'Resilience and continuity',
-            '/regulatory' => 'GDPR and regulatory records', '/isms-documents' => 'ISMS documents',
-            '/notifications' => 'Notifications', '/profile' => 'User profile',
+            '/' => ['Tableau de bord', 'Dashboard'], '/risks' => ['Registre des risques', 'Risk register'],
+            '/risk-matrix' => ['Matrice des risques', 'Risk matrix'], '/actions' => ['Plans d’action', 'Action plans'],
+            '/operations' => ['Pilotage opérationnel', 'Operations'], '/search' => ['Recherche transverse', 'Global search'],
+            '/decision' => ['Espace de décision', 'Decision workspace'], '/experiments' => ['Propositions gouvernées', 'Governed proposals'],
+            '/ebios' => ['EBIOS RM', 'EBIOS RM'], '/indicators' => ['Indicateurs', 'Indicators'],
+            '/annual-reports' => ['Rapports annuels', 'Annual reports'], '/compliance' => ['Conformité', 'Compliance'],
+            '/nis2' => ['Conformité NIS2', 'NIS2 compliance'], '/third-parties' => ['Tiers et fournisseurs', 'Third parties'],
+            '/resilience' => ['Incidents et continuité', 'Resilience and continuity'],
+            '/regulatory' => ['Vie privée et obligations', 'Privacy and regulatory records'],
+            '/isms-documents' => ['Documents ISMS', 'ISMS documents'], '/notifications' => ['Notifications', 'Notifications'],
+            '/profile' => ['Profil utilisateur', 'User profile'],
         ];
         $actions = [];
-        foreach ($routes as $path => $label) {
-            $actions[] = ['type' => 'NAVIGATE', 'label' => $label, 'path' => $path];
+        foreach ($routes as $path => [$frenchLabel, $englishLabel]) {
+            $actions[] = ['type' => 'NAVIGATE', 'label' => $english ? $englishLabel : $frenchLabel, 'path' => $path];
         }
         if ([] !== array_intersect([User::ROLE_RISK_MANAGER, User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $this->currentUser->get()->getRoles())) {
-            $actions[] = ['type' => 'OPEN_RISK_DRAFT', 'label' => 'Prepare a risk draft'];
-            $actions[] = ['type' => 'OPEN_COMPLIANCE_ACTION_DRAFT', 'label' => 'Prepare a compliance action draft'];
+            $actions[] = ['type' => 'OPEN_RISK_DRAFT', 'label' => $english ? 'Prepare a risk draft' : 'Préparer un brouillon de risque'];
+            $actions[] = ['type' => 'OPEN_COMPLIANCE_ACTION_DRAFT', 'label' => $english ? 'Prepare a compliance action draft' : 'Préparer un brouillon d’action conformité'];
         }
-        $actions[] = ['type' => 'OPEN_ISMS_DOCUMENT_DRAFT', 'label' => 'Prepare an ISMS document draft'];
+        $actions[] = ['type' => 'OPEN_ISMS_DOCUMENT_DRAFT', 'label' => $english ? 'Prepare an ISMS document draft' : 'Préparer un brouillon de document ISMS'];
 
         return $actions;
     }
@@ -267,15 +272,17 @@ final readonly class GlobalCopilotController
     {
         $allowed = $this->pilotCapabilities();
 
-        return array_values(array_filter($actions, static function (array $action) use ($allowed): bool {
+        $validated = [];
+        foreach ($actions as $action) {
             foreach ($allowed as $capability) {
                 if ($action['type'] === $capability['type'] && ('NAVIGATE' !== $action['type'] || ($action['path'] ?? null) === ($capability['path'] ?? null))) {
-                    return true;
+                    $validated[] = $capability;
+                    break;
                 }
             }
+        }
 
-            return false;
-        }));
+        return $validated;
     }
 
     /** @param list<object> $entities

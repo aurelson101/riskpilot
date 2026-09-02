@@ -97,6 +97,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $pilot = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('PILOT', $pilot['mode']);
         self::assertSame('/risks', $pilot['actions'][0]['path']);
+        self::assertSame('Registre des risques', $pilot['actions'][0]['label']);
         self::assertCount(1, $pilot['actions'], 'A provider cannot inject a non-allowlisted destination.');
         $pilotAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
         self::assertSame('PILOT', $pilotAudit->getNewValues()['entities'][0]['mode']);
