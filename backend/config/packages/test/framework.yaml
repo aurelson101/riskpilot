@@ -2,3 +2,8 @@ framework:
     test: true
     session:
         storage_factory_id: session.storage.factory.mock_file
+    rate_limiter:
+        ai_copilot:
+            policy: sliding_window
+            limit: 1000
+            interval: '1 hour'

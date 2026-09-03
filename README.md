@@ -170,6 +170,16 @@ exclusivement des identifiants du tenant. RiskPilot rejette toute relation
 éditables. Le prompt est expurgé du journal d'audit et cet endpoint ne crée
 aucun risque : seule la confirmation distincte appelle `POST /api/risks`.
 
+L’onglet **Synthèse GRC** consolide les résultats actifs des référentiels
+réellement évalués dans l’organisation (NIS2, ISO 27001, RGPD ou autres). Les
+compteurs par statut sont calculés par RiskPilot, puis seuls les 120 écarts les
+plus récents sont transmis afin de maîtriser le quota. L’IA rédige une synthèse
+exécutive et propose au maximum cinq priorités reliées à des résultats
+existants. Une priorité peut préremplir l’assistant d’action de conformité ;
+elle ne modifie jamais un statut, une preuve ou une action automatiquement.
+Cette synthèse facilite le pilotage multinorme sans constituer une certification
+ni un avis juridique.
+
 ## Documents ISMS
 
 L'écran **Documents ISMS** centralise les politiques, procédures, instructions, preuves, registres et modèles. Chaque document possède un propriétaire, une classification, une visibilité organisation ou restreinte, un statut et un historique de versions immuables. Les ACL nominatives distinguent lecture, édition et administration.

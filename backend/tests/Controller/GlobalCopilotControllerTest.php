@@ -35,6 +35,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
             new MockResponse(json_encode(['output_text' => '{"answer":"Ouvrez le registre des risques.","actions":[{"type":"NAVIGATE","label":"Ouvrir les risques","path":"/risks"},{"type":"NAVIGATE","label":"Action interdite","path":"https://evil.test"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Rançongiciel chez le prestataire","description":"Le service externalisé pourrait être indisponible et les données exposées.","scopeId":1,"assetId":1,"threatId":1,"likelihood":3,"impact":4,"rationale":"Le niveau doit être confirmé après revue des contrôles du prestataire."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Formaliser la revue des accès","description":"Documenter une revue trimestrielle des accès privilégiés, son responsable, les écarts et les preuves de clôture.","complianceResultId":1,"priority":"HIGH","actionType":"ORGANIZATIONAL","dueInDays":60,"rationale":"L’exigence est partiellement satisfaite ; la fréquence et les preuves doivent être confirmées."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
+            new MockResponse(json_encode(['output_text' => '{"summary":"La revue des accès ISO 27001 reste partiellement couverte.","priorities":[{"complianceResultId":1,"title":"Formaliser la revue trimestrielle des accès","rationale":"La fréquence, le responsable et les preuves restent à confirmer.","priority":"HIGH"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
         ]));
         $manager = self::getContainer()->get(EntityManagerInterface::class);
         $tool = new SchemaTool($manager);
@@ -69,6 +70,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         self::assertFalse($context['enabled']);
         self::assertContains('RISK_DRAFT', $context['capabilities']);
         self::assertContains('COMPLIANCE_ACTION_DRAFT', $context['capabilities']);
+        self::assertContains('GRC_BRIEF', $context['capabilities']);
         self::assertContains('PILOT', $context['modes']);
         self::assertFalse($context['automaticWrite']);
         $client->jsonRequest('POST', '/api/copilot', ['question' => 'Aide-moi à créer un risque tiers', 'consent' => true]);
@@ -134,6 +136,19 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $actionDraftAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
         self::assertSame('COMPLIANCE_ACTION_DRAFT', $actionDraftAudit->getNewValues()['entities'][0]['workflow']);
         self::assertSame('[REDACTED]', $actionDraftAudit->getNewValues()['request']['prompt']);
+
+        $client->jsonRequest('POST', '/api/copilot/grc-brief', ['objective' => 'Prioriser les écarts ISO 27001 et NIS2.', 'consent' => true]);
+        self::assertResponseIsSuccessful();
+        $brief = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('La revue des accès ISO 27001 reste partiellement couverte.', $brief['brief']['summary']);
+        self::assertSame($complianceResult->getId(), $brief['brief']['priorities'][0]['complianceResultId']);
+        self::assertSame('ISO 27001 2022', $brief['coverage'][0]['framework']);
+        self::assertSame(1, $brief['coverage'][0]['partial']);
+        self::assertFalse($brief['automaticWrite']);
+        self::assertCount(0, $manager->getRepository(\App\Entity\ActionPlan::class)->findAll());
+        $briefAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
+        self::assertSame('GRC_BRIEF', $briefAudit->getNewValues()['entities'][0]['workflow']);
+        self::assertSame('[REDACTED]', $briefAudit->getNewValues()['request']['objective']);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->request('GET', '/api/copilot/context');

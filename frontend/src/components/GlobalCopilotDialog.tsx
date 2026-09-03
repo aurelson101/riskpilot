@@ -78,6 +78,26 @@ type ComplianceActionDraft = {
   dueInDays: number;
   rationale: string;
 };
+type GrcCoverage = {
+  framework: string;
+  total: number;
+  compliant: number;
+  partial: number;
+  nonCompliant: number;
+  notAssessed: number;
+  notApplicable: number;
+};
+type GrcPriority = {
+  complianceResultId: number;
+  title: string;
+  rationale: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+};
+type GrcBrief = {
+  brief: { summary: string; priorities: GrcPriority[] };
+  coverage: GrcCoverage[];
+  automaticWrite: false;
+};
 type DraftRequest = { request: string; consent: boolean };
 
 function errorMessage(error: unknown) {
@@ -94,12 +114,13 @@ export function GlobalCopilotDialog({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const isEnglish = user?.locale === "en";
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"chat" | "risk" | "compliance" | "isms">(
-    "chat",
-  );
+  const [tab, setTab] = useState<
+    "chat" | "overview" | "risk" | "compliance" | "isms"
+  >("chat");
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState<"ASSIST" | "PILOT">("ASSIST");
   const [pilotActions, setPilotActions] = useState<PilotAction[]>([]);
@@ -112,6 +133,8 @@ export function GlobalCopilotDialog({
   const [complianceRequest, setComplianceRequest] = useState("");
   const [complianceConsent, setComplianceConsent] = useState(false);
   const [complianceRationale, setComplianceRationale] = useState("");
+  const [grcObjective, setGrcObjective] = useState("");
+  const [grcConsent, setGrcConsent] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [success, setSuccess] = useState<{
     label: string;
@@ -167,7 +190,10 @@ export function GlobalCopilotDialog({
   });
   const complianceCatalog = useQuery({
     queryKey: ["global-copilot-compliance-catalog"],
-    enabled: open && tab === "compliance" && Boolean(canCreateRisk),
+    enabled:
+      open &&
+      (tab === "overview" || tab === "compliance") &&
+      Boolean(canCreateRisk),
     queryFn: async () =>
       (
         await api.get<{ items: ComplianceOption[] }>(
@@ -289,6 +315,16 @@ export function GlobalCopilotDialog({
       setConfirmed(false);
     },
   });
+  const generateGrcBrief = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<GrcBrief>("/copilot/grc-brief", {
+          objective: grcObjective,
+          consent: grcConsent,
+        })
+      ).data,
+    onSuccess: () => setGrcConsent(false),
+  });
   const createComplianceAction = useMutation({
     mutationFn: async () => {
       const source = complianceCatalog.data?.find(
@@ -408,6 +444,7 @@ export function GlobalCopilotDialog({
     complianceAction.dueDate,
   );
   const pending =
+    generateGrcBrief.isPending ||
     generateRisk.isPending ||
     createRisk.isPending ||
     generateComplianceAction.isPending ||
@@ -415,6 +452,7 @@ export function GlobalCopilotDialog({
     createIsms.isPending;
   const failure =
     chat.error ||
+    generateGrcBrief.error ||
     generateRisk.error ||
     createRisk.error ||
     generateComplianceAction.error ||
@@ -452,6 +490,7 @@ export function GlobalCopilotDialog({
             }}
           >
             <Tab value="chat" label="Discussion" />
+            <Tab value="overview" label="Synthèse GRC" />
             <Tab value="risk" label="Risque tiers guidé" />
             <Tab value="compliance" label="Action conformité guidée" />
             <Tab value="isms" label="Document ISMS guidé" />
@@ -576,6 +615,145 @@ export function GlobalCopilotDialog({
                 </Button>
               </Stack>
             </>
+          )}
+          {tab === "overview" && (
+            <Stack spacing={2}>
+              {!canCreateRisk && (
+                <Alert severity="error">
+                  Votre rôle ne permet pas de générer une synthèse GRC.
+                </Alert>
+              )}
+              <Alert severity="info">
+                Obtenez une vue courte de vos résultats NIS2, ISO 27001, RGPD et
+                autres référentiels réellement évalués. Les chiffres sont
+                calculés par RiskPilot ; l’IA formule uniquement la synthèse et
+                les priorités à vérifier.
+              </Alert>
+              <TextField
+                label="Objectif facultatif"
+                placeholder="Ex. Prioriser les écarts à présenter au comité de direction ce trimestre."
+                multiline
+                minRows={2}
+                value={grcObjective}
+                inputProps={{ maxLength: 1000 }}
+                onChange={(event) => setGrcObjective(event.target.value)}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={grcConsent}
+                    onChange={(event) => setGrcConsent(event.target.checked)}
+                  />
+                }
+                label="J’autorise l’envoi des références, titres et statuts de conformité au fournisseur IA configuré."
+              />
+              <Button
+                variant="contained"
+                disabled={
+                  !canCreateRisk ||
+                  !context.data?.enabled ||
+                  !grcConsent ||
+                  !complianceCatalog.data?.length ||
+                  pending
+                }
+                onClick={() => generateGrcBrief.mutate()}
+              >
+                Générer la synthèse GRC
+              </Button>
+              {complianceCatalog.isSuccess &&
+                complianceCatalog.data.length === 0 && (
+                  <Alert severity="warning">
+                    Aucun écart exploitable : créez ou mettez à jour une
+                    évaluation de conformité.
+                  </Alert>
+                )}
+              {generateGrcBrief.data && (
+                <Stack spacing={2} aria-live="polite">
+                  <Alert severity="success">
+                    <Typography fontWeight={700}>Synthèse exécutive</Typography>
+                    {generateGrcBrief.data.brief.summary}
+                  </Alert>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    flexWrap="wrap"
+                    useFlexGap
+                  >
+                    {generateGrcBrief.data.coverage.map((item) => (
+                      <Chip
+                        key={item.framework}
+                        label={
+                          isEnglish
+                            ? `${item.framework} · ${item.compliant}/${item.total} compliant · ${item.nonCompliant} non-compliant · ${item.notAssessed} not assessed`
+                            : `${item.framework} · ${item.compliant}/${item.total} conformes · ${item.nonCompliant} non conformes · ${item.notAssessed} non évalués`
+                        }
+                      />
+                    ))}
+                  </Stack>
+                  <Typography variant="h6">Priorités proposées</Typography>
+                  {generateGrcBrief.data.brief.priorities.length === 0 ? (
+                    <Alert severity="info">
+                      Aucune priorité n’a été proposée. Vérifiez les résultats
+                      évalués et les éléments non applicables.
+                    </Alert>
+                  ) : (
+                    generateGrcBrief.data.brief.priorities.map(
+                      (priority, index) => (
+                        <Box
+                          key={priority.complianceResultId}
+                          sx={{
+                            border: 1,
+                            borderColor: "divider",
+                            borderRadius: 2,
+                            p: 2,
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              justifyContent="space-between"
+                              gap={1}
+                            >
+                              <Typography fontWeight={700}>
+                                {index + 1}. {priority.title}
+                              </Typography>
+                              <Chip size="small" label={priority.priority} />
+                            </Stack>
+                            <Typography color="text.secondary">
+                              {priority.rationale}
+                            </Typography>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={{ alignSelf: "flex-start" }}
+                              onClick={() => {
+                                setComplianceRequest(
+                                  `${priority.title}. ${priority.rationale}`,
+                                );
+                                setComplianceAction((current) => ({
+                                  ...current,
+                                  complianceResultId: String(
+                                    priority.complianceResultId,
+                                  ),
+                                  priority: priority.priority,
+                                }));
+                                setConfirmed(false);
+                                setTab("compliance");
+                              }}
+                            >
+                              Préparer l’action
+                            </Button>
+                          </Stack>
+                        </Box>
+                      ),
+                    )
+                  )}
+                  <Alert severity="warning">
+                    Aucune conformité ni preuve n’a été créée ou modifiée.
+                  </Alert>
+                </Stack>
+              )}
+            </Stack>
           )}
           {tab === "risk" && (
             <Stack spacing={2}>

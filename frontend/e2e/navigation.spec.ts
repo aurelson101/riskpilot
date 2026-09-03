@@ -274,6 +274,9 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
     }),
   ).toBeVisible();
   await expect(
+    page.getByRole("tab", { name: /Synthèse GRC|GRC overview/ }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("tab", {
       name: /Risque tiers guidé|Guided third-party risk/,
     }),
@@ -286,6 +289,122 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
   await expect(
     page.getByRole("tab", { name: /Document ISMS guidé|Guided ISMS document/ }),
   ).toBeVisible();
+});
+
+test("la synthèse GRC IA reste gouvernée et prépare une action sans la créer", async ({
+  page,
+  request,
+}) => {
+  let briefCalls = 0;
+  let actionWrites = 0;
+  await page.route("**/api/copilot/context", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        enabled: true,
+        provider: "MISTRAL",
+        model: "codestral-latest",
+        notice: "Validation humaine obligatoire.",
+      }),
+    });
+  });
+  await page.route("**/api/copilot/compliance-catalog", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [
+          {
+            id: 42,
+            label: "ISO 27001 2022 · A.5.18 — Droits d’accès",
+            status: "PARTIAL",
+            requirementId: 12,
+            frameworkId: 7,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/copilot/grc-brief", async (route) => {
+    briefCalls += 1;
+    const payload = route.request().postDataJSON() as {
+      consent: boolean;
+      objective: string;
+    };
+    expect(payload.consent).toBe(true);
+    expect(payload.objective).toContain("comité");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        brief: {
+          summary: "La revue des accès reste partiellement couverte.",
+          priorities: [
+            {
+              complianceResultId: 42,
+              title: "Formaliser la revue trimestrielle des accès",
+              rationale:
+                "Le responsable et les preuves doivent être confirmés.",
+              priority: "HIGH",
+            },
+          ],
+        },
+        coverage: [
+          {
+            framework: "ISO 27001 2022",
+            total: 10,
+            compliant: 6,
+            partial: 1,
+            nonCompliant: 1,
+            notAssessed: 2,
+            notApplicable: 0,
+          },
+        ],
+        automaticWrite: false,
+      }),
+    });
+  });
+  await page.route("**/api/actions", async (route) => {
+    if (route.request().method() === "POST") actionWrites += 1;
+    await route.continue();
+  });
+
+  await authenticate(page, request, "admin@riskpilot.local");
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page
+    .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: /Synthèse GRC|GRC overview/ }).click();
+  await dialog
+    .getByRole("textbox", { name: /Objectif facultatif|Optional objective/ })
+    .fill("Prioriser les écarts pour le comité de direction.");
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’autorise l’envoi des références|I authorize sending compliance references/,
+    })
+    .check();
+  await dialog
+    .getByRole("button", {
+      name: /Générer la synthèse GRC|Generate GRC overview/,
+    })
+    .click();
+
+  await expect(
+    dialog.getByText("La revue des accès reste partiellement couverte."),
+  ).toBeVisible();
+  await expect(dialog.getByText(/ISO 27001 2022/)).toBeVisible();
+  await dialog
+    .getByRole("button", { name: /Préparer l’action|Prepare action/ })
+    .click();
+  await expect(
+    dialog.getByRole("textbox", {
+      name: /Décrivez la demande de conformité|Describe the compliance request/,
+    }),
+  ).toHaveValue(/Formaliser la revue trimestrielle des accès/);
+  expect(briefCalls).toBe(1);
+  expect(actionWrites).toBe(0);
 });
 
 test("le rapport exécutif télécharge un PDF gouverné", async ({

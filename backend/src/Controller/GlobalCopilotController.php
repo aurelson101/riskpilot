@@ -41,6 +41,54 @@ final readonly class GlobalCopilotController
         return new JsonResponse(['items' => $this->complianceCatalogItems()]);
     }
 
+    #[Route('/grc-brief', methods: ['POST'])]
+    #[IsGranted(User::ROLE_RISK_MANAGER)]
+    public function grcBrief(Request $request): JsonResponse
+    {
+        $actor = $this->currentUser->get();
+        $settings = $this->findSettings();
+        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
+            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        }
+        if ('CUSTOM' === $settings->getProvider()) {
+            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
+        }
+        $input = $request->toArray();
+        $objective = trim((string) ($input['objective'] ?? ''));
+        if (true !== ($input['consent'] ?? false) || mb_strlen($objective) > 1000) {
+            return $this->error('INVALID_REQUEST', 'Le consentement est obligatoire et l’objectif est limité à 1 000 caractères.', 422);
+        }
+        $catalog = $this->grcCatalogItems();
+        if ([] === $catalog) {
+            return $this->error('COMPLIANCE_CATALOG_EMPTY', 'Aucun résultat de conformité n’est disponible pour cette organisation.', 422);
+        }
+        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
+        if (!$limit->isAccepted()) {
+            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        }
+        $coverage = $this->grcCoverage($catalog);
+        $gaps = array_values(array_filter($catalog, static fn (array $item): bool => in_array($item['status'], ['PARTIAL', 'NON_COMPLIANT', 'NOT_ASSESSED'], true)));
+        try {
+            $brief = $this->client->draftGrcBrief($settings, $objective, ['coverage' => $coverage, 'gaps' => array_slice($gaps, 0, 120)], $actor->getLocale(), hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())));
+        } catch (\Throwable) {
+            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire une synthèse GRC valide.', 502);
+        }
+        $actionableIds = array_column(array_slice($gaps, 0, 120), 'id');
+        $seen = [];
+        foreach ($brief['priorities'] as $priority) {
+            if (!in_array($priority['complianceResultId'], $actionableIds, true) || isset($seen[$priority['complianceResultId']])) {
+                return $this->error('AI_DRAFT_INVALID_RELATION', 'La synthèse IA référence un résultat indisponible ou dupliqué.', 502);
+            }
+            $seen[$priority['complianceResultId']] = true;
+        }
+        $request->attributes->set('_audit_after', [[
+            'provider' => $settings->getProvider(), 'model' => $settings->getModel(), 'dataPolicy' => $settings->getDataPolicy(),
+            'requestHash' => hash('sha256', $objective), 'workflow' => 'GRC_BRIEF', 'automaticWrite' => false,
+        ]]);
+
+        return new JsonResponse(['brief' => $brief, 'coverage' => $coverage, 'automaticWrite' => false, 'notice' => 'Synthèse indicative : vérifiez chaque priorité avant de préparer une action.']);
+    }
+
     #[Route('/compliance-action-draft', methods: ['POST'])]
     #[IsGranted(User::ROLE_RISK_MANAGER)]
     public function complianceActionDraft(Request $request): JsonResponse
@@ -138,7 +186,7 @@ final readonly class GlobalCopilotController
             'model' => $settings?->getModel(),
             'dataPolicy' => $settings?->getDataPolicy() ?? 'MINIMAL',
             'modes' => ['ASSIST', 'PILOT'],
-            'capabilities' => ['GUIDANCE', 'NAVIGATION', 'RISK_DRAFT', 'COMPLIANCE_ACTION_DRAFT', 'ISMS_DOCUMENT_DRAFT'],
+            'capabilities' => ['GUIDANCE', 'NAVIGATION', 'GRC_BRIEF', 'RISK_DRAFT', 'COMPLIANCE_ACTION_DRAFT', 'ISMS_DOCUMENT_DRAFT'],
             'automaticWrite' => false,
             'notice' => 'Toute création passe par un brouillon relu et une confirmation humaine explicite.',
         ]);
@@ -314,5 +362,44 @@ final readonly class GlobalCopilotController
                 'frameworkId' => (int) $framework->getId(),
             ];
         }, $this->complianceResults->findActionableVisibleTo($this->currentUser->get()));
+    }
+
+    /** @return list<array{id: int, framework: string, reference: string, title: string, status: string}> */
+    private function grcCatalogItems(): array
+    {
+        return array_map(static function (\App\Entity\ComplianceResult $result): array {
+            $requirement = $result->getRequirement();
+            $framework = $requirement->getFramework();
+
+            return [
+                'id' => (int) $result->getId(),
+                'framework' => mb_substr(sprintf('%s %s', $framework->getName(), $framework->getVersion()), 0, 180),
+                'reference' => mb_substr($requirement->getReference(), 0, 80),
+                'title' => mb_substr($requirement->getTitle(), 0, 300),
+                'status' => $result->getComplianceStatus(),
+            ];
+        }, $this->complianceResults->findVisibleTo($this->currentUser->get()));
+    }
+
+    /**
+     * @param list<array{id: int, framework: string, reference: string, title: string, status: string}> $catalog
+     *
+     * @return list<array{framework: string, total: int, compliant: int, partial: int, nonCompliant: int, notAssessed: int, notApplicable: int}>
+     */
+    private function grcCoverage(array $catalog): array
+    {
+        $coverage = [];
+        foreach ($catalog as $item) {
+            $framework = $item['framework'];
+            $coverage[$framework] ??= ['framework' => $framework, 'total' => 0, 'compliant' => 0, 'partial' => 0, 'nonCompliant' => 0, 'notAssessed' => 0, 'notApplicable' => 0];
+            ++$coverage[$framework]['total'];
+            $key = match ($item['status']) {
+                'COMPLIANT' => 'compliant', 'PARTIAL' => 'partial', 'NON_COMPLIANT' => 'nonCompliant',
+                'NOT_ASSESSED' => 'notAssessed', default => 'notApplicable',
+            };
+            ++$coverage[$framework][$key];
+        }
+
+        return array_values($coverage);
     }
 }

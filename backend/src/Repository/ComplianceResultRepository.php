@@ -25,6 +25,22 @@ final class ComplianceResultRepository extends ServiceEntityRepository
     }
 
     /** @return list<ComplianceResult> */
+    public function findVisibleTo(User $actor, int $limit = 500): array
+    {
+        return $this->createQueryBuilder('result')
+            ->innerJoin('result.assessment', 'assessment')
+            ->innerJoin('result.requirement', 'requirement')
+            ->andWhere('assessment.organization = :organization')
+            ->andWhere('assessment.status != :archived')
+            ->setParameter('organization', $actor->getOrganization())
+            ->setParameter('archived', 'ARCHIVED')
+            ->orderBy('result.id', 'DESC')
+            ->setMaxResults(max(1, min(500, $limit)))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** @return list<ComplianceResult> */
     public function findActionableVisibleTo(User $actor, int $limit = 200): array
     {
         return $this->createQueryBuilder('result')

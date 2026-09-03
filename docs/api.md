@@ -45,6 +45,7 @@ inexistant avant l'échec d'une génération.
 
 - `GET /api/copilot/context` expose l'état et les capacités du copilote sans secret ;
 - `POST /api/copilot` répond à une question après consentement explicite. Le mode `ASSIST` conseille sans action ; le mode `PILOT` reçoit le chemin courant et peut proposer jusqu'à trois actions applicatives strictement inscrites sur liste blanche ;
+- `POST /api/copilot/grc-brief` produit une synthèse multinorme et jusqu’à cinq priorités à partir des résultats de conformité actifs du tenant ;
 - `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.
 
 Dans l'interface, l'action `OPEN_RISK_DRAFT` réutilise automatiquement la
@@ -67,6 +68,14 @@ conformité ou de document ISMS. Le serveur revalide chaque type, chemin et rôl
 une URL externe, une capacité inventée ou une action interdite est supprimée.
 Le fournisseur ne reçoit aucun jeton applicatif et ne peut appeler directement
 une API métier. La langue de réponse est celle du profil (`fr` ou `en`).
+
+La synthèse GRC exige `ROLE_RISK_MANAGER`, un consentement explicite et partage
+uniquement les agrégats et, au maximum, les 120 écarts non archivés les plus
+récents avec noms de référentiels, références, titres et statuts. Le serveur
+calcule `coverage`, refuse les identifiants absents,
+étrangers, conformes ou dupliqués dans les priorités IA, limite celles-ci à cinq
+et retourne toujours `automaticWrite: false`. L’objectif facultatif est limité à
+1 000 caractères et expurgé du journal d’audit.
 
 ## Plans d’action et notifications
 

@@ -124,6 +124,13 @@ revalide la route, la capacité et le RBAC ; aucune clé de session ni API méti
 n'est exposée au fournisseur. Les écritures restent des brouillons modifiables
 avec confirmation humaine explicite.
 
+La synthèse GRC utilise les résultats de conformité non archivés du tenant. Les
+agrégats par référentiel et statut restent déterministes côté serveur ; le
+fournisseur ne rédige que le résumé et classe au maximum cinq écarts réels. Le
+backend revalide chaque identifiant et refuse les doublons avant de présenter
+une priorité à l’utilisateur. Le passage vers une action ouvre le formulaire
+gouverné existant et ne persiste rien sans confirmation distincte.
+
 `KnowledgeLibraryItem` représente une version immuable d'une ressource interne.
 Une révision crée une nouvelle ligne liée par `supersedes`; elle ne réécrit pas
 une analyse ou une version approuvée. Le workflow impose soumission, approbation
