@@ -43,6 +43,7 @@ type Context = {
   enabled: boolean;
   provider: string | null;
   model: string | null;
+  dataPolicy: "MINIMAL" | "CONTEXTUAL";
   notice: string;
 };
 type Option = { id: number; name: string };
@@ -125,6 +126,7 @@ export function GlobalCopilotDialog({
   const [mode, setMode] = useState<"ASSIST" | "PILOT">("ASSIST");
   const [pilotActions, setPilotActions] = useState<PilotAction[]>([]);
   const [lastPilotRequest, setLastPilotRequest] = useState("");
+  const [guidedFromPilot, setGuidedFromPilot] = useState(false);
   const [question, setQuestion] = useState("");
   const [consent, setConsent] = useState(false);
   const [riskRequest, setRiskRequest] = useState("");
@@ -406,14 +408,17 @@ export function GlobalCopilotDialog({
     if (action.type === "OPEN_RISK_DRAFT") {
       const request = lastPilotRequest;
       setRiskRequest(request);
+      setRiskConsent(false);
+      setGuidedFromPilot(true);
       setTab("risk");
-      generateRisk.mutate({ request, consent: true });
     } else if (action.type === "OPEN_COMPLIANCE_ACTION_DRAFT") {
       const request = lastPilotRequest;
       setComplianceRequest(request);
+      setComplianceConsent(false);
+      setGuidedFromPilot(true);
       setTab("compliance");
-      generateComplianceAction.mutate({ request, consent: true });
     } else if (action.type === "OPEN_ISMS_DOCUMENT_DRAFT") {
+      setGuidedFromPilot(false);
       setTab("isms");
     }
   };
@@ -469,6 +474,18 @@ export function GlobalCopilotDialog({
               <Chip color="success" label="IA activée" />
               <Chip label={context.data.provider ?? "—"} />
               <Chip label={context.data.model ?? "—"} />
+              <Chip
+                variant="outlined"
+                label={
+                  context.data.dataPolicy === "CONTEXTUAL"
+                    ? isEnglish
+                      ? "Contextual data"
+                      : "Données contextuelles"
+                    : isEnglish
+                      ? "Minimal data"
+                      : "Données minimales"
+                }
+              />
             </Stack>
           ) : (
             <Alert severity="warning">
@@ -767,6 +784,12 @@ export function GlobalCopilotDialog({
                 demande de vos périmètres, actifs et menaces. Relisez ensuite le
                 brouillon avant de le créer avec le traitement « Réduire ».
               </Alert>
+              {guidedFromPilot && (
+                <Alert severity="info">
+                  La demande a été préremplie par le mode pilotage. Vérifiez-la
+                  et donnez votre consentement avant un nouvel envoi IA.
+                </Alert>
+              )}
               <TextField
                 label="Décrivez le risque à créer"
                 placeholder="Ex. Notre prestataire de paie héberge des données personnelles. Une compromission pourrait interrompre les salaires et exposer les dossiers employés."
@@ -928,6 +951,12 @@ export function GlobalCopilotDialog({
                 une action mesurable et la relie uniquement à une exigence
                 partielle, non conforme ou non évaluée de votre organisation.
               </Alert>
+              {guidedFromPilot && (
+                <Alert severity="info">
+                  La demande a été préremplie par le mode pilotage. Vérifiez-la
+                  et donnez votre consentement avant un nouvel envoi IA.
+                </Alert>
+              )}
               <TextField
                 label="Décrivez la demande de conformité"
                 placeholder="Ex. Nous devons formaliser la revue trimestrielle des accès privilégiés et conserver les preuves de validation."
