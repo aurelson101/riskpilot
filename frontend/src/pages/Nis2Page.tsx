@@ -151,8 +151,13 @@ export function Nis2Page() {
         </Alert>
       ) : (
         <Card>
-          <CardContent>
-            <Table aria-label="Exigences NIS2">
+          <CardContent sx={{ overflowX: "auto" }}>
+            {priorities.length === 0 ? (
+              <Alert severity="info">
+                Aucune exigence évaluée : complétez l’évaluation pour obtenir les priorités de remédiation.
+              </Alert>
+            ) : (
+            <Table aria-label="Exigences NIS2" sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Exigence</TableCell>
@@ -186,6 +191,7 @@ export function Nis2Page() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
       )}

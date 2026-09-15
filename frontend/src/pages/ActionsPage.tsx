@@ -370,8 +370,11 @@ export function ActionsPage() {
   const update = <K extends keyof ActionForm>(key: K, value: ActionForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   function openCreate() {
+    const today = new Date();
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + 30);
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, startDate: dateKey(today), dueDate: dateKey(dueDate) });
     setError("");
     setDialogOpen(true);
   }
@@ -570,6 +573,20 @@ export function ActionsPage() {
               </Select>
             </FormControl>
           </Stack>
+          {(search || priorityFilter !== "ALL" || ownerFilter !== "ALL" || quickFilter !== "ALL") && (
+            <Button
+              size="small"
+              sx={{ mt: 1 }}
+              onClick={() => {
+                setSearch("");
+                setPriorityFilter("ALL");
+                setOwnerFilter("ALL");
+                setQuickFilter("ALL");
+              }}
+            >
+              Réinitialiser les filtres
+            </Button>
+          )}
           <ToggleButtonGroup
             exclusive
             size="small"
@@ -590,6 +607,9 @@ export function ActionsPage() {
               Critiques · {quickCounts.critical}
             </ToggleButton>
           </ToggleButtonGroup>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {filteredActions.length} action(s) affichée(s)
+          </Typography>
         </CardContent>
       </Card>
       {view === "table" && (
@@ -1048,9 +1068,9 @@ export function ActionsPage() {
                 onChange={(e) => update("description", e.target.value)}
               />
               <FormControl>
-                <InputLabel>Linked risk</InputLabel>
+                <InputLabel>Risque lié</InputLabel>
                 <Select
-                  label="Linked risk"
+                  label="Risque lié"
                   value={form.relatedRiskId}
                   onChange={(e) =>
                     update(
@@ -1061,7 +1081,7 @@ export function ActionsPage() {
                     )
                   }
                 >
-                  <MenuItem value="">None</MenuItem>
+                  <MenuItem value="">Aucun</MenuItem>
                   {risks.data
                     ?.filter((risk) => risk.status !== "ARCHIVED")
                     .map((risk) => (
@@ -1086,14 +1106,14 @@ export function ActionsPage() {
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   fullWidth
-                  label="Tracking ticket number"
+                  label="Référence du ticket"
                   value={form.ticketNumber}
                   onChange={(e) => update("ticketNumber", e.target.value)}
                 />
                 <TextField
                   fullWidth
                   type="url"
-                  label="Tracking ticket URL"
+                  label="Lien du ticket"
                   value={form.ticketUrl}
                   onChange={(e) => update("ticketUrl", e.target.value)}
                 />
@@ -1102,7 +1122,7 @@ export function ActionsPage() {
                 <TextField
                   select
                   fullWidth
-                  label="Action origin"
+                  label="Origine"
                   value={form.origin}
                   onChange={(e) => update("origin", e.target.value)}
                 >
@@ -1124,7 +1144,7 @@ export function ActionsPage() {
                 <TextField
                   select
                   fullWidth
-                  label="Action type"
+                  label="Type d’action"
                   value={form.actionType}
                   onChange={(e) => update("actionType", e.target.value)}
                 >
@@ -1196,7 +1216,7 @@ export function ActionsPage() {
                   >
                     {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => (
                       <MenuItem key={value} value={value}>
-                        {value}
+                        {priorityLabels[value as ActionPlan["priority"]]}
                       </MenuItem>
                     ))}
                   </Select>
@@ -1219,7 +1239,7 @@ export function ActionsPage() {
                       "CANCELLED",
                     ].map((value) => (
                       <MenuItem key={value} value={value}>
-                        {value}
+                        {statusLabels[value]}
                       </MenuItem>
                     ))}
                   </Select>

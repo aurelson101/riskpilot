@@ -174,7 +174,15 @@ export function EbiosPage() {
             variant="scrollable"
           >
             {definitions.map((item, index) => (
-              <Tab key={item.title} label={`Atelier ${index + 1}`} />
+              <Tab
+                key={item.title}
+                label={`Atelier ${index + 1}`}
+                disabled={
+                  index > 0 &&
+                  selected?.workshops.find((workshop) => workshop.number === index)
+                    ?.status !== "VALIDATED"
+                }
+              />
             ))}
           </Tabs>
           <Card variant="outlined">
