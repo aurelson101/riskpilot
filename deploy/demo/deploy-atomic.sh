@@ -39,6 +39,11 @@ else
   RISKPILOT_DEMO_RESET_IMAGE=$reset_candidate $compose build demo-reset-scheduler
 fi
 
+# Fail before the live backend is replaced: this boots the exact candidate
+# image with the production environment and verifies that Symfony can start.
+RISKPILOT_BACKEND_IMAGE=$backend_candidate $compose run --rm --no-deps backend \
+  php bin/console about --env=prod >/dev/null
+
 # Les migrations doivent être rétrocompatibles avec la version précédente.
 RISKPILOT_BACKEND_IMAGE=$backend_candidate $compose run --rm backend php bin/console doctrine:migrations:migrate --no-interaction
 if ! RISKPILOT_BACKEND_IMAGE=$backend_candidate RISKPILOT_FRONTEND_IMAGE=$frontend_candidate RISKPILOT_DEMO_RESET_IMAGE=$reset_candidate \

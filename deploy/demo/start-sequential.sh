@@ -35,9 +35,9 @@ $compose up -d --no-build --force-recreate --no-deps backend frontend
 wait_healthy riskpilot_demo-backend-1
 wait_healthy riskpilot_demo-frontend-1
 
-# Nginx résout les noms Docker au démarrage. Le recréer après le backend évite
-# qu'il conserve l'ancienne adresse du conteneur et serve temporairement des 502.
-$compose up -d --no-build --force-recreate --no-deps nginx
+# Nginx resolves the backend through Docker DNS at request time; retaining it
+# avoids an avoidable proxy restart during a healthy backend replacement.
+$compose up -d --no-build --no-deps nginx
 $compose up -d --no-build --no-deps worker scheduler demo-reset-scheduler
 wait_healthy riskpilot_demo-worker-1
 wait_healthy riskpilot_demo-scheduler-1
