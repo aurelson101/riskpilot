@@ -15,7 +15,7 @@ RUN npm install || (sleep 2 && npm install)
 COPY . .
 ARG VITE_DEMO_MODE=false
 ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
-ENV NODE_OPTIONS=--max-old-space-size=384
+ENV NODE_OPTIONS=--max-old-space-size=512
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS production
