@@ -1,5 +1,6 @@
 import {
   Alert,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -14,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type {
   ComplianceAssessment,
@@ -52,6 +54,32 @@ export function Nis2Page() {
     }),
     {},
   );
+  const statusLabels: Record<string, string> = {
+    COMPLIANT: "Conforme",
+    PARTIAL: "Partielle",
+    NON_COMPLIANT: "Non conforme",
+    NOT_ASSESSED: "À évaluer",
+  };
+  const statusColors: Record<
+    string,
+    "success" | "warning" | "error" | "default"
+  > = {
+    COMPLIANT: "success",
+    PARTIAL: "warning",
+    NON_COMPLIANT: "error",
+    NOT_ASSESSED: "default",
+  };
+  const priorities = [...(results.data ?? [])].sort((left, right) => {
+    const severity = (item: ComplianceResult) =>
+      item.complianceStatus === "NON_COMPLIANT"
+        ? 0
+        : item.complianceStatus === "PARTIAL"
+          ? 1
+          : item.complianceStatus === "NOT_ASSESSED"
+            ? 2
+            : 3;
+    return severity(left) - severity(right) || left.maturityLevel - right.maturityLevel;
+  });
   if (frameworks.isPending || assessments.isPending)
     return <CircularProgress aria-label="Chargement du pilotage NIS2" />;
   if (frameworks.isError || assessments.isError || results.isError)
@@ -100,6 +128,22 @@ export function Nis2Page() {
         aria-label="Conformité globale NIS2"
         sx={{ height: 12, borderRadius: 6 }}
       />
+      {current && (
+        <Alert
+          severity={counts.NON_COMPLIANT ? "error" : counts.PARTIAL ? "warning" : "success"}
+          action={
+            <Button component={Link} to="/actions" color="inherit" size="small">
+              Voir les plans
+            </Button>
+          }
+        >
+          {counts.NON_COMPLIANT
+            ? `${counts.NON_COMPLIANT} exigence(s) non conforme(s) à traiter en priorité.`
+            : counts.PARTIAL
+              ? `${counts.PARTIAL} exigence(s) à compléter pour progresser.`
+              : "Aucun écart critique identifié dans cette évaluation."}
+        </Alert>
+      )}
       {!current ? (
         <Alert severity="info">
           Lancez une évaluation sur le référentiel {nis2.name} depuis le module
@@ -119,7 +163,7 @@ export function Nis2Page() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {results.data?.map((item) => (
+                {priorities.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
                       <strong>{item.requirement.reference}</strong>
@@ -127,7 +171,11 @@ export function Nis2Page() {
                       {item.requirement.title}
                     </TableCell>
                     <TableCell>
-                      <Chip label={item.complianceStatus} />
+                      <Chip
+                        label={statusLabels[item.complianceStatus] ?? item.complianceStatus}
+                        color={statusColors[item.complianceStatus] ?? "default"}
+                        size="small"
+                      />
                     </TableCell>
                     <TableCell>{item.maturityLevel}/5</TableCell>
                     <TableCell>{item.evidence.length}</TableCell>

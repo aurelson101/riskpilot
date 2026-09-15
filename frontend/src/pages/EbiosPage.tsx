@@ -7,6 +7,9 @@ import {
   CircularProgress,
   MenuItem,
   Stack,
+  Step,
+  StepLabel,
+  Stepper,
   Tab,
   Tabs,
   TextField,
@@ -84,6 +87,9 @@ export function EbiosPage() {
   const selected =
     analyses.data?.find((item) => item.id === analysisId) ?? analyses.data?.[0];
   const workshop = selected?.workshops.find((item) => item.number === tab + 1);
+  const completedWorkshops = selected?.workshops.filter(
+    (item) => item.status === "VALIDATED",
+  ).length ?? 0;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const values = useMemo(
     () =>
@@ -169,6 +175,33 @@ export function EbiosPage() {
               <Tab key={item.title} label={`Atelier ${index + 1}`} />
             ))}
           </Tabs>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography fontWeight={700}>Parcours EBIOS RM</Typography>
+                  <Chip label={`${completedWorkshops}/5 ateliers validés`} color={completedWorkshops === 5 ? "success" : "primary"} size="small" />
+                </Stack>
+                <Stepper activeStep={tab} alternativeLabel>
+                  {definitions.map((definition, index) => {
+                    const item = selected?.workshops.find((candidate) => candidate.number === index + 1);
+                    return (
+                      <Step key={definition.title} completed={item?.status === "VALIDATED"}>
+                        <StepLabel>{`Atelier ${index + 1}`}</StepLabel>
+                      </Step>
+                    );
+                  })}
+                </Stepper>
+                {workshop?.missingFields.length ? (
+                  <Alert severity="info">
+                    À compléter avant validation : {workshop.missingFields.map((field) => labels[field] ?? field).join(", ")}.
+                  </Alert>
+                ) : workshop?.status !== "VALIDATED" ? (
+                  <Alert severity="success">Atelier complet : enregistrez puis faites-le valider.</Alert>
+                ) : null}
+              </Stack>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent>
               <Stack spacing={2}>
