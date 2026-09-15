@@ -52,10 +52,11 @@ final class XlsxExporter
     {
         $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
         $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+        $xml .= '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
         $xml .= '<sheetViews><sheetView workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
         $xml .= '<cols>';
         foreach ($rows[0] as $index => $header) {
-            $width = max(12, min(42, mb_strlen((string) $header) + 4));
+            $width = $this->columnWidth($rows, $index);
             $xml .= sprintf('<col min="%d" max="%d" width="%d" customWidth="1"/>', $index + 1, $index + 1, $width);
         }
         $xml .= '</cols><sheetData>';
@@ -68,7 +69,7 @@ final class XlsxExporter
             foreach ($row as $columnIndex => $value) {
                 $ref = $this->columnName($columnIndex + 1).$excelRow;
                 if (0 !== $rowIndex && (is_int($value) || is_float($value))) {
-                    $xml .= sprintf('<c r="%s" s="%d" t="n"><v>%s</v></c>', $ref, $style, $value);
+                    $xml .= sprintf('<c r="%s" s="6" t="n"><v>%s</v></c>', $ref, $value);
                 } else {
                     $xml .= $this->inlineCell($ref, $this->safeText($value), $style);
                 }
@@ -79,7 +80,9 @@ final class XlsxExporter
         $xml .= sprintf('<mergeCells count="2"><mergeCell ref="A1:%s1"/><mergeCell ref="A2:%s2"/></mergeCells>', $lastColumn, $lastColumn);
         $xml .= sprintf('<autoFilter ref="A3:%s%d"/>', $lastColumn, count($rows) + 2);
         $xml .= sprintf('<dimension ref="A1:%s%d"/>', $lastColumn, count($rows) + 2);
+        $xml .= '<printOptions horizontalCentered="1"/>';
         $xml .= '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+        $xml .= '<headerFooter><oddHeader>&C&amp;B'.$this->xml($title).'&amp;B</oddHeader><oddFooter>&L'.$this->xml($organization).'&RPage &amp;P / &amp;N</oddFooter></headerFooter>';
         $xml .= '</worksheet>';
 
         return $xml;
@@ -88,6 +91,22 @@ final class XlsxExporter
     private function inlineCell(string $reference, string $value, int $style): string
     {
         return sprintf('<c r="%s" s="%d" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>', $reference, $style, htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+    }
+
+    /** @param list<list<int|float|string|null>> $rows */
+    private function columnWidth(array $rows, int $column): int
+    {
+        $length = 0;
+        foreach (array_slice($rows, 0, 50) as $row) {
+            $length = max($length, mb_strlen((string) ($row[$column] ?? '')));
+        }
+
+        return max(12, min(46, $length + 3));
+    }
+
+    private function xml(string $value): string
+    {
+        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 
     private function safeText(int|float|string|null $value): string
@@ -131,7 +150,7 @@ final class XlsxExporter
 
     private function styles(): string
     {
-        return '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Aptos Display"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Aptos"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF17324D"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F6E8C"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF2F6"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FFD4DEE5"/></left><right style="thin"><color rgb="FFD4DEE5"/></right><top style="thin"><color rgb="FFD4DEE5"/></top><bottom style="thin"><color rgb="FFD4DEE5"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs></styleSheet>';
+        return '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="16"/><name val="Aptos Display"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Aptos"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF17324D"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F6E8C"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF2F6"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FFD4DEE5"/></left><right style="thin"><color rgb="FFD4DEE5"/></right><top style="thin"><color rgb="FFD4DEE5"/></top><bottom style="thin"><color rgb="FFD4DEE5"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf></cellXfs></styleSheet>';
     }
 
     private function appProperties(): string
