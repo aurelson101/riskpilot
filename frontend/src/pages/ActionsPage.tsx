@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Card,
   CardContent,
@@ -36,6 +39,7 @@ import {
   ContentCopyOutlined,
   DeleteOutline,
   EditOutlined,
+  ExpandMore,
   PersonOutline,
   TodayOutlined,
   SyncOutlined,
@@ -1067,6 +1071,18 @@ export function ActionsPage() {
                     ))}
                 </Select>
               </FormControl>
+              <Accordion
+                disableGutters
+                elevation={0}
+                sx={{ border: "1px solid", borderColor: "divider" }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Typography fontWeight={700}>
+                    Informations complémentaires
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Stack spacing={2}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   fullWidth
@@ -1148,6 +1164,9 @@ export function ActionsPage() {
                   ))}
                 </Select>
               </FormControl>
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
               <FormControl required>
                 <InputLabel>Responsable</InputLabel>
                 <Select

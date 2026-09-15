@@ -127,8 +127,10 @@ export function EbiosPage() {
       api.post(
         `/v1/ebios/analyses/${selected?.id}/workshops/${tab + 1}/validate`,
       ),
-    onSuccess: async () =>
-      client.invalidateQueries({ queryKey: ["ebios-analyses"] }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["ebios-analyses"] });
+      setTab((current) => Math.min(current + 1, definitions.length - 1));
+    },
   });
   if (analyses.isPending)
     return <CircularProgress aria-label="Chargement des analyses EBIOS RM" />;
@@ -259,7 +261,9 @@ export function EbiosPage() {
                     }
                     onClick={() => validate.mutate()}
                   >
-                    Valider indépendamment
+                    {tab < definitions.length - 1
+                      ? "Valider et poursuivre"
+                      : "Valider l’analyse"}
                   </Button>
                 </Stack>
               </Stack>
