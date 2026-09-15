@@ -171,6 +171,7 @@ type CalendarSubscription = {
   createdAt: string | null;
   url?: string;
 };
+type QuickFilter = "ALL" | "TO_DO" | "OVERDUE" | "MINE" | "CRITICAL";
 const emptyForm: ActionForm = {
   title: "",
   description: "",
@@ -275,6 +276,7 @@ export function ActionsPage() {
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [ownerFilter, setOwnerFilter] = useState("ALL");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("ALL");
   const [calendarMonth, setCalendarMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
@@ -416,6 +418,14 @@ export function ActionsPage() {
       <Alert severity="error">Impossible de charger les plans d’action.</Alert>
     );
   const actions = query.data ?? [];
+  const quickCounts = {
+    toDo: actions.filter(
+      (action) => !["COMPLETED", "CANCELLED"].includes(action.status),
+    ).length,
+    overdue: actions.filter((action) => action.status === "OVERDUE").length,
+    mine: actions.filter((action) => action.owner.id === user?.id).length,
+    critical: actions.filter((action) => action.priority === "CRITICAL").length,
+  };
   const filteredActions = actions.filter((action) => {
     const term = search.trim().toLocaleLowerCase(locale);
     const matchesSearch =
@@ -430,7 +440,13 @@ export function ActionsPage() {
     return (
       matchesSearch &&
       (priorityFilter === "ALL" || action.priority === priorityFilter) &&
-      (ownerFilter === "ALL" || String(action.owner.id) === ownerFilter)
+      (ownerFilter === "ALL" || String(action.owner.id) === ownerFilter) &&
+      (quickFilter === "ALL" ||
+        (quickFilter === "TO_DO" &&
+          !["COMPLETED", "CANCELLED"].includes(action.status)) ||
+        (quickFilter === "OVERDUE" && action.status === "OVERDUE") ||
+        (quickFilter === "MINE" && action.owner.id === user?.id) ||
+        (quickFilter === "CRITICAL" && action.priority === "CRITICAL"))
     );
   });
   const availableOwners = Array.from(
@@ -550,19 +566,36 @@ export function ActionsPage() {
               </Select>
             </FormControl>
           </Stack>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={quickFilter}
+            onChange={(_, value) => value && setQuickFilter(value)}
+            aria-label="Filtres rapides des actions"
+            sx={{ mt: 1.5, flexWrap: "wrap" }}
+          >
+            <ToggleButton value="ALL">Toutes · {actions.length}</ToggleButton>
+            <ToggleButton value="TO_DO">
+              À traiter · {quickCounts.toDo}
+            </ToggleButton>
+            <ToggleButton value="OVERDUE" color="error">
+              En retard · {quickCounts.overdue}
+            </ToggleButton>
+            <ToggleButton value="MINE">Mes actions · {quickCounts.mine}</ToggleButton>
+            <ToggleButton value="CRITICAL" color="error">
+              Critiques · {quickCounts.critical}
+            </ToggleButton>
+          </ToggleButtonGroup>
         </CardContent>
       </Card>
       {view === "table" && (
         <Card variant="outlined">
-          <CardContent>
-            <Table aria-label="Plans d’action">
+          <CardContent sx={{ overflowX: "auto" }}>
+            <Table aria-label="Plans d’action" sx={{ minWidth: 760 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Action</TableCell>
                   <TableCell>Risque</TableCell>
-                  <TableCell>Ticket</TableCell>
-                  <TableCell>Origin</TableCell>
-                  <TableCell>Type</TableCell>
                   <TableCell>Responsable</TableCell>
                   <TableCell>Priorité</TableCell>
                   <TableCell>Progression</TableCell>
@@ -578,21 +611,6 @@ export function ActionsPage() {
                       <Typography fontWeight={650}>{action.title}</Typography>
                     </TableCell>
                     <TableCell>{action.relatedRisk?.title ?? "—"}</TableCell>
-                    <TableCell>
-                      {action.ticketUrl ? (
-                        <a
-                          href={action.ticketUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {action.ticketNumber ?? "Open"}
-                        </a>
-                      ) : (
-                        (action.ticketNumber ?? "—")
-                      )}
-                    </TableCell>
-                    <TableCell>{action.origin.replaceAll("_", " ")}</TableCell>
-                    <TableCell>{action.actionType}</TableCell>
                     <TableCell>
                       {action.owner.firstName} {action.owner.lastName}
                     </TableCell>
