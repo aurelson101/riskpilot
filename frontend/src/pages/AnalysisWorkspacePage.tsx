@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Chip,
+  LinearProgress,
   MenuItem,
   Stack,
   TextField,
@@ -24,6 +25,12 @@ type Analysis = {
   status: string;
   completeness: number;
   qualityFindings: string[];
+  createdById: number;
+};
+const findingLabels: Record<string, string> = {
+  OBJECTIVES_REQUIRED: "Définir les objectifs de l’analyse",
+  TEAM_REQUIRED: "Ajouter une équipe responsable",
+  SCENARIOS_REQUIRED: "Associer au moins un scénario de risque",
 };
 const artifactKinds = [
   "METHOD_STEP",
@@ -44,6 +51,10 @@ export function AnalysisWorkspacePage() {
     "ROLE_SUPER_ADMIN",
     "ROLE_ADMIN",
     "ROLE_RISK_MANAGER",
+  ]);
+  const canApprove = hasAnyRole(user?.roles, [
+    "ROLE_SUPER_ADMIN",
+    "ROLE_ADMIN",
   ]);
   const qc = useQueryClient();
   const [selected, setSelected] = useState<number | null>(null);
@@ -100,6 +111,19 @@ export function AnalysisWorkspacePage() {
         idempotencyKey: crypto.randomUUID(),
       }),
   });
+  const quality = useMutation({
+    mutationFn: (id: number) =>
+      api.post(`/analysis-workspace/analyses/${id}/quality`),
+    onSuccess: async () =>
+      qc.invalidateQueries({ queryKey: ["risk-analyses"] }),
+  });
+  const approve = useMutation({
+    mutationFn: (id: number) =>
+      api.post(`/analysis-workspace/analyses/${id}/approve`),
+    onSuccess: async () =>
+      qc.invalidateQueries({ queryKey: ["risk-analyses"] }),
+  });
+  const selectedAnalysis = analyses.data?.find((item) => item.id === selected);
   const addArtifact = () => {
     setFormError(null);
     add.mutate();
@@ -115,7 +139,10 @@ export function AnalysisWorkspacePage() {
           et qualité
         </Typography>
       </div>
-      {(create.isError || add.isError) && (
+      {(create.isError ||
+        add.isError ||
+        quality.isError ||
+        approve.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
       {formError && <Alert severity="error">{formError}</Alert>}
@@ -191,6 +218,11 @@ export function AnalysisWorkspacePage() {
                     {a.key} · v{a.version} · {a.method} · complétude{" "}
                     {a.completeness}%
                   </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={a.completeness}
+                    sx={{ mt: 1, minWidth: { sm: 220 } }}
+                  />
                 </div>
                 <Chip label={a.status} />
               </Stack>
@@ -198,6 +230,56 @@ export function AnalysisWorkspacePage() {
           </Card>
         ))}
       </Stack>
+      {selectedAnalysis && (
+        <Card>
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography variant="h6">Validation de l’analyse</Typography>
+              <Typography color="text.secondary">
+                Vérifiez la qualité des données avant de figer une baseline
+                approuvée et traçable.
+              </Typography>
+              {selectedAnalysis.qualityFindings.length > 0 && (
+                <Alert severity="warning">
+                  {selectedAnalysis.qualityFindings.map((finding) => (
+                    <div key={finding}>
+                      {findingLabels[finding] ??
+                        (finding.startsWith("FOREIGN_OR_MISSING_SCENARIO_")
+                          ? "Corriger un scénario absent ou inaccessible"
+                          : finding)}
+                    </div>
+                  ))}
+                </Alert>
+              )}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                {canManage && selectedAnalysis.status === "DRAFT" && (
+                  <Button
+                    variant="outlined"
+                    disabled={quality.isPending}
+                    onClick={() => quality.mutate(selectedAnalysis.id)}
+                  >
+                    Contrôler la qualité
+                  </Button>
+                )}
+                {canApprove &&
+                  selectedAnalysis.status === "IN_REVIEW" &&
+                  selectedAnalysis.createdById !== user?.id && (
+                  <Button
+                    variant="contained"
+                    disabled={approve.isPending}
+                    onClick={() => approve.mutate(selectedAnalysis.id)}
+                  >
+                    Approuver la baseline
+                  </Button>
+                )}
+                {selectedAnalysis.status === "APPROVED" && (
+                  <Chip color="success" label="Baseline approuvée" />
+                )}
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
       {selected && canManage && (
         <Card>
           <CardContent>

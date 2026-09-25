@@ -1716,6 +1716,24 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Aucun résultat accessible.", "No accessible results."],
   ["% · écart", "% · gap"],
   ["jours restants · source", "days remaining · source"],
+  ["Validation de l’analyse", "Analysis validation"],
+  [
+    "Vérifiez la qualité des données avant de figer une baseline approuvée et traçable.",
+    "Check data quality before freezing an approved and traceable baseline.",
+  ],
+  ["Définir les objectifs de l’analyse", "Define the analysis objectives"],
+  ["Ajouter une équipe responsable", "Add an accountable team"],
+  [
+    "Associer au moins un scénario de risque",
+    "Link at least one risk scenario",
+  ],
+  [
+    "Corriger un scénario absent ou inaccessible",
+    "Fix a missing or inaccessible scenario",
+  ],
+  ["Contrôler la qualité", "Check quality"],
+  ["Approuver la baseline", "Approve baseline"],
+  ["Baseline approuvée", "Approved baseline"],
 ];
 
 export const frToEn = new Map(pairs);
