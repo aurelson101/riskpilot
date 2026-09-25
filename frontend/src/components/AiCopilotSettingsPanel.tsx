@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import axios from "axios";
 import { api } from "../api/client";
 
 type Provider = "MISTRAL" | "OPENAI" | "GEMINI" | "CUSTOM";
@@ -111,12 +112,15 @@ export function AiCopilotSettingsPanel() {
           )}
           {test.isSuccess && (
             <Alert severity="success">
-              Connexion au fournisseur IA validée.
+              Connexion et génération IA validées.
             </Alert>
           )}
           {test.isError && (
             <Alert severity="error">
-              Le test de connexion au fournisseur IA a échoué.
+              {axios.isAxiosError<{ message?: string }>(test.error)
+                ? (test.error.response?.data?.message ??
+                  "Le test de génération IA a échoué.")
+                : "Le test de génération IA a échoué."}
             </Alert>
           )}
           <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -232,8 +236,13 @@ export function AiCopilotSettingsPanel() {
               }
               onClick={() => test.mutate()}
             >
-              Tester la connexion
+              Tester la génération IA
             </Button>
+            {!form.apiKeyConfigured && (
+              <Typography variant="caption" color="text.secondary">
+                Enregistrez d’abord la clé, puis lancez le test de génération.
+              </Typography>
+            )}
           </Stack>
         </Stack>
       </CardContent>

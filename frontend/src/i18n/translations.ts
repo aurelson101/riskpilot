@@ -1734,6 +1734,19 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Contrôler la qualité", "Check quality"],
   ["Approuver la baseline", "Approve baseline"],
   ["Baseline approuvée", "Approved baseline"],
+  [
+    "Connexion et génération IA validées.",
+    "AI connection and generation validated.",
+  ],
+  [
+    "Le test de génération IA a échoué.",
+    "The AI generation test failed.",
+  ],
+  [
+    "Enregistrez d’abord la clé, puis lancez le test de génération.",
+    "Save the key first, then run the generation test.",
+  ],
+  ["Tester la génération IA", "Test AI generation"],
 ];
 
 export const frToEn = new Map(pairs);

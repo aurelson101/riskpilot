@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\AiCopilotClient;
 use App\Entity\AiSettings;
 use App\Entity\User;
 use App\Repository\AiSettingsRepository;
@@ -14,7 +15,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/settings/ai')]
 final readonly class AiSettingsController
@@ -32,7 +32,7 @@ final readonly class AiSettingsController
         private AiSettingsRepository $repository,
         private EntityManagerInterface $entityManager,
         private SecretCipher $cipher,
-        private HttpClientInterface $httpClient,
+        private AiCopilotClient $copilot,
     ) {
     }
 
@@ -93,24 +93,19 @@ final readonly class AiSettingsController
         if ('CUSTOM' === $settings->getProvider()) {
             return $this->error('Le test automatique est désactivé pour les endpoints personnalisés afin d’éviter les accès réseau internes.');
         }
-        $key = $this->cipher->decrypt($settings->getEncryptedApiKey());
-        $headers = 'GEMINI' === $settings->getProvider()
-            ? ['x-goog-api-key' => $key]
-            : ['Authorization' => 'Bearer '.$key];
         try {
-            $response = $this->httpClient->request('GET', $settings->getBaseUrl().'/models', [
-                'headers' => $headers,
-                'max_duration' => 10,
-            ]);
-            $status = $response->getStatusCode();
-            if ($status < 200 || $status >= 300) {
-                throw new \RuntimeException('Provider rejected credentials.');
-            }
+            $this->copilot->askGlobal(
+                $settings,
+                'Répondez uniquement par OK.',
+                [],
+                'fr',
+                hash('sha256', 'settings-test:'.$settings->getOrganization()->getId()),
+            );
         } catch (\Throwable) {
-            return new JsonResponse(['code' => 'AI_CONNECTION_FAILED', 'message' => 'Connexion refusée. Vérifiez la clé, le fournisseur et les restrictions réseau.'], JsonResponse::HTTP_BAD_GATEWAY);
+            return new JsonResponse(['code' => 'AI_GENERATION_FAILED', 'message' => 'Le fournisseur n’a pas pu générer de réponse. Vérifiez la clé, le modèle, le quota et les restrictions réseau.'], JsonResponse::HTTP_BAD_GATEWAY);
         }
 
-        return new JsonResponse(['message' => 'Connexion au fournisseur IA validée.']);
+        return new JsonResponse(['message' => 'Connexion et génération IA validées.']);
     }
 
     private function find(): ?AiSettings

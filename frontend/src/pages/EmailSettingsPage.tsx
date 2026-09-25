@@ -90,15 +90,28 @@ export function EmailSettingsPage() {
   }, []);
 
   function selectProvider(provider: string) {
+    const providerChanged = provider !== form.provider;
+    const resetSecrets = providerChanged
+      ? {
+          password: "",
+          passwordConfigured: false,
+          oauthClientSecret: "",
+          oauthClientSecretConfigured: false,
+          oauthConnected: false,
+          connectedEmail: null,
+          enabled: false,
+        }
+      : {};
     if (provider === "SMTP2GO")
       setForm({
         ...form,
+        ...resetSecrets,
         provider,
         host: "mail.smtp2go.com",
         port: 587,
         encryption: "tls",
       });
-    else setForm({ ...form, provider });
+    else setForm({ ...form, ...resetSecrets, provider });
   }
   async function save(event: FormEvent) {
     event.preventDefault();
