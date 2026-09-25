@@ -33,5 +33,8 @@ describe("buildComplianceSummary", () => {
     expect(summary.strong).toHaveLength(1);
     expect(summary.remaining).toHaveLength(1);
     expect(summary.notApplicable).toHaveLength(1);
+    expect(summary.evaluatedCount).toBe(3);
+    expect(summary.progress).toBe(75);
+    expect(summary.next?.requirement.reference).toBe("ART-3");
   });
 });

@@ -10,6 +10,10 @@ export function buildComplianceSummary(items: ComplianceResult[]) {
     ? assessed.reduce((sum, item) => sum + item.maturityLevel, 0) /
       assessed.length
     : null;
+  const remaining = items.filter(
+    (item) => item.complianceStatus === "NOT_ASSESSED",
+  );
+  const evaluatedCount = items.length - remaining.length;
 
   return {
     radar: assessed.map((item) => ({
@@ -21,7 +25,12 @@ export function buildComplianceSummary(items: ComplianceResult[]) {
     average,
     weak: assessed.filter((item) => item.maturityLevel <= 2),
     strong: assessed.filter((item) => item.maturityLevel >= 4),
-    remaining: items.filter((item) => item.complianceStatus === "NOT_ASSESSED"),
+    remaining,
+    evaluatedCount,
+    progress: items.length
+      ? Math.round((evaluatedCount / items.length) * 100)
+      : 0,
+    next: remaining[0] ?? null,
     notApplicable: items.filter(
       (item) => item.complianceStatus === "NOT_APPLICABLE",
     ),

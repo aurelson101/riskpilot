@@ -1738,15 +1738,49 @@ const pairs: Array<[fr: string, en: string]> = [
     "Connexion et génération IA validées.",
     "AI connection and generation validated.",
   ],
-  [
-    "Le test de génération IA a échoué.",
-    "The AI generation test failed.",
-  ],
+  ["Le test de génération IA a échoué.", "The AI generation test failed."],
   [
     "Enregistrez d’abord la clé, puis lancez le test de génération.",
     "Save the key first, then run the generation test.",
   ],
   ["Tester la génération IA", "Test AI generation"],
+  ["Parcours guidé", "Guided workflow"],
+  ["exigences traitées", "requirements processed"],
+  ["Continuer l’évaluation", "Continue assessment"],
+  ["Passer à la prochaine exigence", "Move to the next requirement"],
+  ["Vue complète", "Full view"],
+  ["Exigence", "Requirement"],
+  ["sur", "of"],
+  ["Précédent", "Previous"],
+  ["Suivant", "Next"],
+  [
+    "Toutes les exigences ont été traitées. Vous pouvez maintenant contrôler les écarts et terminer l’évaluation.",
+    "All requirements have been processed. You can now review gaps and complete the assessment.",
+  ],
+  [
+    "La demande a été préremplie par le mode pilotage. Vérifiez-la et donnez votre consentement avant un nouvel envoi IA.",
+    "The request was prefilled by management mode. Review it and provide consent before sending it to AI again.",
+  ],
+  ["Réinitialiser les filtres", "Reset filters"],
+  ["Filtres rapides des actions", "Quick action filters"],
+  ["Toutes ·", "All ·"],
+  ["À traiter ·", "To process ·"],
+  ["En retard ·", "Overdue ·"],
+  ["Mes actions ·", "My actions ·"],
+  ["Critiques ·", "Critical ·"],
+  ["action(s) affichée(s)", "action(s) displayed"],
+  ["Informations complémentaires", "Additional information"],
+  ["Parcours EBIOS RM", "EBIOS RM workflow"],
+  ["À compléter avant validation :", "Complete before validation:"],
+  [
+    "Atelier complet : enregistrez puis faites-le valider.",
+    "Workshop complete: save it, then have it validated.",
+  ],
+  ["Voir les plans", "View action plans"],
+  [
+    "Aucune exigence évaluée : complétez l’évaluation pour obtenir les priorités de remédiation.",
+    "No requirements assessed: complete the assessment to obtain remediation priorities.",
+  ],
 ];
 
 export const frToEn = new Map(pairs);

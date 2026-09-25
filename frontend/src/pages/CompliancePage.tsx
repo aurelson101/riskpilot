@@ -98,6 +98,7 @@ export function CompliancePage() {
   const [selectedAssessment, setSelectedAssessment] = useState<number | null>(
     null,
   );
+  const [guidedResultId, setGuidedResultId] = useState<number | null>(null);
   const client = useQueryClient();
   const [assessmentDialog, setAssessmentDialog] = useState(false);
   const [copilotResult, setCopilotResult] = useState<ComplianceResult | null>(
@@ -247,6 +248,13 @@ export function CompliancePage() {
     () => buildComplianceSummary(results.data ?? []),
     [results.data],
   );
+  const resultItems = results.data ?? [];
+  const guidedIndex =
+    guidedResultId === null
+      ? -1
+      : resultItems.findIndex((item) => item.id === guidedResultId);
+  const guidedResult = guidedIndex >= 0 ? resultItems[guidedIndex] : null;
+  const visibleResults = guidedResult ? [guidedResult] : resultItems;
   const selectedFrameworkForCreation = frameworks.data?.find(
     (framework) => framework.id === Number(assessmentForm.frameworkId),
   );
@@ -354,7 +362,10 @@ export function CompliancePage() {
               <Card
                 key={assessment.id}
                 variant="outlined"
-                onClick={() => setSelectedAssessment(assessment.id)}
+                onClick={() => {
+                  setSelectedAssessment(assessment.id);
+                  setGuidedResultId(null);
+                }}
                 sx={{
                   width: "100%",
                   cursor: "pointer",
@@ -482,7 +493,76 @@ export function CompliancePage() {
                       a été restaurée.
                     </Alert>
                   )}
-                  {(results.data?.length ?? 0) > 0 && (
+                  {resultItems.length > 0 && (
+                    <Card variant="outlined" sx={{ bgcolor: "action.hover" }}>
+                      <CardContent>
+                        <Stack spacing={1.5}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            gap={2}
+                          >
+                            <Box>
+                              <Typography variant="h6" fontWeight={750}>
+                                Parcours guidé
+                              </Typography>
+                              <Typography color="text.secondary">
+                                {resultSummary.evaluatedCount} /{" "}
+                                {resultItems.length} exigences traitées
+                              </Typography>
+                            </Box>
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              spacing={1}
+                            >
+                              {resultSummary.next &&
+                                resultSummary.next.id !== guidedResult?.id && (
+                                  <Button
+                                    variant="contained"
+                                    onClick={() =>
+                                      setGuidedResultId(
+                                        resultSummary.next?.id ?? null,
+                                      )
+                                    }
+                                  >
+                                    {guidedResult
+                                      ? "Passer à la prochaine exigence"
+                                      : "Continuer l’évaluation"}
+                                  </Button>
+                                )}
+                              {guidedResult && (
+                                <Button
+                                  variant="outlined"
+                                  onClick={() => setGuidedResultId(null)}
+                                >
+                                  Vue complète
+                                </Button>
+                              )}
+                            </Stack>
+                          </Stack>
+                          <LinearProgress
+                            aria-label={`Progression de l’évaluation : ${resultSummary.progress}%`}
+                            variant="determinate"
+                            value={resultSummary.progress}
+                            color={
+                              resultSummary.progress === 100
+                                ? "success"
+                                : "primary"
+                            }
+                          />
+                          {resultSummary.progress === 100 && (
+                            <Alert severity="success">
+                              Toutes les exigences ont été traitées. Vous pouvez
+                              maintenant contrôler les écarts et terminer
+                              l’évaluation.
+                            </Alert>
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {resultItems.length > 0 && !guidedResult && (
                     <Card variant="outlined">
                       <CardContent>
                         <Stack
@@ -609,7 +689,43 @@ export function CompliancePage() {
                       </CardContent>
                     </Card>
                   )}
-                  {results.data?.map((result) => (
+                  {guidedResult && (
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      justifyContent="space-between"
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                      gap={1}
+                    >
+                      <Typography fontWeight={700}>
+                        Exigence {guidedIndex + 1} sur {resultItems.length}
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          disabled={guidedIndex <= 0}
+                          onClick={() =>
+                            setGuidedResultId(
+                              resultItems[guidedIndex - 1]?.id ?? null,
+                            )
+                          }
+                        >
+                          Précédent
+                        </Button>
+                        <Button
+                          size="small"
+                          disabled={guidedIndex >= resultItems.length - 1}
+                          onClick={() =>
+                            setGuidedResultId(
+                              resultItems[guidedIndex + 1]?.id ?? null,
+                            )
+                          }
+                        >
+                          Suivant
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  )}
+                  {visibleResults.map((result) => (
                     <Box
                       key={result.id}
                       sx={{
