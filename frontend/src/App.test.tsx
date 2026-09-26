@@ -169,7 +169,12 @@ describe("App", () => {
     expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(riskMenu);
     expect(await screen.findByText("Registre des risques")).toBeInTheDocument();
-    expect(screen.getByText("Périmètres")).toBeInTheDocument();
+    expect(screen.queryByText("Périmètres")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Référentiels" }));
+    expect(await screen.findByText("Périmètres")).toBeInTheDocument();
+    expect(screen.getByText("Actifs")).toBeInTheDocument();
+    expect(screen.getByText("Mesures de sécurité")).toBeInTheDocument();
+    expect(riskMenu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("button", { name: "Pilotage" }));
     expect(await screen.findByText("Indicateurs")).toBeInTheDocument();
     expect(riskMenu).toHaveAttribute("aria-expanded", "false");
@@ -177,17 +182,15 @@ describe("App", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Conformité et contrôles" }),
     );
-    expect(await screen.findByText("Mesures de sécurité")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Évaluations de conformité"),
+    ).toBeInTheDocument();
     expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Indicateurs")).not.toBeInTheDocument();
-    expect(screen.getByText("Conformité NIS2")).toBeInTheDocument();
+    expect(screen.getByText("Tableau de bord NIS2")).toBeInTheDocument();
     expect(screen.getByText("Tiers et fournisseurs")).toBeInTheDocument();
     expect(screen.getByText("Incidents et continuité")).toBeInTheDocument();
-    expect(screen.getByText("Actifs")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Actifs" })).not.toHaveAttribute(
-      "aria-expanded",
-    );
-    expect(screen.queryByText("Tous les actifs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Actifs")).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText("Langue de l’interface"));
     fireEvent.click(await screen.findByRole("option", { name: "Anglais" }));
     fireEvent.click(
@@ -206,7 +209,7 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
     expect(screen.getByText("Compliance and controls")).toBeInTheDocument();
-    expect(screen.getByText("Assets")).toBeInTheDocument();
+    expect(screen.queryByText("Assets")).not.toBeInTheDocument();
     expect(screen.queryByText("All assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Hardware assets")).not.toBeInTheDocument();
     const ismsItem = await screen.findByRole("button", {

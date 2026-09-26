@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
@@ -71,7 +71,7 @@ describe("OperationsPage", () => {
     expect(screen.getByText("OPERATIONAL · Sans échéance")).toBeInTheDocument();
   });
 
-  it("ouvre la création de tâche avec un sélecteur de responsable", async () => {
+  it("évite de dupliquer les tâches opérationnelles", async () => {
     vi.spyOn(api, "get").mockImplementation(async (url) => ({
       data: url === "/operations/my-tasks" ? { items: [] } : [],
     }));
@@ -80,13 +80,10 @@ describe("OperationsPage", () => {
     expect(
       await screen.findByText("Aucune tâche ouverte."),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("tab", { name: "Tâches opérationnelles" }),
-    );
-    fireEvent.click(await screen.findByRole("button", { name: "Créer" }));
+    expect(screen.getByRole("tab", { name: "Mes tâches" })).toBeInTheDocument();
     expect(
-      screen.getByRole("combobox", { name: "Responsable" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("tab", { name: "Tâches opérationnelles" }),
+    ).not.toBeInTheDocument();
   });
 
   it("affiche une erreur de chargement sans exposer un éditeur avancé au gestionnaire", async () => {
