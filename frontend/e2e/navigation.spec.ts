@@ -291,10 +291,11 @@ test("le bouton flottant rend le copilote IA accessible partout", async ({
   ).toBeVisible();
 });
 
-test("la synthèse GRC IA reste gouvernée et prépare une action sans la créer", async ({
+test("le pilotage ouvre une synthèse GRC gouvernée sans écriture automatique", async ({
   page,
   request,
 }) => {
+  let pilotCalls = 0;
   let briefCalls = 0;
   let actionWrites = 0;
   await page.route("**/api/copilot/context", async (route) => {
@@ -323,6 +324,27 @@ test("la synthèse GRC IA reste gouvernée et prépare une action sans la créer
             frameworkId: 7,
           },
         ],
+      }),
+    });
+  });
+  await page.route("**/api/copilot", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    pilotCalls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer: "Je prépare une synthèse GRC gouvernée.",
+        actions: [
+          {
+            type: "OPEN_GRC_BRIEF",
+            label: "Préparer une synthèse GRC",
+          },
+        ],
+        automaticWrite: false,
       }),
     });
   });
@@ -376,10 +398,37 @@ test("la synthèse GRC IA reste gouvernée et prépare une action sans la créer
     .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("tab", { name: /Synthèse GRC|GRC overview/ }).click();
   await dialog
-    .getByRole("textbox", { name: /Objectif facultatif|Optional objective/ })
+    .getByRole("button", { name: /Mode pilotage|Pilot mode/ })
+    .click();
+  await dialog
+    .getByRole("textbox", {
+      name: /Que voulez-vous accomplir|What do you want to accomplish/,
+    })
     .fill("Prioriser les écarts pour le comité de direction.");
+  await dialog
+    .getByRole("checkbox", {
+      name: /J’autorise l’envoi|I authorize sending/,
+    })
+    .check();
+  await dialog.getByRole("button", { name: /Envoyer|Send/ }).click();
+  await dialog
+    .getByRole("button", {
+      name: /Préparer une synthèse GRC|Prepare a GRC overview/,
+    })
+    .click();
+  await expect(
+    dialog.getByRole("textbox", {
+      name: /Objectif facultatif|Optional objective/,
+    }),
+  ).toHaveValue("Prioriser les écarts pour le comité de direction.");
+  await expect(
+    dialog.getByRole("checkbox", {
+      name: /J’autorise l’envoi des références|I authorize sending compliance references/,
+    }),
+  ).not.toBeChecked();
+  expect(pilotCalls).toBe(1);
+  expect(briefCalls).toBe(0);
   await dialog
     .getByRole("checkbox", {
       name: /J’autorise l’envoi des références|I authorize sending compliance references/,
@@ -511,6 +560,104 @@ test("le mode pilotage prépare réellement le brouillon de risque proposé", as
     }),
   ).toHaveValue("Rançongiciel sur la plateforme cloud");
   expect(draftCalls).toBe(1);
+});
+
+test("le pilotage conserve la conversation après une navigation", async ({
+  page,
+  request,
+}) => {
+  const paths: string[] = [];
+  await page.route("**/api/copilot/context", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        enabled: true,
+        provider: "MISTRAL",
+        model: "codestral-latest",
+        dataPolicy: "MINIMAL",
+      }),
+    });
+  });
+  await page.route("**/api/copilot", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    const payload = route.request().postDataJSON() as { currentPath: string };
+    paths.push(payload.currentPath);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer:
+          paths.length === 1
+            ? "J’ouvre le registre des risques."
+            : "Nous poursuivons depuis le registre des risques.",
+        actions:
+          paths.length === 1
+            ? [
+                {
+                  type: "NAVIGATE",
+                  label: "Ouvrir le registre des risques",
+                  path: "/risks",
+                },
+              ]
+            : [],
+        automaticWrite: false,
+      }),
+    });
+  });
+
+  await authenticate(page, request, "admin@riskpilot.local");
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page
+    .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: /Mode pilotage|Pilot mode/ })
+    .click();
+  await dialog
+    .getByRole("textbox", {
+      name: /Que voulez-vous accomplir|What do you want to accomplish/,
+    })
+    .fill("Ouvre le registre des risques.");
+  await dialog
+    .getByRole("checkbox", { name: /J’autorise l’envoi|I authorize sending/ })
+    .check();
+  await dialog.getByRole("button", { name: /Envoyer|Send/ }).click();
+  await dialog
+    .getByRole("button", {
+      name: /Ouvrir le registre des risques|Open the risk register/,
+    })
+    .click();
+
+  await expect(page).toHaveURL(/\/risks$/);
+  await expect(dialog).not.toBeVisible();
+  await page
+    .getByRole("button", { name: /Ouvrir le copilote IA|Open AI copilot/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("J’ouvre le registre des risques."),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: /Mode pilotage|Pilot mode/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await dialog
+    .getByRole("textbox", {
+      name: /Que voulez-vous accomplir|What do you want to accomplish/,
+    })
+    .fill("Quelle est la prochaine étape ?");
+  await dialog
+    .getByRole("checkbox", { name: /J’autorise l’envoi|I authorize sending/ })
+    .check();
+  await dialog.getByRole("button", { name: /Envoyer|Send/ }).click();
+  await expect(
+    dialog.getByText("Nous poursuivons depuis le registre des risques."),
+  ).toBeVisible();
+  expect(paths).toEqual(["/", "/risks"]);
 });
 
 test("le copilote crée des brouillons risque, conformité et ISMS après confirmation", async ({

@@ -32,10 +32,11 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $client->disableReboot();
         self::getContainer()->set(HttpClientInterface::class, new MockHttpClient([
             new MockResponse(json_encode(['output_text' => 'Commençons par identifier le périmètre.'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
-            new MockResponse(json_encode(['output_text' => '{"answer":"Ouvrez le registre des risques.","actions":[{"type":"NAVIGATE","label":"Ouvrir les risques","path":"/risks"},{"type":"NAVIGATE","label":"Action interdite","path":"https://evil.test"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
+            new MockResponse(json_encode(['output_text' => '{"answer":"Ouvrez le registre ou préparez la synthèse GRC.","actions":[{"type":"NAVIGATE","label":"Ouvrir les risques","path":"/risks"},{"type":"OPEN_GRC_BRIEF","label":"Lancer la synthèse"},{"type":"NAVIGATE","label":"Action interdite","path":"https://evil.test"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Rançongiciel chez le prestataire","description":"Le service externalisé pourrait être indisponible et les données exposées.","scopeId":1,"assetId":1,"threatId":1,"likelihood":3,"impact":4,"rationale":"Le niveau doit être confirmé après revue des contrôles du prestataire."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"title":"Formaliser la revue des accès","description":"Documenter une revue trimestrielle des accès privilégiés, son responsable, les écarts et les preuves de clôture.","complianceResultId":1,"priority":"HIGH","actionType":"ORGANIZATIONAL","dueInDays":60,"rationale":"L’exigence est partiellement satisfaite ; la fréquence et les preuves doivent être confirmées."}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode(['output_text' => '{"summary":"La revue des accès ISO 27001 reste partiellement couverte.","priorities":[{"complianceResultId":1,"title":"Formaliser la revue trimestrielle des accès","rationale":"La fréquence, le responsable et les preuves restent à confirmer.","priority":"HIGH"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
+            new MockResponse(json_encode(['output_text' => '{"answer":"Je peux vous guider vers la synthèse GRC.","actions":[{"type":"OPEN_GRC_BRIEF","label":"Lancer la synthèse"}]}'], JSON_THROW_ON_ERROR), ['http_code' => 200]),
         ]));
         $manager = self::getContainer()->get(EntityManagerInterface::class);
         $tool = new SchemaTool($manager);
@@ -45,6 +46,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $organization = new Organization('Primary');
         $otherOrganization = new Organization('Other');
         $managerUser = new User('manager@example.test', 'Risk', 'Manager', $organization, [User::ROLE_RISK_MANAGER]);
+        $viewer = new User('viewer@example.test', 'Read', 'Only', $organization, [User::ROLE_VIEWER]);
         $other = new User('other@example.test', 'Other', 'User', $otherOrganization, [User::ROLE_RISK_MANAGER]);
         $scope = new Scope('Prestataires critiques', 'ORGANIZATION', $organization);
         $asset = new Asset('Service de paie', 'CLOUD_SERVICE', $scope, $organization);
@@ -57,7 +59,7 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $foreignRequirement = new Requirement($foreignFramework, 'F.1', 'Foreign requirement', 'Other');
         $foreignAssessment = new ComplianceAssessment($otherOrganization, $foreignFramework, new Scope('Foreign scope', 'ORGANIZATION', $otherOrganization), $other, new \DateTimeImmutable());
         $foreignResult = (new ComplianceResult($foreignAssessment, $foreignRequirement))->setComplianceStatus('NON_COMPLIANT');
-        foreach ([$organization, $otherOrganization, $managerUser, $other, $scope, $asset, $threat, $framework, $requirement, $assessment, $complianceResult, $foreignFramework, $foreignRequirement, $foreignAssessment->getScope(), $foreignAssessment, $foreignResult] as $entity) {
+        foreach ([$organization, $otherOrganization, $managerUser, $viewer, $other, $scope, $asset, $threat, $framework, $requirement, $assessment, $complianceResult, $foreignFramework, $foreignRequirement, $foreignAssessment->getScope(), $foreignAssessment, $foreignResult] as $entity) {
             $manager->persist($entity);
         }
         $manager->flush();
@@ -100,7 +102,9 @@ final class GlobalCopilotControllerTest extends WebTestCase
         self::assertSame('PILOT', $pilot['mode']);
         self::assertSame('/risks', $pilot['actions'][0]['path']);
         self::assertSame('Registre des risques', $pilot['actions'][0]['label']);
-        self::assertCount(1, $pilot['actions'], 'A provider cannot inject a non-allowlisted destination.');
+        self::assertSame('OPEN_GRC_BRIEF', $pilot['actions'][1]['type']);
+        self::assertSame('Préparer une synthèse GRC', $pilot['actions'][1]['label']);
+        self::assertCount(2, $pilot['actions'], 'A provider cannot inject a non-allowlisted destination.');
         $pilotAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
         self::assertSame('PILOT', $pilotAudit->getNewValues()['entities'][0]['mode']);
 
@@ -149,6 +153,13 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $briefAudit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
         self::assertSame('GRC_BRIEF', $briefAudit->getNewValues()['entities'][0]['workflow']);
         self::assertSame('[REDACTED]', $briefAudit->getNewValues()['request']['objective']);
+
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($viewer));
+        $client->jsonRequest('POST', '/api/copilot', ['question' => 'Prépare une synthèse GRC', 'consent' => true, 'mode' => 'PILOT', 'currentPath' => '/']);
+        self::assertResponseIsSuccessful();
+        $viewerPilot = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame([], $viewerPilot['actions'], 'A viewer cannot open a manager-only AI workflow.');
+        self::assertFalse($viewerPilot['automaticWrite']);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->request('GET', '/api/copilot/context');

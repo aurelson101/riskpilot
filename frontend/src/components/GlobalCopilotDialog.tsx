@@ -33,6 +33,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type PilotAction = {
   type:
     | "NAVIGATE"
+    | "OPEN_GRC_BRIEF"
     | "OPEN_RISK_DRAFT"
     | "OPEN_COMPLIANCE_ACTION_DRAFT"
     | "OPEN_ISMS_DOCUMENT_DRAFT";
@@ -401,11 +402,16 @@ export function GlobalCopilotDialog({
   const runPilotAction = (action: PilotAction) => {
     setConfirmed(false);
     if (action.type === "NAVIGATE" && action.path) {
+      setPilotActions([]);
       navigate(action.path);
       onClose();
       return;
     }
-    if (action.type === "OPEN_RISK_DRAFT") {
+    if (action.type === "OPEN_GRC_BRIEF") {
+      setGrcObjective(lastPilotRequest);
+      setGrcConsent(false);
+      setTab("overview");
+    } else if (action.type === "OPEN_RISK_DRAFT") {
       const request = lastPilotRequest;
       setRiskRequest(request);
       setRiskConsent(false);
@@ -434,6 +440,16 @@ export function GlobalCopilotDialog({
         {empty}
       </MenuItem>
     );
+  const resetConversation = () => {
+    setMessages([]);
+    setMode("ASSIST");
+    setPilotActions([]);
+    setLastPilotRequest("");
+    setQuestion("");
+    setConsent(false);
+    setGuidedFromPilot(false);
+    setTab("chat");
+  };
   const riskReady = Boolean(
     risk.title.trim() &&
     risk.scopeId &&
@@ -1234,6 +1250,7 @@ export function GlobalCopilotDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
+        <Button onClick={resetConversation}>Nouvelle conversation</Button>
         <Button onClick={onClose}>Fermer</Button>
       </DialogActions>
     </Dialog>

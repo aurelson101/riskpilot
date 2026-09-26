@@ -289,22 +289,40 @@ final readonly class GlobalCopilotController
         $english = 'en' === $this->currentUser->get()->getLocale();
         $routes = [
             '/' => ['Tableau de bord', 'Dashboard'], '/risks' => ['Registre des risques', 'Risk register'],
+            '/analysis-workspace' => ['Analyses de risques', 'Risk analyses'],
             '/risk-matrix' => ['Matrice des risques', 'Risk matrix'], '/actions' => ['Plans d’action', 'Action plans'],
+            '/scopes' => ['Périmètres', 'Scopes'], '/assets' => ['Actifs', 'Assets'],
+            '/threats' => ['Menaces', 'Threats'], '/vulnerabilities' => ['Vulnérabilités', 'Vulnerabilities'],
             '/operations' => ['Pilotage opérationnel', 'Operations'], '/search' => ['Recherche transverse', 'Global search'],
             '/decision' => ['Espace de décision', 'Decision workspace'], '/experiments' => ['Propositions gouvernées', 'Governed proposals'],
             '/ebios' => ['EBIOS RM', 'EBIOS RM'], '/indicators' => ['Indicateurs', 'Indicators'],
-            '/annual-reports' => ['Rapports annuels', 'Annual reports'], '/compliance' => ['Conformité', 'Compliance'],
+            '/annual-reports' => ['Rapports annuels', 'Annual reports'], '/reports/executive' => ['Rapport exécutif', 'Executive report'],
+            '/compliance' => ['Conformité', 'Compliance'],
             '/nis2' => ['Conformité NIS2', 'NIS2 compliance'], '/third-parties' => ['Tiers et fournisseurs', 'Third parties'],
+            '/security-controls' => ['Mesures de sécurité', 'Security controls'],
             '/resilience' => ['Incidents et continuité', 'Resilience and continuity'],
             '/regulatory' => ['Vie privée et obligations', 'Privacy and regulatory records'],
             '/isms-documents' => ['Documents ISMS', 'ISMS documents'], '/notifications' => ['Notifications', 'Notifications'],
             '/profile' => ['Profil utilisateur', 'User profile'],
         ];
+        $roles = $this->currentUser->get()->getRoles();
+        if ([] !== array_intersect([User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $roles)) {
+            $routes += [
+                '/administration/rbac' => ['Rôles et permissions', 'Roles and permissions'],
+                '/administration/action-fields' => ['Colonnes des actions', 'Action columns'],
+                '/administration/integrations' => ['Identité et intégrations', 'Identity and integrations'],
+                '/administration/email-settings' => ['Messagerie', 'Email'],
+                '/administration/users' => ['Utilisateurs', 'Users'],
+                '/administration/organizations' => ['Organisations', 'Organizations'],
+                '/administration/audit-logs' => ['Journal d’audit', 'Audit log'],
+            ];
+        }
         $actions = [];
         foreach ($routes as $path => [$frenchLabel, $englishLabel]) {
             $actions[] = ['type' => 'NAVIGATE', 'label' => $english ? $englishLabel : $frenchLabel, 'path' => $path];
         }
-        if ([] !== array_intersect([User::ROLE_RISK_MANAGER, User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $this->currentUser->get()->getRoles())) {
+        if ([] !== array_intersect([User::ROLE_RISK_MANAGER, User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $roles)) {
+            $actions[] = ['type' => 'OPEN_GRC_BRIEF', 'label' => $english ? 'Prepare a GRC overview' : 'Préparer une synthèse GRC'];
             $actions[] = ['type' => 'OPEN_RISK_DRAFT', 'label' => $english ? 'Prepare a risk draft' : 'Préparer un brouillon de risque'];
             $actions[] = ['type' => 'OPEN_COMPLIANCE_ACTION_DRAFT', 'label' => $english ? 'Prepare a compliance action draft' : 'Préparer un brouillon d’action conformité'];
         }

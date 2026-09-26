@@ -1,6 +1,7 @@
 export type Locale = "fr" | "en";
 
 const pairs: Array<[fr: string, en: string]> = [
+  ["Nouvelle conversation", "New conversation"],
   ["Tableau de bord", "Dashboard"],
   ["Risques", "Risks"],
   ["Gestion des risques", "Risk management"],

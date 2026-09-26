@@ -929,9 +929,10 @@ function Layout() {
           <SmartToyOutlined />
         </Fab>
       </Tooltip>
-      {copilotOpen && (
-        <GlobalCopilotDialog open onClose={() => setCopilotOpen(false)} />
-      )}
+      <GlobalCopilotDialog
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+      />
     </Box>
   );
 }
