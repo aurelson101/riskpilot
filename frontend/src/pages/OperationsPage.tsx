@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddOutlined, EditOutlined } from "@mui/icons-material";
 import {
+  Autocomplete,
   Alert,
   Button,
   Card,
@@ -11,6 +12,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Checkbox,
+  FormControlLabel,
   LinearProgress,
   Pagination,
   CircularProgress,
@@ -72,13 +75,67 @@ type Trajectory = {
 
 const sections: Array<{ type: RecordType | "MY_TASKS"; label: string }> = [
   { type: "MY_TASKS", label: "Mes tâches" },
-  { type: "TASK", label: "Tâches opérationnelles" },
   { type: "RESPONSIBILITY_RULE", label: "Responsabilités" },
   { type: "COMPLIANCE_PROGRAM", label: "Trajectoires" },
   { type: "QUESTIONNAIRE_TEMPLATE", label: "Questionnaires" },
   { type: "QUESTIONNAIRE_CAMPAIGN", label: "Campagnes" },
-  { type: "REFERENCE_PACK", label: "Packs" },
 ];
+
+const sectionHelp: Record<RecordType | "MY_TASKS", string> = {
+  MY_TASKS:
+    "Retrouvez ici vos actions, évaluations, risques, contrôles, tiers et incidents à traiter.",
+  TASK: "Les tâches manuelles sont regroupées dans Mes tâches.",
+  RESPONSIBILITY_RULE:
+    "Définissez qui prend automatiquement en charge un domaine GRC.",
+  COMPLIANCE_PROGRAM:
+    "Fixez une cible et suivez la progression réelle de vos référentiels.",
+  QUESTIONNAIRE_TEMPLATE:
+    "Préparez un questionnaire simple pour collecter des réponses ou des preuves.",
+  QUESTIONNAIRE_CAMPAIGN:
+    "Choisissez un questionnaire, ses destinataires et une échéance.",
+  REFERENCE_PACK: "Les packs techniques sont gérés automatiquement.",
+};
+
+const defaultDetails: Record<RecordType, Record<string, unknown>> = {
+  TASK: { description: "", priority: "MEDIUM" },
+  RESPONSIBILITY_RULE: {
+    domain: "GOUVERNANCE",
+    scopeType: "ORGANIZATION",
+    defaultRole: "ROLE_RISK_MANAGER",
+    requiresApproval: true,
+  },
+  COMPLIANCE_PROGRAM: {
+    startDate: new Date().toISOString().slice(0, 10),
+    currentScore: 0,
+    targetScore: 100,
+    frameworks: [],
+  },
+  QUESTIONNAIRE_TEMPLATE: {
+    useCase: "EVIDENCE_COLLECTION",
+    version: 1,
+    questions: [
+      {
+        id: "Q1",
+        label: "Décrivez la preuve disponible.",
+        type: "EVIDENCE",
+      },
+    ],
+    reminderDays: [7, 2],
+  },
+  QUESTIONNAIRE_CAMPAIGN: {
+    templateId: null,
+    recipientIds: [],
+    responseStatus: "DRAFT",
+  },
+  REFERENCE_PACK: {},
+};
+
+const emptyForm = (type: RecordType) => ({
+  title: "",
+  dueAt: "",
+  ownerId: "",
+  details: JSON.stringify(defaultDetails[type], null, 2),
+});
 
 export function OperationsPage() {
   const { user } = useAuth();
@@ -87,19 +144,12 @@ export function OperationsPage() {
     "ROLE_ADMIN",
     "ROLE_RISK_MANAGER",
   ]);
-  const isAdmin = hasAnyRole(user?.roles, ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"]);
   const client = useQueryClient();
   const navigate = useNavigate();
   const [section, setSection] = useState<RecordType | "MY_TASKS">("MY_TASKS");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    title: "",
-    dueAt: "",
-    ownerId: "",
-    details: "{}",
-  });
-  const [formError, setFormError] = useState<string | null>(null);
+  const [form, setForm] = useState(() => emptyForm("RESPONSIBILITY_RULE"));
   const [taskQuery, setTaskQuery] = useState("");
   const [taskSource, setTaskSource] = useState("");
   const [taskStatus, setTaskStatus] = useState("");
@@ -112,13 +162,12 @@ export function OperationsPage() {
   const closeDialog = () => {
     setOpen(false);
     setEditingId(null);
-    setForm({ title: "", dueAt: "", ownerId: "", details: "{}" });
-    setFormError(null);
+    if (section !== "MY_TASKS") setForm(emptyForm(section));
   };
   const openCreateDialog = () => {
     setEditingId(null);
-    setForm({ title: "", dueAt: "", ownerId: "", details: "{}" });
-    setFormError(null);
+    if (section === "MY_TASKS") return;
+    setForm(emptyForm(section));
     setOpen(true);
   };
   const openEditDialog = (item: RecordItem) => {
@@ -129,7 +178,6 @@ export function OperationsPage() {
       ownerId: item.owner ? String(item.owner.id) : "",
       details: JSON.stringify(item.details, null, 2),
     });
-    setFormError(null);
     setOpen(true);
   };
   const tasks = useQuery({
@@ -167,6 +215,16 @@ export function OperationsPage() {
     queryFn: async () => (await api.get<User[]>("/users")).data,
     staleTime: 5 * 60 * 1000,
   });
+  const questionnaireTemplates = useQuery({
+    queryKey: ["operations", "QUESTIONNAIRE_TEMPLATE", "campaign-selector"],
+    enabled: open && section === "QUESTIONNAIRE_CAMPAIGN",
+    queryFn: async () =>
+      (
+        await api.get<RecordItem[]>(
+          "/operations/records?type=QUESTIONNAIRE_TEMPLATE",
+        )
+      ).data.filter((item) => item.status === "ACTIVE"),
+  });
   const create = useMutation({
     mutationFn: () =>
       api.post("/operations/records", {
@@ -203,14 +261,8 @@ export function OperationsPage() {
   );
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    try {
-      JSON.parse(form.details);
-      setFormError(null);
-      if (editingId) update.mutate();
-      else create.mutate();
-    } catch {
-      setFormError("La configuration JSON n’est pas valide.");
-    }
+    if (editingId) update.mutate();
+    else create.mutate();
   };
   const completeTask = useMutation({
     mutationFn: (id: number) => api.post(`/operations/tasks/${id}/complete`),
@@ -239,6 +291,21 @@ export function OperationsPage() {
       ...form,
       details: JSON.stringify({ ...parsedDetails, [key]: value }, null, 2),
     });
+  const questionnaireQuestions = Array.isArray(parsedDetails.questions)
+    ? (parsedDetails.questions as Array<{ id?: string; label?: string }>)
+    : [];
+  const recordReady =
+    form.title.trim().length > 0 &&
+    (section !== "QUESTIONNAIRE_TEMPLATE" ||
+      (questionnaireQuestions.length > 0 &&
+        questionnaireQuestions.every(
+          (question) =>
+            Boolean(question.id?.trim()) && Boolean(question.label?.trim()),
+        ))) &&
+    (section !== "QUESTIONNAIRE_CAMPAIGN" ||
+      (Number(parsedDetails.templateId) > 0 &&
+        Array.isArray(parsedDetails.recipientIds) &&
+        parsedDetails.recipientIds.length > 0));
 
   return (
     <Stack spacing={3}>
@@ -264,6 +331,7 @@ export function OperationsPage() {
           ))}
         </Tabs>
       </Card>
+      <Alert severity="info">{sectionHelp[section]}</Alert>
       {(tasks.isError ||
         records.isError ||
         trajectory.isError ||
@@ -271,7 +339,6 @@ export function OperationsPage() {
         update.isError) && (
         <Alert severity="error">L’opération n’a pas pu être terminée.</Alert>
       )}
-      {formError && <Alert severity="error">{formError}</Alert>}
       {(tasks.isLoading ||
         (section !== "MY_TASKS" && records.isLoading) ||
         (section === "COMPLIANCE_PROGRAM" && trajectory.isLoading)) && (
@@ -573,6 +640,17 @@ export function OperationsPage() {
                       </MenuItem>
                     ))}
                   </TextField>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(parsedDetails.requiresApproval)}
+                        onChange={(event) =>
+                          setDetail("requiresApproval", event.target.checked)
+                        }
+                      />
+                    }
+                    label="Validation obligatoire avant application"
+                  />
                 </>
               )}
               {section === "COMPLIANCE_PROGRAM" && (
@@ -621,74 +699,196 @@ export function OperationsPage() {
                   />
                 </>
               )}
-              {!editingId && (
-                <TextField
-                  select
-                  label="Modèle de données"
-                  value={form.details}
-                  onChange={(e) =>
-                    setForm({ ...form, details: e.target.value })
-                  }
-                >
-                  <MenuItem value="{}">Vide</MenuItem>
-                  {section === "COMPLIANCE_PROGRAM" && (
-                    <MenuItem
-                      value={
-                        '{"startDate":"2026-08-01","currentScore":0,"targetScore":100,"frameworks":[]}'
-                      }
-                    >
-                      Programme de conformité
-                    </MenuItem>
-                  )}
-                  {section === "RESPONSIBILITY_RULE" && (
-                    <MenuItem
-                      value={
-                        '{"domain":"governance","scopeType":"ORGANIZATION","defaultRole":"ROLE_RISK_MANAGER","requiresApproval":true}'
-                      }
-                    >
-                      Règle de responsabilité
-                    </MenuItem>
-                  )}
-                  {section === "QUESTIONNAIRE_TEMPLATE" && (
-                    <MenuItem
-                      value={
-                        '{"useCase":"EVIDENCE_COLLECTION","version":1,"questions":[],"reminderDays":[7,2]}'
-                      }
-                    >
+              {section === "QUESTIONNAIRE_TEMPLATE" && (
+                <>
+                  <TextField
+                    select
+                    label="Usage du questionnaire"
+                    value={String(
+                      parsedDetails.useCase ?? "EVIDENCE_COLLECTION",
+                    )}
+                    onChange={(event) =>
+                      setDetail("useCase", event.target.value)
+                    }
+                  >
+                    <MenuItem value="EVIDENCE_COLLECTION">
                       Collecte de preuves
                     </MenuItem>
-                  )}
-                  {section === "QUESTIONNAIRE_CAMPAIGN" && (
-                    <MenuItem
-                      value={
-                        '{"templateId":null,"recipientIds":[],"responseStatus":"DRAFT"}'
-                      }
-                    >
-                      Campagne interne
+                    <MenuItem value="COMPLIANCE_SELF_ASSESSMENT">
+                      Autoévaluation de conformité
                     </MenuItem>
-                  )}
-                  {section === "REFERENCE_PACK" && (
-                    <MenuItem
-                      value={
-                        '{"code":"STARTER","version":"1.0","license":"metadata-only","frameworks":[],"mappings":[]}'
-                      }
-                    >
-                      Pack gouverné vide
+                    <MenuItem value="CONTROL_REVIEW">
+                      Revue d’un contrôle
                     </MenuItem>
-                  )}
-                </TextField>
+                    <MenuItem value="THIRD_PARTY">
+                      Évaluation d’un tiers
+                    </MenuItem>
+                    <MenuItem value="PROJECT_PREQUALIFICATION">
+                      Qualification d’un projet
+                    </MenuItem>
+                    <MenuItem value="EXCEPTION_REQUEST">
+                      Demande d’exception
+                    </MenuItem>
+                  </TextField>
+                  <TextField
+                    type="number"
+                    label="Version"
+                    inputProps={{ min: 1 }}
+                    value={Number(parsedDetails.version ?? 1)}
+                    onChange={(event) =>
+                      setDetail("version", Number(event.target.value))
+                    }
+                  />
+                  {(
+                    (parsedDetails.questions as Array<{
+                      id: string;
+                      label: string;
+                      type: string;
+                    }>) ?? []
+                  ).map((question, index, questions) => (
+                    <Card key={question.id || index} variant="outlined">
+                      <CardContent>
+                        <Stack spacing={1}>
+                          <Typography fontWeight={700}>
+                            Question {index + 1}
+                          </Typography>
+                          <TextField
+                            required
+                            label="Question posée"
+                            value={question.label}
+                            onChange={(event) => {
+                              const next = [...questions];
+                              next[index] = {
+                                ...question,
+                                id: question.id || `Q${index + 1}`,
+                                label: event.target.value,
+                              };
+                              setDetail("questions", next);
+                            }}
+                          />
+                          <TextField
+                            select
+                            label="Type de réponse"
+                            value={question.type}
+                            onChange={(event) => {
+                              const next = [...questions];
+                              next[index] = {
+                                ...question,
+                                type: event.target.value,
+                              };
+                              setDetail("questions", next);
+                            }}
+                          >
+                            <MenuItem value="TEXT">Texte</MenuItem>
+                            <MenuItem value="BOOLEAN">Oui / Non</MenuItem>
+                            <MenuItem value="DATE">Date</MenuItem>
+                            <MenuItem value="EVIDENCE">
+                              Preuve à joindre
+                            </MenuItem>
+                          </TextField>
+                          {questions.length > 1 && (
+                            <Button
+                              color="error"
+                              onClick={() =>
+                                setDetail(
+                                  "questions",
+                                  questions.filter((_, item) => item !== index),
+                                )
+                              }
+                            >
+                              Retirer cette question
+                            </Button>
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      const questions = Array.isArray(parsedDetails.questions)
+                        ? parsedDetails.questions
+                        : [];
+                      setDetail("questions", [
+                        ...questions,
+                        {
+                          id: `Q${questions.length + 1}`,
+                          label: "",
+                          type: "TEXT",
+                        },
+                      ]);
+                    }}
+                  >
+                    Ajouter une question
+                  </Button>
+                  <TextField
+                    label="Rappels avant l’échéance (jours)"
+                    helperText="Exemple : 7, 2"
+                    value={
+                      Array.isArray(parsedDetails.reminderDays)
+                        ? parsedDetails.reminderDays.join(", ")
+                        : ""
+                    }
+                    onChange={(event) =>
+                      setDetail(
+                        "reminderDays",
+                        event.target.value
+                          .split(",")
+                          .map((value) => Number(value.trim()))
+                          .filter(
+                            (value) => Number.isInteger(value) && value >= 0,
+                          ),
+                      )
+                    }
+                  />
+                </>
               )}
-              {isAdmin && (
-                <TextField
-                  multiline
-                  minRows={7}
-                  label="Configuration avancée JSON"
-                  helperText="Réservée aux administrateurs. Vérifiez la structure avant l’enregistrement."
-                  value={form.details}
-                  onChange={(e) =>
-                    setForm({ ...form, details: e.target.value })
-                  }
-                />
+              {section === "QUESTIONNAIRE_CAMPAIGN" && (
+                <>
+                  <TextField
+                    required
+                    select
+                    label="Questionnaire"
+                    value={String(parsedDetails.templateId ?? "")}
+                    onChange={(event) =>
+                      setDetail("templateId", Number(event.target.value))
+                    }
+                  >
+                    {(questionnaireTemplates.data ?? []).map((template) => (
+                      <MenuItem key={template.id} value={template.id}>
+                        {template.title}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  {questionnaireTemplates.isSuccess &&
+                    questionnaireTemplates.data.length === 0 && (
+                      <Alert severity="warning">
+                        Créez d’abord un questionnaire actif.
+                      </Alert>
+                    )}
+                  <Autocomplete
+                    multiple
+                    options={users.data ?? []}
+                    getOptionLabel={(option) =>
+                      `${option.firstName} ${option.lastName} — ${option.email}`
+                    }
+                    value={(users.data ?? []).filter((candidate) =>
+                      (
+                        (parsedDetails.recipientIds as number[] | undefined) ??
+                        []
+                      ).includes(candidate.id),
+                    )}
+                    onChange={(_, recipients) =>
+                      setDetail(
+                        "recipientIds",
+                        recipients.map((recipient) => recipient.id),
+                      )
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} label="Destinataires" required />
+                    )}
+                  />
+                </>
               )}
             </Stack>
           </DialogContent>
@@ -697,7 +897,7 @@ export function OperationsPage() {
             <Button
               type="submit"
               variant="contained"
-              disabled={create.isPending || update.isPending}
+              disabled={!recordReady || create.isPending || update.isPending}
             >
               {editingId ? "Enregistrer les modifications" : "Créer"}
             </Button>

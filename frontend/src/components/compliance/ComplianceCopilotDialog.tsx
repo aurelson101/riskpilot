@@ -81,6 +81,34 @@ export function ComplianceCopilotDialog({
       setConsent(false);
     },
   });
+  const contextRows = preview.data
+    ? [
+        ["Référentiel", preview.data.context.framework],
+        [
+          "Exigence",
+          [
+            preview.data.context.requirementReference,
+            preview.data.context.requirementTitle,
+          ]
+            .filter(Boolean)
+            .join(" — "),
+        ],
+        ["Catégorie", preview.data.context.category],
+        ["Niveau de maturité", preview.data.context.maturityLevel],
+        ["Statut de conformité", preview.data.context.complianceStatus],
+        ["Périmètre", preview.data.context.assessmentScope],
+        ["Commentaire actuel", preview.data.context.currentComment],
+        ["Action corrective", preview.data.context.remediationAction],
+        [
+          "Preuves partagées",
+          Array.isArray(preview.data.context.evidenceReferences)
+            ? `${preview.data.context.evidenceReferences.length} preuve(s)`
+            : null,
+        ],
+      ].filter(
+        (row) => row[1] !== null && row[1] !== undefined && row[1] !== "",
+      )
+    : [];
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
@@ -119,19 +147,20 @@ export function ComplianceCopilotDialog({
                 />
               </Stack>
               <Box
-                component="pre"
                 aria-label="Données envoyées au fournisseur IA"
-                sx={{
-                  m: 0,
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: "grey.100",
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "anywhere",
-                  fontSize: 13,
-                }}
+                sx={{ p: 2, borderRadius: 1, bgcolor: "grey.100" }}
               >
-                {JSON.stringify(preview.data.context, null, 2)}
+                <Typography fontWeight={700} mb={1}>
+                  Informations partagées avec l’IA
+                </Typography>
+                <Stack spacing={0.75}>
+                  {contextRows.map(([label, value]) => (
+                    <Typography key={String(label)} variant="body2">
+                      <strong>{String(label)} :</strong>{" "}
+                      {String(value).replaceAll("_", " ")}
+                    </Typography>
+                  ))}
+                </Stack>
               </Box>
               <Stack spacing={1} aria-label="Conversation avec le copilote">
                 {messages.map((message, index) => (

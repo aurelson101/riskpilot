@@ -269,9 +269,16 @@ function Layout() {
     "/analysis-workspace",
     "/ebios",
     "/risk-matrix",
+  ].some((path) => location.pathname === path);
+  const catalogActive = [
     "/scopes",
+    "/assets",
+    "/assets/hardware",
+    "/assets/software",
+    "/assets/information",
     "/threats",
     "/vulnerabilities",
+    "/security-controls",
   ].some((path) => location.pathname === path);
   const steeringActive = [
     "/actions",
@@ -284,7 +291,6 @@ function Layout() {
     "/reports/executive",
   ].some((path) => location.pathname === path);
   const complianceActive = [
-    "/security-controls",
     "/compliance",
     "/nis2",
     "/regulatory",
@@ -296,13 +302,15 @@ function Layout() {
     location.pathname.startsWith("/administration");
   const activeGroup = riskActive
     ? "risk"
-    : steeringActive
-      ? "steering"
-      : complianceActive
-        ? "compliance"
-        : settingsActive
-          ? "settings"
-          : null;
+    : catalogActive
+      ? "catalog"
+      : steeringActive
+        ? "steering"
+        : complianceActive
+          ? "compliance"
+          : settingsActive
+            ? "settings"
+            : null;
   const [openGroup, setOpenGroup] = useState<string | null>(activeGroup);
   const isAdmin = user?.roles.some((role) =>
     ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
@@ -558,6 +566,23 @@ function Layout() {
             label="Matrice des risques"
             icon={<GridViewOutlined fontSize="small" />}
           />
+        </NavGroup>
+        <NavGroup
+          id="catalog"
+          label="Référentiels"
+          icon={<Inventory2Outlined />}
+          active={catalogActive}
+          open={openGroup === "catalog"}
+          onToggle={() =>
+            setOpenGroup((value) => (value === "catalog" ? null : "catalog"))
+          }
+        >
+          <NavItem
+            nested
+            path="/assets"
+            label="Actifs"
+            icon={<Inventory2Outlined fontSize="small" />}
+          />
           <NavItem
             nested
             path="/scopes"
@@ -575,6 +600,12 @@ function Layout() {
             path="/vulnerabilities"
             label="Vulnérabilités"
             icon={<BugReportOutlined fontSize="small" />}
+          />
+          <NavItem
+            nested
+            path="/security-controls"
+            label="Mesures de sécurité"
+            icon={<VerifiedUserOutlined fontSize="small" />}
           />
         </NavGroup>
         <NavGroup
@@ -596,7 +627,7 @@ function Layout() {
           <NavItem
             nested
             path="/operations"
-            label="Mes tâches et programmes"
+            label="Mes tâches et campagnes"
             icon={<FactCheckOutlined fontSize="small" />}
           />
           <NavItem
@@ -614,13 +645,13 @@ function Layout() {
           <NavItem
             nested
             path="/annual-reports"
-            label="Rapports annuels"
+            label="Rapports réglementaires"
             icon={<HistoryOutlined fontSize="small" />}
           />
           <NavItem
             nested
             path="/reports/executive"
-            label="Rapport exécutif"
+            label="Synthèse de direction"
             icon={<DescriptionOutlined fontSize="small" />}
           />
           <NavItem
@@ -632,12 +663,11 @@ function Layout() {
           <NavItem
             nested
             path="/experiments"
-            label="Assistant et bibliothèque"
+            label="Améliorations gouvernées"
             icon={<BugReportOutlined fontSize="small" />}
           />
         </NavGroup>
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
-        <NavItem path="/assets" label="Actifs" icon={<Inventory2Outlined />} />
         <NavGroup
           id="compliance"
           label="Conformité et contrôles"
@@ -653,20 +683,14 @@ function Layout() {
           <NavItem
             nested
             path="/compliance"
-            label="Conformité"
+            label="Évaluations de conformité"
             icon={<FactCheckOutlined fontSize="small" />}
           />
           <NavItem
             nested
             path="/nis2"
-            label="Conformité NIS2"
+            label="Tableau de bord NIS2"
             icon={<ShieldOutlined fontSize="small" />}
-          />
-          <NavItem
-            nested
-            path="/security-controls"
-            label="Mesures de sécurité"
-            icon={<VerifiedUserOutlined fontSize="small" />}
           />
           <NavItem
             nested
