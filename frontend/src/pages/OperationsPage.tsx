@@ -167,7 +167,7 @@ export function OperationsPage() {
   const openCreateDialog = () => {
     setEditingId(null);
     if (section === "MY_TASKS") return;
-    setForm(emptyForm(section));
+    setForm({ ...emptyForm(section), ownerId: String(user?.id ?? "") });
     setOpen(true);
   };
   const openEditDialog = (item: RecordItem) => {

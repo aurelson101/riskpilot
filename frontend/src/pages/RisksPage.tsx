@@ -184,7 +184,7 @@ export function RisksPage() {
   });
   function openCreate() {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, riskOwnerId: user?.id ?? "" });
     setError("");
     setDialogOpen(true);
   }

@@ -374,7 +374,12 @@ export function ActionsPage() {
     const dueDate = new Date(today);
     dueDate.setDate(dueDate.getDate() + 30);
     setEditing(null);
-    setForm({ ...emptyForm, startDate: dateKey(today), dueDate: dateKey(dueDate) });
+    setForm({
+      ...emptyForm,
+      ownerId: user?.id ?? "",
+      startDate: dateKey(today),
+      dueDate: dateKey(dueDate),
+    });
     setError("");
     setDialogOpen(true);
   }
