@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Add, DeleteOutline, EditOutlined } from "@mui/icons-material";
+import {
+  Add,
+  DeleteOutline,
+  EditOutlined,
+  PersonOutline,
+} from "@mui/icons-material";
 import {
   Alert,
   Button,
@@ -167,6 +172,11 @@ const initialForms: Record<InventoryKind, FormData> = {
     ownerId: null,
   },
 };
+const responsibilityKinds: InventoryKind[] = [
+  "scopes",
+  "assets",
+  "security-controls",
+];
 
 function renderValue(value: unknown): string {
   if (value == null) return "—";
@@ -229,6 +239,7 @@ export function InventoryPage({
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [mineOnly, setMineOnly] = useState(false);
   const [form, setForm] = useState<FormData>({
     ...initialForms[kind],
     ...(assetFamily ? { family: assetFamily } : {}),
@@ -278,6 +289,9 @@ export function InventoryPage({
     setEditing(null);
     setForm({
       ...initialForms[kind],
+      ...(responsibilityKinds.includes(kind) && user?.id
+        ? { ownerId: user.id }
+        : {}),
       ...(assetFamily ? { family: assetFamily } : {}),
     });
     setError("");
@@ -322,6 +336,10 @@ export function InventoryPage({
         Impossible de charger {config.title.toLowerCase()}.
       </Alert>
     );
+  const supportsOwnership = responsibilityKinds.includes(kind);
+  const visibleItems = mineOnly
+    ? (query.data ?? []).filter((item) => relationId(item.owner) === user?.id)
+    : (query.data ?? []);
   return (
     <Stack spacing={3}>
       <Stack
@@ -338,11 +356,28 @@ export function InventoryPage({
             {config.subtitle} · {query.data?.length ?? 0} élément(s)
           </Typography>
         </Stack>
-        {canManage && (
-          <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
-            Créer
-          </Button>
-        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          {supportsOwnership && user && (
+            <Button
+              variant={mineOnly ? "contained" : "outlined"}
+              color="secondary"
+              startIcon={<PersonOutline />}
+              onClick={() => setMineOnly((current) => !current)}
+              aria-pressed={mineOnly}
+            >
+              Mes responsabilités
+            </Button>
+          )}
+          {canManage && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={openCreate}
+            >
+              Créer
+            </Button>
+          )}
+        </Stack>
       </Stack>
       {error && !dialogOpen && <Alert severity="error">{error}</Alert>}
       <Card variant="outlined">
@@ -359,7 +394,7 @@ export function InventoryPage({
               </TableRow>
             </TableHead>
             <TableBody>
-              {query.data?.map((item) => (
+              {visibleItems.map((item) => (
                 <TableRow key={item.id} hover>
                   <TableCell>
                     <Typography fontWeight={650}>{item.name}</Typography>
@@ -409,6 +444,25 @@ export function InventoryPage({
                   )}
                 </TableRow>
               ))}
+              {visibleItems.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={
+                      1 +
+                      config.columns.length +
+                      (kind === "security-controls" ? 0 : 1) +
+                      (canManage ? 1 : 0)
+                    }
+                    align="center"
+                  >
+                    <Typography color="text.secondary">
+                      {mineOnly
+                        ? "Aucun élément ne vous est attribué."
+                        : "Aucun élément enregistré."}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
