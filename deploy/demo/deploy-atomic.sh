@@ -10,6 +10,15 @@ reset_candidate="riskpilot-demo-reset:$release"
 state=$(mktemp -d)
 cleanup() { rm -rf -- "$state"; }
 trap cleanup EXIT HUP INT TERM
+wait_http() {
+  url=$1
+  attempt=0
+  until curl -fsS --max-time 10 "$url" >/dev/null; do
+    attempt=$((attempt + 1))
+    [ "$attempt" -ge 15 ] && return 1
+    sleep 1
+  done
+}
 
 for service in backend frontend demo-reset-scheduler; do
   container="riskpilot_demo-${service}-1"
@@ -26,6 +35,7 @@ rollback() {
   RISKPILOT_FRONTEND_IMAGE=$(cat "$state/frontend") \
   RISKPILOT_DEMO_RESET_IMAGE=$(cat "$state/demo-reset-scheduler") \
     deploy/demo/start-sequential.sh || true
+  $compose restart nginx || true
 }
 trap 'rollback' INT TERM HUP
 
@@ -52,7 +62,7 @@ if ! RISKPILOT_BACKEND_IMAGE=$backend_candidate RISKPILOT_FRONTEND_IMAGE=$fronte
   exit 70
 fi
 $compose restart nginx
-curl -fsS --max-time 10 http://127.0.0.1:18081/ >/dev/null || { rollback; exit 71; }
-curl -fsS --max-time 10 http://127.0.0.1:18081/api/health >/dev/null || { rollback; exit 71; }
+wait_http http://127.0.0.1:18081/ || { rollback; exit 71; }
+wait_http http://127.0.0.1:18081/api/health || { rollback; exit 71; }
 printf '%s\n' "$release" > .git/riskpilot-deployed-release
 echo "Livraison atomique active : $release"
