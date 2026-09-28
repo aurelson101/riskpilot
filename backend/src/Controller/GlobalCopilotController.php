@@ -304,7 +304,7 @@ final readonly class GlobalCopilotController
             '/scopes' => ['Périmètres', 'Scopes'], '/assets' => ['Actifs', 'Assets'],
             '/threats' => ['Menaces', 'Threats'], '/vulnerabilities' => ['Vulnérabilités', 'Vulnerabilities'],
             '/operations' => ['Mes tâches et campagnes', 'My tasks and campaigns'], '/search' => ['Recherche transverse', 'Global search'],
-            '/decision' => ['Espace de décision', 'Decision workspace'], '/experiments' => ['Améliorations gouvernées', 'Governed improvements'],
+            '/decision' => ['Pilotage et décisions', 'Governance decisions'], '/experiments' => ['Améliorations gouvernées', 'Governed improvements'],
             '/ebios' => ['EBIOS RM', 'EBIOS RM'], '/indicators' => ['Indicateurs', 'Indicators'],
             '/annual-reports' => ['Rapports réglementaires', 'Regulatory reports'], '/reports/executive' => ['Synthèse de direction', 'Executive overview'],
             '/compliance' => ['Évaluations de conformité', 'Compliance assessments'],

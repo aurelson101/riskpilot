@@ -18,13 +18,16 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Stack,
+  Switch,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from "@mui/material";
+import axios from "axios";
 import { useMemo, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/useAuth";
@@ -58,13 +61,54 @@ type Portfolio = {
   }>;
 };
 
-const sections: Array<{ type: Section; label: string }> = [
-  { type: "SECURITY_PROJECT", label: "Security by Design" },
-  { type: "FINANCIAL_SCENARIO", label: "Quantification financière" },
-  { type: "SAVED_VIEW", label: "Vues 360°" },
-  { type: "REPORT_TEMPLATE", label: "Rapports gouvernés" },
-  { type: "CONNECTOR_SYNC", label: "Connecteurs" },
-  { type: "TPRM_PROGRAM", label: "Portefeuille TPRM" },
+const sections: Array<{
+  type: Section;
+  label: string;
+  description: string;
+  createLabel: string;
+}> = [
+  {
+    type: "SECURITY_PROJECT",
+    label: "Projets sécurité",
+    description:
+      "Préparez l’avis sécurité, le jalon de validation et la décision de mise en production.",
+    createLabel: "Nouveau projet",
+  },
+  {
+    type: "FINANCIAL_SCENARIO",
+    label: "Risques financiers",
+    description:
+      "Estimez les pertes annuelles à partir d’hypothèses simples, puis faites valider le modèle.",
+    createLabel: "Nouveau scénario",
+  },
+  {
+    type: "REPORT_TEMPLATE",
+    label: "Rapports",
+    description:
+      "Choisissez les informations utiles à la direction, prévisualisez, approuvez puis générez.",
+    createLabel: "Nouveau rapport",
+  },
+  {
+    type: "TPRM_PROGRAM",
+    label: "Fournisseurs",
+    description:
+      "Suivez les tiers critiques, les évaluations en retard et les plans de sortie manquants.",
+    createLabel: "Nouvelle politique tiers",
+  },
+  {
+    type: "SAVED_VIEW",
+    label: "Vues enregistrées",
+    description:
+      "Mémorisez une vue de pilotage privée ou partagée sans dupliquer les données.",
+    createLabel: "Nouvelle vue",
+  },
+  {
+    type: "CONNECTOR_SYNC",
+    label: "Connecteurs",
+    description:
+      "Définissez la source de référence avant de tester un rapprochement Jira ou ServiceNow.",
+    createLabel: "Nouveau connecteur",
+  },
 ];
 
 const defaults: Record<Section, Record<string, unknown>> = {
@@ -112,9 +156,10 @@ const defaults: Record<Section, Record<string, unknown>> = {
   },
   CONNECTOR_SYNC: {
     provider: "JIRA",
+    baseUrl: "https://",
     direction: "BIDIRECTIONAL",
     conflictStrategy: "MANUAL",
-    fieldOwnership: {},
+    fieldOwnership: { status: "RISKPILOT" },
   },
   TPRM_PROGRAM: {
     version: "1.0",
@@ -128,6 +173,77 @@ const defaults: Record<Section, Record<string, unknown>> = {
   },
 };
 
+const statusLabels: Record<string, string> = {
+  DRAFT: "Brouillon",
+  ACTIVE: "Actif",
+  IN_PROGRESS: "En cours",
+  AT_RISK: "À risque",
+  COMPLETED: "Terminé",
+  APPROVED: "Approuvé",
+  ARCHIVED: "Archivé",
+};
+const criticalityLabels: Record<string, string> = {
+  LOW: "Faible",
+  MEDIUM: "Modérée",
+  HIGH: "Élevée",
+  CRITICAL: "Critique",
+};
+const alertLabels: Record<string, string> = {
+  ASSESSMENT_OVERDUE: "Évaluation en retard",
+  CONTRACT_EXPIRING: "Contrat à renouveler",
+  EXIT_PLAN_MISSING: "Plan de sortie manquant",
+};
+
+const detailFields: Record<Section, string[]> = {
+  SECURITY_PROJECT: [
+    "criticality",
+    "milestones",
+    "securityOpinion",
+    "productionDecision",
+  ],
+  FINANCIAL_SCENARIO: [
+    "frequencyMin",
+    "frequencyMax",
+    "lossMin",
+    "lossMostLikely",
+    "lossMax",
+    "currency",
+  ],
+  SAVED_VIEW: ["shared", "groupBy", "period"],
+  REPORT_TEMPLATE: [
+    "reportType",
+    "blocks",
+    "period",
+    "classification",
+    "approved",
+  ],
+  CONNECTOR_SYNC: [
+    "provider",
+    "baseUrl",
+    "direction",
+    "conflictStrategy",
+    "fieldOwnership",
+  ],
+  TPRM_PROGRAM: ["reassessmentMonths", "reminders"],
+};
+
+function visibleDetails(
+  section: Section,
+  details: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    detailFields[section]
+      .filter((key) => key in details)
+      .map((key) => [key, details[key]]),
+  );
+}
+
+function mutationError(error: unknown): string {
+  return axios.isAxiosError<{ message?: string }>(error)
+    ? (error.response?.data?.message ?? "L’opération n’a pas pu être terminée.")
+    : "L’opération n’a pas pu être terminée.";
+}
+
 export function DecisionWorkspacePage() {
   const { user } = useAuth();
   const isAdmin = hasAnyRole(user?.roles, ["ROLE_SUPER_ADMIN", "ROLE_ADMIN"]);
@@ -140,6 +256,7 @@ export function DecisionWorkspacePage() {
   const [section, setSection] = useState<Section>("SECURITY_PROJECT");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [simulation, setSimulation] = useState<Record<string, unknown> | null>(
     null,
   );
@@ -152,6 +269,7 @@ export function DecisionWorkspacePage() {
     dueAt: "",
     details: JSON.stringify(defaults.SECURITY_PROJECT, null, 2),
   });
+  const selectedSection = sections.find((item) => item.type === section)!;
   const isFinancial = section === "FINANCIAL_SCENARIO";
   const isConnector = section === "CONNECTOR_SYNC";
   const canCreate = isConnector ? isAdmin : canContribute;
@@ -213,35 +331,50 @@ export function DecisionWorkspacePage() {
       ),
   });
   const create = useMutation({
-    mutationFn: (details: Record<string, unknown>) =>
-      isFinancial
-        ? api.post("/executive-governance/records", {
+    mutationFn: async (details: Record<string, unknown>) => {
+      if (isFinancial) {
+        return (
+          await api.post<Item>("/executive-governance/records", {
             type: section,
             title: form.title,
             ownerId: user?.id,
             status: "DRAFT",
             details,
           })
-        : isConnector
-          ? api.post("/v1/integrations", {
-              type: "CONNECTOR",
-              provider: details.provider,
-              name: form.title,
-              enabled: true,
-              configuration: details,
-            })
-          : api.post("/operations/records", {
-              type: section,
-              title: form.title,
-              ownerId: user?.id,
-              status: "ACTIVE",
-              dueAt: form.dueAt || null,
-              details,
-            }),
-    onSuccess: async () => {
+        ).data;
+      }
+      if (isConnector) {
+        return (
+          await api.post<{ secret: string | null }>("/v1/integrations", {
+            type: "CONNECTOR",
+            provider: details.provider,
+            name: form.title,
+            enabled: true,
+            configuration: details,
+          })
+        ).data;
+      }
+      return (
+        await api.post<Item>("/operations/records", {
+          type: section,
+          title: form.title,
+          ownerId: user?.id,
+          status: "ACTIVE",
+          dueAt: form.dueAt || null,
+          details,
+        })
+      ).data;
+    },
+    onSuccess: async (data) => {
       await client.invalidateQueries({ queryKey: ["decision-records"] });
       await client.invalidateQueries({ queryKey: ["decision-finance"] });
       await client.invalidateQueries({ queryKey: ["decision-connectors"] });
+      setCreatedSecret("secret" in data ? (data.secret ?? null) : null);
+      setForm({
+        title: "",
+        dueAt: "",
+        details: JSON.stringify(defaults[section], null, 2),
+      });
       setOpen(false);
     },
   });
@@ -260,6 +393,12 @@ export function DecisionWorkspacePage() {
         )
       ).data,
     onSuccess: setReportPreview,
+  });
+  const snapshotView = useMutation({
+    mutationFn: async (id: number) =>
+      (await api.get<Record<string, unknown>>(`/decision/views/${id}/snapshot`))
+        .data,
+    onSuccess: setSimulation,
   });
   const downloadReport = useMutation({
     mutationFn: async ({
@@ -325,7 +464,7 @@ export function DecisionWorkspacePage() {
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       api.post(`/decision/projects/${id}/transition`, {
         status,
-        comment: "Transition validée depuis le workspace P2",
+        comment: "Transition validée depuis l’espace de décision",
       }),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: ["decision-records"] }),
@@ -358,23 +497,52 @@ export function DecisionWorkspacePage() {
     : isConnector
       ? connectors.data
       : records.data;
+  const operationError = [
+    create.error,
+    runReport.error,
+    downloadReport.error,
+    approveFinance.error,
+    simulate.error,
+    reconcile.error,
+    transitionProject.error,
+    approveReport.error,
+    previewReport.error,
+    snapshotView.error,
+  ].find(Boolean);
+  const resetFeedback = () => {
+    create.reset();
+    runReport.reset();
+    downloadReport.reset();
+    approveFinance.reset();
+    simulate.reset();
+    reconcile.reset();
+    transitionProject.reset();
+    approveReport.reset();
+    previewReport.reset();
+    snapshotView.reset();
+  };
 
   return (
     <Stack spacing={3}>
       <div>
         <Typography variant="h4" fontWeight={800}>
-          Décision et différenciation
+          Pilotage et décisions
         </Typography>
         <Typography color="text.secondary">
-          Security by Design, quantification, vues, rapports, connecteurs et
-          portefeuille tiers
+          Un espace simple pour préparer, valider et tracer les décisions GRC.
         </Typography>
       </div>
       <Card>
         <Tabs
           value={section}
           onChange={(_, value: Section) => {
+            resetFeedback();
             setSection(value);
+            setOpen(false);
+            setError(null);
+            setCreatedSecret(null);
+            setSimulation(null);
+            setReportPreview(null);
             setForm({
               title: "",
               dueAt: "",
@@ -383,13 +551,20 @@ export function DecisionWorkspacePage() {
           }}
           variant="scrollable"
           scrollButtons="auto"
-          aria-label="Décision et différenciation"
+          aria-label="Pilotage et décisions"
         >
           {sections.map((item) => (
             <Tab key={item.type} value={item.type} label={item.label} />
           ))}
         </Tabs>
       </Card>
+      <Alert severity="info">{selectedSection.description}</Alert>
+      {createdSecret && (
+        <Alert severity="warning">
+          Copiez ce secret maintenant, il ne sera plus affiché :{" "}
+          <strong>{createdSecret}</strong>
+        </Alert>
+      )}
       {(records.isError ||
         finance.isError ||
         connectors.isError ||
@@ -403,10 +578,9 @@ export function DecisionWorkspacePage() {
         transitionProject.isError ||
         approveReport.isError ||
         previewReport.isError ||
+        snapshotView.isError ||
         error) && (
-        <Alert severity="error">
-          {error ?? "L’opération n’a pas pu être terminée."}
-        </Alert>
+        <Alert severity="error">{error ?? mutationError(operationError)}</Alert>
       )}
       {runReport.data && (
         <Alert
@@ -481,10 +655,18 @@ export function DecisionWorkspacePage() {
                       Segment {item.segment} · score {item.cyberScore}%
                     </Typography>
                   </div>
-                  <Stack direction="row" gap={1}>
-                    <Chip label={item.criticality} />
+                  <Stack direction="row" gap={1} flexWrap="wrap">
+                    <Chip
+                      label={
+                        criticalityLabels[item.criticality] ?? item.criticality
+                      }
+                    />
                     {item.alerts.map((alert) => (
-                      <Chip key={alert} color="warning" label={alert} />
+                      <Chip
+                        key={alert}
+                        color="warning"
+                        label={alertLabels[alert] ?? alert}
+                      />
                     ))}
                   </Stack>
                 </Stack>
@@ -498,21 +680,47 @@ export function DecisionWorkspacePage() {
           variant="contained"
           startIcon={<AddOutlined />}
           sx={{ alignSelf: "flex-start" }}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            create.reset();
+            setError(null);
+            setOpen(true);
+          }}
         >
-          Créer
+          {selectedSection.createLabel}
         </Button>
       )}
+      {!records.isLoading &&
+        !finance.isLoading &&
+        !connectors.isLoading &&
+        items?.length === 0 && (
+          <Alert severity="info">Aucun élément pour cette rubrique.</Alert>
+        )}
       <Stack spacing={2}>
         {items?.map((item) => (
           <Card key={item.id}>
             <CardContent>
               <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between">
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  justifyContent="space-between"
+                  alignItems={{ sm: "center" }}
+                  gap={1}
+                >
                   <Typography fontWeight={750}>{item.title}</Typography>
-                  <Chip label={item.status} />
+                  <Chip label={statusLabels[item.status] ?? item.status} />
                 </Stack>
-                <RecordDetails details={item.details} />
+                <RecordDetails
+                  details={visibleDetails(section, item.details)}
+                />
+                {section === "SAVED_VIEW" && (
+                  <Button
+                    startIcon={<VisibilityOutlined />}
+                    disabled={snapshotView.isPending}
+                    onClick={() => snapshotView.mutate(item.id)}
+                  >
+                    Afficher la vue
+                  </Button>
+                )}
                 {section === "REPORT_TEMPLATE" && (
                   <Button
                     startIcon={<VisibilityOutlined />}
@@ -602,7 +810,7 @@ export function DecisionWorkspacePage() {
       {simulation && (
         <Card>
           <CardContent>
-            <Typography fontWeight={750}>Résultat du traitement</Typography>
+            <Typography fontWeight={750}>Résultat</Typography>
             <RecordDetails details={simulation} />
           </CardContent>
         </Card>
@@ -625,7 +833,7 @@ export function DecisionWorkspacePage() {
         maxWidth="md"
       >
         <form onSubmit={submit}>
-          <DialogTitle>Créer un élément P2</DialogTitle>
+          <DialogTitle>Créer — {selectedSection.label}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
               <TextField
@@ -636,7 +844,7 @@ export function DecisionWorkspacePage() {
                   setForm({ ...form, title: event.target.value })
                 }
               />
-              {!isFinancial && (
+              {section === "SECURITY_PROJECT" && (
                 <TextField
                   type="date"
                   label="Échéance"
@@ -647,16 +855,6 @@ export function DecisionWorkspacePage() {
                   }
                 />
               )}
-              <TextField
-                select
-                label="Statut initial"
-                value={isFinancial ? "DRAFT" : "ACTIVE"}
-                disabled
-              >
-                <MenuItem value={isFinancial ? "DRAFT" : "ACTIVE"}>
-                  {isFinancial ? "DRAFT" : "ACTIVE"}
-                </MenuItem>
-              </TextField>
               {"version" in parsedDetails && (
                 <TextField
                   required
@@ -664,6 +862,171 @@ export function DecisionWorkspacePage() {
                   value={String(parsedDetails.version ?? "")}
                   onChange={(event) => setDetail("version", event.target.value)}
                 />
+              )}
+              {section === "SECURITY_PROJECT" && (
+                <>
+                  <TextField
+                    select
+                    label="Criticité"
+                    value={String(parsedDetails.criticality ?? "MEDIUM")}
+                    onChange={(event) =>
+                      setDetail("criticality", event.target.value)
+                    }
+                  >
+                    <MenuItem value="LOW">Faible</MenuItem>
+                    <MenuItem value="MEDIUM">Modérée</MenuItem>
+                    <MenuItem value="HIGH">Élevée</MenuItem>
+                    <MenuItem value="CRITICAL">Critique</MenuItem>
+                  </TextField>
+                  <TextField
+                    required
+                    label="Jalon de validation"
+                    helperText="Exemple : revue d’architecture validée"
+                    value={String(
+                      ((parsedDetails.milestones as string[]) ?? [])[0] ?? "",
+                    )}
+                    onChange={(event) =>
+                      setDetail(
+                        "milestones",
+                        event.target.value.trim() ? [event.target.value] : [],
+                      )
+                    }
+                  />
+                  <TextField
+                    required
+                    multiline
+                    minRows={2}
+                    label="Avis sécurité"
+                    helperText="Résumez les risques résiduels et conditions éventuelles."
+                    value={String(parsedDetails.securityOpinion ?? "")}
+                    onChange={(event) =>
+                      setDetail("securityOpinion", event.target.value)
+                    }
+                  />
+                  <TextField
+                    required
+                    select
+                    label="Décision de mise en production"
+                    value={String(parsedDetails.productionDecision ?? "")}
+                    onChange={(event) =>
+                      setDetail("productionDecision", event.target.value)
+                    }
+                  >
+                    <MenuItem value="GO">Autoriser</MenuItem>
+                    <MenuItem value="GO_WITH_CONDITIONS">
+                      Autoriser sous conditions
+                    </MenuItem>
+                    <MenuItem value="NO_GO">Refuser</MenuItem>
+                  </TextField>
+                </>
+              )}
+              {section === "FINANCIAL_SCENARIO" && (
+                <>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      required
+                      fullWidth
+                      type="number"
+                      label="Incidents/an — minimum"
+                      inputProps={{ min: 0, step: 0.1 }}
+                      value={Number(parsedDetails.frequencyMin ?? 0)}
+                      onChange={(event) =>
+                        setDetail("frequencyMin", Number(event.target.value))
+                      }
+                    />
+                    <TextField
+                      required
+                      fullWidth
+                      type="number"
+                      label="Incidents/an — maximum"
+                      inputProps={{ min: 0, step: 0.1 }}
+                      value={Number(parsedDetails.frequencyMax ?? 0)}
+                      onChange={(event) =>
+                        setDetail("frequencyMax", Number(event.target.value))
+                      }
+                    />
+                  </Stack>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    {[
+                      ["lossMin", "Perte minimale"],
+                      ["lossMostLikely", "Perte probable"],
+                      ["lossMax", "Perte maximale"],
+                    ].map(([key, label]) => (
+                      <TextField
+                        key={key}
+                        required
+                        fullWidth
+                        type="number"
+                        label={label}
+                        inputProps={{ min: 0, step: 1000 }}
+                        value={Number(parsedDetails[key] ?? 0)}
+                        onChange={(event) =>
+                          setDetail(key, Number(event.target.value))
+                        }
+                      />
+                    ))}
+                  </Stack>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Pertes indirectes (%)"
+                      inputProps={{ min: 0, max: 500, step: 1 }}
+                      value={Math.round(
+                        Number(parsedDetails.indirectLossFactor ?? 0) * 100,
+                      )}
+                      onChange={(event) =>
+                        setDetail(
+                          "indirectLossFactor",
+                          Number(event.target.value) / 100,
+                        )
+                      }
+                    />
+                    <TextField
+                      select
+                      fullWidth
+                      label="Devise"
+                      value={String(parsedDetails.currency ?? "EUR")}
+                      onChange={(event) =>
+                        setDetail("currency", event.target.value)
+                      }
+                    >
+                      <MenuItem value="EUR">EUR</MenuItem>
+                      <MenuItem value="USD">USD</MenuItem>
+                      <MenuItem value="GBP">GBP</MenuItem>
+                    </TextField>
+                  </Stack>
+                </>
+              )}
+              {section === "SAVED_VIEW" && (
+                <>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={parsedDetails.shared === true}
+                        onChange={(event) =>
+                          setDetail("shared", event.target.checked)
+                        }
+                      />
+                    }
+                    label="Partager avec l’organisation"
+                  />
+                  <TextField
+                    select
+                    label="Regrouper par"
+                    value={String(parsedDetails.groupBy ?? "")}
+                    onChange={(event) =>
+                      setDetail("groupBy", event.target.value || null)
+                    }
+                  >
+                    <MenuItem value="">Aucun regroupement</MenuItem>
+                    <MenuItem value="riskOwner">
+                      Propriétaire du risque
+                    </MenuItem>
+                    <MenuItem value="status">Statut</MenuItem>
+                    <MenuItem value="priority">Priorité</MenuItem>
+                  </TextField>
+                </>
               )}
               {"reportType" in parsedDetails && (
                 <TextField
@@ -834,19 +1197,121 @@ export function DecisionWorkspacePage() {
                     </Stack>
                   );
                 })()}
-              {"provider" in parsedDetails && (
-                <TextField
-                  select
-                  label="Fournisseur"
-                  value={String(parsedDetails.provider)}
-                  onChange={(event) =>
-                    setDetail("provider", event.target.value)
-                  }
-                >
-                  <MenuItem value="JIRA">Jira</MenuItem>
-                  <MenuItem value="SERVICENOW">ServiceNow</MenuItem>
-                </TextField>
+              {section === "CONNECTOR_SYNC" && (
+                <>
+                  <TextField
+                    select
+                    label="Fournisseur"
+                    value={String(parsedDetails.provider)}
+                    onChange={(event) =>
+                      setDetail("provider", event.target.value)
+                    }
+                  >
+                    <MenuItem value="JIRA">Jira</MenuItem>
+                    <MenuItem value="SERVICENOW">ServiceNow</MenuItem>
+                  </TextField>
+                  <TextField
+                    required
+                    type="url"
+                    label="URL du service"
+                    helperText="Une adresse HTTPS est obligatoire."
+                    value={String(parsedDetails.baseUrl ?? "")}
+                    onChange={(event) =>
+                      setDetail("baseUrl", event.target.value)
+                    }
+                  />
+                  <TextField
+                    select
+                    label="Sens de synchronisation"
+                    value={String(parsedDetails.direction ?? "BIDIRECTIONAL")}
+                    onChange={(event) =>
+                      setDetail("direction", event.target.value)
+                    }
+                  >
+                    <MenuItem value="IMPORT">Vers RiskPilot</MenuItem>
+                    <MenuItem value="EXPORT">Depuis RiskPilot</MenuItem>
+                    <MenuItem value="BIDIRECTIONAL">Bidirectionnel</MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    label="En cas de conflit"
+                    value={String(parsedDetails.conflictStrategy ?? "MANUAL")}
+                    onChange={(event) =>
+                      setDetail("conflictStrategy", event.target.value)
+                    }
+                  >
+                    <MenuItem value="MANUAL">Décision manuelle</MenuItem>
+                    <MenuItem value="SOURCE_WINS">
+                      Le fournisseur est prioritaire
+                    </MenuItem>
+                    <MenuItem value="RISKPILOT_WINS">
+                      RiskPilot est prioritaire
+                    </MenuItem>
+                  </TextField>
+                  <TextField
+                    select
+                    label="Référence pour le statut"
+                    value={String(
+                      (parsedDetails.fieldOwnership as Record<string, unknown>)
+                        ?.status ?? "RISKPILOT",
+                    )}
+                    onChange={(event) =>
+                      setDetail("fieldOwnership", {
+                        ...((parsedDetails.fieldOwnership as Record<
+                          string,
+                          unknown
+                        >) ?? {}),
+                        status: event.target.value,
+                      })
+                    }
+                  >
+                    <MenuItem value="RISKPILOT">RiskPilot</MenuItem>
+                    <MenuItem value="SOURCE">Le fournisseur</MenuItem>
+                  </TextField>
+                </>
               )}
+              {section === "TPRM_PROGRAM" &&
+                (() => {
+                  const months = (parsedDetails.reassessmentMonths as
+                    Record<string, unknown> | undefined) ?? {
+                    LIGHT: 24,
+                    STANDARD: 12,
+                    DEEP: 6,
+                  };
+                  return (
+                    <Stack spacing={2}>
+                      <Typography fontWeight={700}>
+                        Fréquence des réévaluations
+                      </Typography>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={2}
+                      >
+                        {[
+                          ["LIGHT", "Tiers standard"],
+                          ["STANDARD", "Tiers important"],
+                          ["DEEP", "Tiers critique"],
+                        ].map(([key, label]) => (
+                          <TextField
+                            key={key}
+                            required
+                            fullWidth
+                            type="number"
+                            label={`${label} (mois)`}
+                            inputProps={{ min: 1, max: 60 }}
+                            value={Number(months[key] ?? 12)}
+                            onChange={(event) =>
+                              setDetail("reassessmentMonths", {
+                                ...months,
+                                [key]: Number(event.target.value),
+                              })
+                            }
+                          />
+                        ))}
+                      </Stack>
+                    </Stack>
+                  );
+                })()}
               {"decisionText" in parsedDetails && (
                 <TextField
                   multiline

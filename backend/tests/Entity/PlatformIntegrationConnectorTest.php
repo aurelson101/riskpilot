@@ -33,4 +33,15 @@ final class PlatformIntegrationConnectorTest extends TestCase
             'direction' => 'IMPORT',
         ]);
     }
+
+    public function testConnectorRejectsAnIncompleteHttpsUrl(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new PlatformIntegration(new Organization('Primary'), 'CONNECTOR', 'JIRA', 'Incomplete', [
+            'baseUrl' => 'https://',
+            'direction' => 'BIDIRECTIONAL',
+            'conflictStrategy' => 'MANUAL',
+            'fieldOwnership' => ['status' => 'RISKPILOT'],
+        ]);
+    }
 }

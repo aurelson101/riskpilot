@@ -180,7 +180,7 @@ class PlatformIntegration
         }
         if ('WEBHOOK' === $type) {
             $url = (string) ($configuration['url'] ?? '');
-            if (!str_starts_with($url, 'https://')) {
+            if (!$this->validHttpsUrl($url)) {
                 throw new \InvalidArgumentException('Un webhook HTTPS est obligatoire.');
             }
         }
@@ -189,7 +189,7 @@ class PlatformIntegration
             $direction = strtoupper((string) ($configuration['direction'] ?? ''));
             $conflictStrategy = strtoupper((string) ($configuration['conflictStrategy'] ?? ''));
             $fieldOwnership = (array) ($configuration['fieldOwnership'] ?? []);
-            if (!str_starts_with($url, 'https://') || !in_array($direction, ['IMPORT', 'EXPORT', 'BIDIRECTIONAL'], true) || !in_array($conflictStrategy, ['SOURCE_WINS', 'RISKPILOT_WINS', 'MANUAL'], true) || [] === $fieldOwnership) {
+            if (!$this->validHttpsUrl($url) || !in_array($direction, ['IMPORT', 'EXPORT', 'BIDIRECTIONAL'], true) || !in_array($conflictStrategy, ['SOURCE_WINS', 'RISKPILOT_WINS', 'MANUAL'], true) || [] === $fieldOwnership) {
                 throw new \InvalidArgumentException('Le connecteur exige une URL HTTPS, un sens, une stratégie de conflit et la propriété des champs.');
             }
         }
@@ -205,5 +205,22 @@ class PlatformIntegration
                 throw new \InvalidArgumentException('LDAPS exige ldaps://, port 636, base DN, bind DN, filtre utilisateur, groupes et une CA PEM valide si fournie.');
             }
         }
+    }
+
+    private function validHttpsUrl(string $url): bool
+    {
+        if (false === filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || 'https' !== strtolower((string) ($parts['scheme'] ?? '')) || isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+        $host = (string) ($parts['host'] ?? '');
+        if (false !== filter_var($host, FILTER_VALIDATE_IP)) {
+            return false !== filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        }
+
+        return str_contains($host, '.') && false !== filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME);
     }
 }

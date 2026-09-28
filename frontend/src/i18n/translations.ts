@@ -1,6 +1,56 @@
 export type Locale = "fr" | "en";
 
 const pairs: Array<[fr: string, en: string]> = [
+  ["Projets sécurité", "Security projects"],
+  [
+    "Préparez l’avis sécurité, le jalon de validation et la décision de mise en production.",
+    "Prepare the security opinion, approval milestone, and production decision.",
+  ],
+  ["Risques financiers", "Financial risks"],
+  [
+    "Estimez les pertes annuelles à partir d’hypothèses simples, puis faites valider le modèle.",
+    "Estimate annual losses from simple assumptions, then have the model approved.",
+  ],
+  ["Rapports", "Reports"],
+  [
+    "Choisissez les informations utiles à la direction, prévisualisez, approuvez puis générez.",
+    "Select useful management information, preview, approve, then generate.",
+  ],
+  ["Fournisseurs", "Suppliers"],
+  [
+    "Suivez les tiers critiques, les évaluations en retard et les plans de sortie manquants.",
+    "Track critical third parties, overdue assessments, and missing exit plans.",
+  ],
+  ["Vues enregistrées", "Saved views"],
+  [
+    "Mémorisez une vue de pilotage privée ou partagée sans dupliquer les données.",
+    "Save a private or shared management view without duplicating data.",
+  ],
+  [
+    "Définissez la source de référence avant de tester un rapprochement Jira ou ServiceNow.",
+    "Define the source of truth before testing Jira or ServiceNow reconciliation.",
+  ],
+  ["Pilotage et décisions", "Governance and decisions"],
+  [
+    "Un espace simple pour préparer, valider et tracer les décisions GRC.",
+    "A simple workspace to prepare, approve, and trace GRC decisions.",
+  ],
+  ["Afficher la vue", "Open view"],
+  ["Créer —", "Create —"],
+  ["Élevée", "High"],
+  ["Autoriser", "Approve"],
+  ["Autoriser sous conditions", "Approve with conditions"],
+  ["Aucun regroupement", "No grouping"],
+  ["Propriétaire du risque", "Risk owner"],
+  ["Vers RiskPilot", "Into RiskPilot"],
+  ["Depuis RiskPilot", "From RiskPilot"],
+  ["Bidirectionnel", "Bidirectional"],
+  ["Décision manuelle", "Manual decision"],
+  ["Le fournisseur est prioritaire", "Provider takes precedence"],
+  ["RiskPilot est prioritaire", "RiskPilot takes precedence"],
+  ["Le fournisseur", "The provider"],
+  ["Fréquence des réévaluations", "Reassessment frequency"],
+  ["Aucun élément pour cette rubrique.", "No items in this section."],
   ["Mes tâches et campagnes", "My tasks and campaigns"],
   ["Rapports réglementaires", "Regulatory reports"],
   ["Synthèse de direction", "Executive overview"],

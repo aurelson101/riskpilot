@@ -1,10 +1,40 @@
 import { Box, Chip, Stack, Typography } from "@mui/material";
 
+const labels: Record<string, string> = {
+  criticality: "Criticité",
+  milestones: "Jalons",
+  securityOpinion: "Avis sécurité",
+  productionDecision: "Décision de mise en production",
+  frequencyMin: "Fréquence minimale",
+  frequencyMax: "Fréquence maximale",
+  lossMin: "Perte minimale",
+  lossMostLikely: "Perte probable",
+  lossMax: "Perte maximale",
+  currency: "Devise",
+  shared: "Partagée",
+  groupBy: "Regroupement",
+  period: "Période",
+  reportType: "Type de rapport",
+  blocks: "Blocs",
+  classification: "Classification",
+  approved: "Approuvé",
+  provider: "Fournisseur",
+  baseUrl: "URL du service",
+  direction: "Sens",
+  conflictStrategy: "Gestion des conflits",
+  fieldOwnership: "Source de référence",
+  reassessmentMonths: "Fréquence de réévaluation",
+  reminders: "Rappels (jours)",
+};
+
 function label(key: string) {
-  return key
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replaceAll("_", " ")
-    .replace(/^./, (value) => value.toUpperCase());
+  return (
+    labels[key] ??
+    key
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replaceAll("_", " ")
+      .replace(/^./, (value) => value.toUpperCase())
+  );
 }
 
 function scalar(value: unknown): string {

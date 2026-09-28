@@ -31,6 +31,8 @@ final class ExecutiveGovernanceControllerTest extends WebTestCase
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
         $client->jsonRequest('POST', '/api/executive-governance/records', ['type' => 'FINANCIAL_SCENARIO', 'title' => 'Rançongiciel', 'ownerId' => $admin->getId(), 'details' => ['frequencyMin' => 0.1, 'frequencyMax' => 0.3, 'lossMin' => 500000, 'lossMostLikely' => 200000, 'lossMax' => 1000000, 'currency' => 'EUR']]);
         self::assertResponseStatusCodeSame(422);
+        $client->jsonRequest('POST', '/api/executive-governance/records', ['type' => 'FINANCIAL_SCENARIO', 'title' => 'Fréquence invalide', 'ownerId' => $admin->getId(), 'details' => ['frequencyMin' => 1, 'frequencyMax' => 0.2, 'lossMin' => 100000, 'lossMostLikely' => 200000, 'lossMax' => 1000000, 'currency' => 'EUR']]);
+        self::assertResponseStatusCodeSame(422);
         $client->jsonRequest('POST', '/api/executive-governance/records', ['type' => 'FINANCIAL_SCENARIO', 'title' => 'Rançongiciel', 'ownerId' => $admin->getId(), 'status' => 'ACTIVE', 'details' => ['frequencyMin' => 0.1, 'frequencyMax' => 0.3, 'lossMin' => 100000, 'lossMostLikely' => 500000, 'lossMax' => 1000000, 'currency' => 'EUR']]);
         self::assertResponseStatusCodeSame(201);
         $scenario = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

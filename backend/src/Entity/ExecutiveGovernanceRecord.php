@@ -80,8 +80,8 @@ class ExecutiveGovernanceRecord
             if (!array_key_exists($key, $details)) {
                 throw new \InvalidArgumentException(sprintf('Le champ %s est requis pour %s.', $key, $this->type));
             }
-        } if ('FINANCIAL_SCENARIO' === $this->type && ((float) $details['lossMin'] > (float) $details['lossMostLikely'] || (float) $details['lossMostLikely'] > (float) $details['lossMax'])) {
-            throw new \InvalidArgumentException('La fourchette de pertes doit être ordonnée.');
+        } if ('FINANCIAL_SCENARIO' === $this->type && ((float) $details['frequencyMin'] < 0 || (float) $details['frequencyMin'] > (float) $details['frequencyMax'] || (float) $details['lossMin'] < 0 || (float) $details['lossMin'] > (float) $details['lossMostLikely'] || (float) $details['lossMostLikely'] > (float) $details['lossMax'] || (float) ($details['indirectLossFactor'] ?? 0) < 0)) {
+            throw new \InvalidArgumentException('Les fréquences et pertes doivent être positives et ordonnées.');
         } if ('FINANCIAL_SCENARIO' === $this->type && 'APPROVED' === $status && ('' === trim((string) ($details['modelVersion'] ?? '')) || true !== ($details['financeApproval']['approved'] ?? false))) {
             throw new \InvalidArgumentException('La version du modèle et l’approbation finance sont obligatoires.');
         } $this->title = trim($title);

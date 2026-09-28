@@ -338,7 +338,7 @@ function Layout() {
     "/risks": "Risques",
     "/actions": "Plans d’action",
     "/operations": "Pilotage opérationnel",
-    "/decision": "Décision et différenciation",
+    "/decision": "Pilotage et décisions",
     "/experiments": "Expérimentations sous contrôle",
     "/analysis-workspace": "Analyses et capitalisation",
     "/ebios": "EBIOS Risk Manager",
@@ -657,7 +657,7 @@ function Layout() {
           <NavItem
             nested
             path="/decision"
-            label="Décision et simulations"
+            label="Pilotage et décisions"
             icon={<GridViewOutlined fontSize="small" />}
           />
           <NavItem
