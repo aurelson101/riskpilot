@@ -256,6 +256,7 @@ final class TenantIsolationTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $payload = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertTrue($payload['passwordConfigured']);
+        self::assertTrue($payload['ready']);
         self::assertArrayNotHasKey('password', $payload);
         $settings = $this->entityManager->getRepository(EmailSettings::class)->findOneBy(['organization' => $this->adminA->getOrganization()]);
         self::assertInstanceOf(EmailSettings::class, $settings);
@@ -306,6 +307,46 @@ final class TenantIsolationTest extends WebTestCase
         self::assertStringStartsWith('https://accounts.google.com/o/oauth2/v2/auth?', $authorization['authorizationUrl']);
         self::assertStringContainsString('gmail.send', urldecode($authorization['authorizationUrl']));
         self::assertStringContainsString('/api/settings/email/oauth/google_workspace/callback', $authorization['redirectUri']);
+    }
+
+    public function testMicrosoftGraphMailIsDistinctFromOidcAndRequestsDelegatedMailPermission(): void
+    {
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'provider' => 'MICROSOFT_365', 'oauthClientId' => 'entra-client-id',
+            'oauthClientSecret' => 'entra-client-secret', 'oauthTenant' => '', 'senderName' => 'RiskPilot',
+        ], JSON_THROW_ON_ERROR));
+        self::assertResponseIsSuccessful();
+        $settings = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('organizations', $settings['oauthTenant']);
+        self::assertFalse($settings['ready'], 'The mail channel is not ready before the mailbox grants consent.');
+
+        $this->client->request('POST', '/api/settings/email/oauth/microsoft_365/authorize');
+        self::assertResponseIsSuccessful();
+        $authorization = json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $url = urldecode($authorization['authorizationUrl']);
+        self::assertStringStartsWith('https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?', $url);
+        self::assertStringContainsString('offline_access', $url);
+        self::assertStringContainsString('User.Read', $url);
+        self::assertStringContainsString('Mail.Send', $url);
+        self::assertStringContainsString('/api/settings/email/oauth/microsoft_365/callback', $authorization['redirectUri']);
+    }
+
+    public function testEmailConfigurationRejectsPrivateSmtpAndEnabledPlaintext(): void
+    {
+        $payload = [
+            'provider' => 'CUSTOM', 'host' => '127.0.0.1', 'port' => 25, 'encryption' => 'tls',
+            'username' => 'smtp-user', 'password' => 'smtp-secret', 'senderEmail' => 'grc@example.test',
+            'senderName' => 'GRC', 'enabled' => false,
+        ];
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($payload, JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(422);
+
+        $payload['host'] = 'smtp.example.test';
+        $payload['encryption'] = 'none';
+        $payload['enabled'] = true;
+        $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($payload, JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('TLS', (string) $this->client->getResponse()->getContent());
     }
 
     #[DataProvider('inventoryResources')]

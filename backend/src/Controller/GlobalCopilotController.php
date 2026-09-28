@@ -6,11 +6,16 @@ namespace App\Controller;
 
 use App\Application\AiCopilotClient;
 use App\Application\CurrentUser;
+use App\Entity\ActionPlan;
 use App\Entity\AiSettings;
+use App\Entity\RiskScenario;
 use App\Entity\User;
+use App\Repository\ActionPlanRepository;
 use App\Repository\AiSettingsRepository;
 use App\Repository\AssetRepository;
 use App\Repository\ComplianceResultRepository;
+use App\Repository\EmailSettingsRepository;
+use App\Repository\RiskScenarioRepository;
 use App\Repository\ScopeRepository;
 use App\Repository\ThreatRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,6 +36,9 @@ final readonly class GlobalCopilotController
         private AssetRepository $assets,
         private ThreatRepository $threats,
         private ComplianceResultRepository $complianceResults,
+        private RiskScenarioRepository $risks,
+        private ActionPlanRepository $actions,
+        private EmailSettingsRepository $emailSettings,
     ) {
     }
 
@@ -223,9 +231,10 @@ final readonly class GlobalCopilotController
         }
         try {
             $safetyIdentifier = hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId()));
+            $context = $this->aiContext($settings->getDataPolicy());
             $result = 'PILOT' === $mode
-                ? $this->client->pilot($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $currentPath, $this->pilotCapabilities())
-                : ['answer' => $this->client->askGlobal($settings, $question, $history, $actor->getLocale(), $safetyIdentifier), 'actions' => []];
+                ? $this->client->pilot($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $currentPath, $this->pilotCapabilities(), $context)
+                : ['answer' => $this->client->askGlobal($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $context), 'actions' => []];
         } catch (\Throwable) {
             return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire de réponse.', 502);
         }
@@ -236,6 +245,7 @@ final readonly class GlobalCopilotController
             'questionHash' => hash('sha256', $question),
             'workflow' => 'GLOBAL_COPILOT',
             'mode' => $mode,
+            'contextPolicy' => $settings->getDataPolicy(),
             'automaticWrite' => false,
         ]]);
 
@@ -349,6 +359,54 @@ final readonly class GlobalCopilotController
         }
 
         return $validated;
+    }
+
+    /** @return array<string, mixed> */
+    private function aiContext(string $dataPolicy): array
+    {
+        $actor = $this->currentUser->get();
+        $risks = $this->risks->findVisibleTo($actor);
+        $actions = $this->actions->findVisibleTo($actor);
+        $catalog = $this->grcCatalogItems();
+        $thresholds = $actor->getOrganization()->getRiskThresholds();
+        $openActions = array_values(array_filter($actions, static fn (ActionPlan $action): bool => !in_array($action->getStatus(), ['COMPLETED', 'CANCELLED'], true)));
+        $gaps = array_values(array_filter($catalog, static fn (array $item): bool => in_array($item['status'], ['PARTIAL', 'NON_COMPLIANT', 'NOT_ASSESSED'], true)));
+        $context = [
+            'policy' => $dataPolicy,
+            'summary' => [
+                'risks' => count($risks),
+                'highOrCriticalRisks' => count(array_filter($risks, static fn (RiskScenario $risk): bool => $risk->getCurrentRiskScore() > $thresholds['moderateMax'])),
+                'openActions' => count($openActions),
+                'overdueActions' => count(array_filter($openActions, static fn (ActionPlan $action): bool => 'OVERDUE' === $action->getStatus())),
+                'complianceRequirements' => count($catalog),
+                'complianceGaps' => count($gaps),
+            ],
+            'complianceCoverage' => $this->grcCoverage($catalog),
+        ];
+        if ([] !== array_intersect([User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $actor->getRoles())) {
+            $email = $this->emailSettings->findOneBy(['organization' => $actor->getOrganization()]);
+            $context['email'] = null === $email ? ['configured' => false, 'enabled' => false] : [
+                'configured' => true,
+                'enabled' => $email->isEnabled(),
+                'provider' => $email->getProvider(),
+            ];
+        }
+        if ('CONTEXTUAL' !== $dataPolicy) {
+            return $context;
+        }
+        usort($risks, static fn (RiskScenario $left, RiskScenario $right): int => $right->getCurrentRiskScore() <=> $left->getCurrentRiskScore());
+        usort($openActions, static fn (ActionPlan $left, ActionPlan $right): int => $left->getDueDate() <=> $right->getDueDate());
+        $context['topRisks'] = array_map(static fn (RiskScenario $risk): array => [
+            'id' => $risk->getId(), 'title' => mb_substr($risk->getTitle(), 0, 180), 'currentScore' => $risk->getCurrentRiskScore(),
+            'residualScore' => $risk->getResidualRiskScore(), 'status' => $risk->getStatus(), 'owner' => trim($risk->getRiskOwner()->getFirstName().' '.$risk->getRiskOwner()->getLastName()),
+        ], array_slice($risks, 0, 8));
+        $context['priorityActions'] = array_map(static fn (ActionPlan $action): array => [
+            'id' => $action->getId(), 'title' => mb_substr($action->getTitle(), 0, 180), 'priority' => $action->getPriority(),
+            'status' => $action->getStatus(), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'owner' => trim($action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName()),
+        ], array_slice($openActions, 0, 8));
+        $context['complianceGaps'] = array_slice($gaps, 0, 20);
+
+        return $context;
     }
 
     /** @param list<object> $entities

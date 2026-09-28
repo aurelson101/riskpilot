@@ -31,13 +31,14 @@ type EmailSettings = {
   oauthTenant: string | null;
   oauthConnected: boolean;
   connectedEmail: string | null;
+  ready: boolean;
 };
 type Form = EmailSettings & { password: string; oauthClientSecret: string };
 const oauthProviders = ["GOOGLE_WORKSPACE", "MICROSOFT_365"];
 const labels: Record<string, string> = {
   SMTP2GO: "SMTP2GO",
-  GOOGLE_WORKSPACE: "Google Workspace — OAuth 2.0",
-  MICROSOFT_365: "Microsoft 365 — OAuth 2.0",
+  GOOGLE_WORKSPACE: "Google Workspace — API Gmail (OAuth 2.0)",
+  MICROSOFT_365: "Microsoft 365 — Microsoft Graph (OAuth 2.0)",
   CUSTOM: "Serveur SMTP personnalisé",
 };
 const empty: Form = {
@@ -55,10 +56,29 @@ const empty: Form = {
   oauthClientId: "",
   oauthClientSecret: "",
   oauthClientSecretConfigured: false,
-  oauthTenant: "common",
+  oauthTenant: "organizations",
   oauthConnected: false,
   connectedEmail: null,
+  ready: false,
 };
+
+function fingerprint(form: Form): string {
+  return JSON.stringify([
+    form.provider,
+    form.host,
+    form.port,
+    form.encryption,
+    form.username,
+    form.password,
+    form.senderEmail,
+    form.senderName,
+    form.replyTo,
+    form.enabled,
+    form.oauthClientId,
+    form.oauthClientSecret,
+    form.oauthTenant,
+  ]);
+}
 
 export function EmailSettingsPage() {
   const query = useQuery({
@@ -67,6 +87,8 @@ export function EmailSettingsPage() {
   });
   const [form, setForm] = useState<Form>(empty);
   const [recipient, setRecipient] = useState("");
+  const [savedFingerprint, setSavedFingerprint] = useState("");
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -74,8 +96,11 @@ export function EmailSettingsPage() {
   const [saving, setSaving] = useState(false);
   const oauth = oauthProviders.includes(form.provider);
   useEffect(() => {
-    if (query.data)
-      setForm({ ...query.data, password: "", oauthClientSecret: "" });
+    if (query.data) {
+      const loaded = { ...query.data, password: "", oauthClientSecret: "" };
+      setForm(loaded);
+      setSavedFingerprint(fingerprint(loaded));
+    }
   }, [query.data]);
   useEffect(() => {
     const result = new URLSearchParams(window.location.search).get("oauth");
@@ -100,6 +125,7 @@ export function EmailSettingsPage() {
           oauthConnected: false,
           connectedEmail: null,
           enabled: false,
+          ready: false,
         }
       : {};
     if (provider === "SMTP2GO")
@@ -119,7 +145,9 @@ export function EmailSettingsPage() {
     setMessage(null);
     try {
       const { data } = await api.put<EmailSettings>("/settings/email", form);
-      setForm({ ...data, password: "", oauthClientSecret: "" });
+      const saved = { ...data, password: "", oauthClientSecret: "" };
+      setForm(saved);
+      setSavedFingerprint(fingerprint(saved));
       setMessage({
         type: "success",
         text: oauth
@@ -155,16 +183,20 @@ export function EmailSettingsPage() {
   }
   async function disconnectOauth() {
     await api.post("/settings/email/oauth/disconnect");
-    setForm({
+    const disconnected = {
       ...form,
       oauthConnected: false,
       connectedEmail: null,
       enabled: false,
-    });
+      ready: false,
+    };
+    setForm(disconnected);
+    setSavedFingerprint(fingerprint(disconnected));
     setMessage({ type: "success", text: "Compte OAuth déconnecté." });
   }
   async function sendTest() {
     setMessage(null);
+    setTesting(true);
     try {
       const { data } = await api.post<{ message: string }>(
         "/settings/email/test",
@@ -178,10 +210,13 @@ export function EmailSettingsPage() {
           ? (caught.response?.data?.message ?? "Test impossible.")
           : "Test impossible.",
       });
+    } finally {
+      setTesting(false);
     }
   }
 
   const callback = `${window.location.origin}/api/settings/email/oauth/${form.provider.toLowerCase()}/callback`;
+  const dirty = fingerprint(form) !== savedFingerprint;
   return (
     <Stack spacing={3} maxWidth={850}>
       <Stack>
@@ -189,10 +224,28 @@ export function EmailSettingsPage() {
           Paramètres de messagerie
         </Typography>
         <Typography color="text.secondary">
-          SMTP2GO/SMTP ou connexion OAuth 2.0 Google Workspace et Microsoft 365.
+          Envoi uniquement : SMTP, API Gmail ou Microsoft Graph. Le SSO OIDC se
+          configure séparément dans Identité et intégrations.
         </Typography>
       </Stack>
       {message && <Alert severity={message.type}>{message.text}</Alert>}
+      {query.data && (
+        <Alert
+          severity={
+            form.ready && form.enabled
+              ? "success"
+              : form.ready
+                ? "info"
+                : "warning"
+          }
+        >
+          {form.ready && form.enabled
+            ? "Messagerie prête et activée pour les notifications."
+            : form.ready
+              ? "Messagerie prête, mais notifications désactivées."
+              : "Configuration incomplète : enregistrez les identifiants requis."}
+        </Alert>
+      )}
       <Card variant="outlined">
         <CardContent>
           <Stack component="form" spacing={2.5} onSubmit={save}>
@@ -211,10 +264,18 @@ export function EmailSettingsPage() {
             {oauth ? (
               <>
                 <Alert severity="info">
-                  Créez une application Web chez le fournisseur et déclarez
-                  exactement cette URI de redirection :<br />
+                  Cette connexion OAuth sert uniquement à envoyer des emails,
+                  pas à connecter les utilisateurs. Créez une application Web et
+                  déclarez exactement cette URI de redirection :<br />
                   <strong>{callback}</strong>
                 </Alert>
+                {form.provider === "MICROSOFT_365" && (
+                  <Alert severity="info">
+                    Microsoft Graph requiert les permissions déléguées openid,
+                    email, offline_access, User.Read et Mail.Send. Un
+                    consentement administrateur peut être nécessaire.
+                  </Alert>
+                )}
                 <TextField
                   label="Client ID OAuth"
                   required
@@ -239,8 +300,8 @@ export function EmailSettingsPage() {
                 {form.provider === "MICROSOFT_365" && (
                   <TextField
                     label="Tenant Microsoft"
-                    helperText="Identifiant du tenant, domaine vérifié ou common pour le multitenant."
-                    value={form.oauthTenant ?? "common"}
+                    helperText="Identifiant du tenant, domaine vérifié ou organizations pour le multitenant professionnel."
+                    value={form.oauthTenant ?? "organizations"}
                     onChange={(e) =>
                       setForm({ ...form, oauthTenant: e.target.value })
                     }
@@ -276,7 +337,9 @@ export function EmailSettingsPage() {
                   variant="outlined"
                   onClick={connectOauth}
                   disabled={
-                    !form.oauthClientSecretConfigured && !form.oauthClientSecret
+                    dirty ||
+                    (!form.oauthClientSecretConfigured &&
+                      !form.oauthClientSecret)
                   }
                 >
                   {form.oauthConnected
@@ -376,6 +439,7 @@ export function EmailSettingsPage() {
                   control={
                     <Switch
                       checked={form.enabled}
+                      disabled={form.encryption === "none"}
                       onChange={(e) =>
                         setForm({ ...form, enabled: e.target.checked })
                       }
@@ -383,6 +447,12 @@ export function EmailSettingsPage() {
                   }
                   label="Utiliser cette configuration pour les notifications"
                 />
+                {form.encryption === "none" && (
+                  <Alert severity="warning">
+                    STARTTLS ou TLS implicite est obligatoire pour activer et
+                    tester la messagerie.
+                  </Alert>
+                )}
                 <Button type="submit" variant="contained" disabled={saving}>
                   {saving ? "Enregistrement…" : "Enregistrer"}
                 </Button>
@@ -408,10 +478,22 @@ export function EmailSettingsPage() {
             <Button
               variant="outlined"
               onClick={sendTest}
-              disabled={!recipient || (oauth && !form.oauthConnected)}
+              disabled={
+                dirty ||
+                testing ||
+                !recipient ||
+                !form.ready ||
+                (!oauth && form.encryption === "none") ||
+                (oauth && !form.oauthConnected)
+              }
             >
-              Envoyer un email de test
+              {testing ? "Envoi…" : "Envoyer un email de test"}
             </Button>
+            {dirty && (
+              <Typography variant="caption" color="warning.main">
+                Enregistrez les modifications avant de tester l’envoi.
+              </Typography>
+            )}
           </Stack>
         </CardContent>
       </Card>

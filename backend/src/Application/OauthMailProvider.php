@@ -23,7 +23,7 @@ final readonly class OauthMailProvider
         if ('GOOGLE_WORKSPACE' === $settings->getProvider()) {
             return 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email https://www.googleapis.com/auth/gmail.send', 'access_type' => 'offline', 'prompt' => 'consent', 'include_granted_scopes' => 'true', 'state' => $state], '', '&', PHP_QUERY_RFC3986);
         }
-        $tenant = rawurlencode($settings->getOauthTenant() ?? 'common');
+        $tenant = rawurlencode($settings->getOauthTenant() ?? 'organizations');
 
         return 'https://login.microsoftonline.com/'.$tenant.'/oauth2/v2.0/authorize?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'response_mode' => 'query', 'scope' => 'openid email offline_access User.Read Mail.Send', 'state' => $state], '', '&', PHP_QUERY_RFC3986);
     }
@@ -59,7 +59,12 @@ final readonly class OauthMailProvider
 
             return;
         }
-        $payload = ['message' => ['subject' => $subject, 'body' => ['contentType' => 'Text', 'content' => $message], 'toRecipients' => [['emailAddress' => ['address' => $recipient]]]], 'saveToSentItems' => true];
+        $payload = ['message' => [
+            'subject' => $subject,
+            'body' => ['contentType' => 'Text', 'content' => $message],
+            'from' => ['emailAddress' => ['address' => $settings->getSenderEmail(), 'name' => $settings->getSenderName()]],
+            'toRecipients' => [['emailAddress' => ['address' => $recipient]]],
+        ], 'saveToSentItems' => true];
         if (null !== $settings->getReplyTo()) {
             $payload['message']['replyTo'] = [['emailAddress' => ['address' => $settings->getReplyTo()]]];
         }
@@ -99,7 +104,7 @@ final readonly class OauthMailProvider
         if ('MICROSOFT_365' === $settings->getProvider()) {
             $parameters['scope'] = 'openid email offline_access User.Read Mail.Send';
         }
-        $url = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? 'https://oauth2.googleapis.com/token' : 'https://login.microsoftonline.com/'.rawurlencode($settings->getOauthTenant() ?? 'common').'/oauth2/v2.0/token';
+        $url = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? 'https://oauth2.googleapis.com/token' : 'https://login.microsoftonline.com/'.rawurlencode($settings->getOauthTenant() ?? 'organizations').'/oauth2/v2.0/token';
         $data = $this->httpClient->request('POST', $url, ['body' => $parameters])->toArray();
         if (!isset($data['access_token']) || !is_string($data['access_token'])) {
             throw new \RuntimeException('Jeton OAuth absent.');

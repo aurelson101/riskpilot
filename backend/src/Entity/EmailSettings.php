@@ -153,7 +153,7 @@ class EmailSettings
         if (null !== $encryptedClientSecret) {
             $this->encryptedOauthClientSecret = $encryptedClientSecret;
         }
-        $this->oauthTenant = null === $tenant || '' === trim($tenant) ? 'common' : trim($tenant);
+        $this->oauthTenant = null === $tenant || '' === trim($tenant) ? 'organizations' : trim($tenant);
         $this->senderName = $senderName;
         $this->replyTo = null === $replyTo || '' === trim($replyTo) ? null : mb_strtolower(trim($replyTo));
         $this->username = '';

@@ -38,6 +38,9 @@ class PlatformIntegration
         if (!in_array($type, self::TYPES, true) || !in_array($provider, self::PROVIDERS, true) || '' === trim($name)) {
             throw new \InvalidArgumentException('Type, fournisseur ou nom d’intégration invalide.');
         }
+        if ($enabled && in_array($type, ['OIDC', 'SAML'], true)) {
+            throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
+        }
         $this->validateConfiguration($type, $configuration);
         $this->organization = $organization;
         $this->type = $type;
@@ -83,8 +86,20 @@ class PlatformIntegration
     {
         return $this->credentialPrefix;
     }
-    public function getEncryptedCredential(): ?string { return $this->encryptedCredential; }
-    public function setEncryptedCredential(string $value): void { if ('DIRECTORY' !== $this->type || '' === $value) throw new \LogicException('Credential annuaire invalide.'); $this->encryptedCredential = $value; $this->updatedAt = new \DateTimeImmutable(); }
+
+    public function getEncryptedCredential(): ?string
+    {
+        return $this->encryptedCredential;
+    }
+
+    public function setEncryptedCredential(string $value): void
+    {
+        if ('DIRECTORY' !== $this->type || '' === $value) {
+            throw new \LogicException('Credential annuaire invalide.');
+        }
+        $this->encryptedCredential = $value;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
 
     public function isEnabled(): bool
     {
@@ -141,6 +156,9 @@ class PlatformIntegration
         if ('' === trim($name)) {
             throw new \InvalidArgumentException('Le nom est obligatoire.');
         }
+        if ($enabled && in_array($this->type, ['OIDC', 'SAML'], true)) {
+            throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
+        }
         $this->validateConfiguration($this->type, $configuration);
         $this->name = trim($name);
         $this->configuration = $configuration;
@@ -176,7 +194,13 @@ class PlatformIntegration
             }
         }
         if ('DIRECTORY' === $type) {
-            $host = strtolower(trim((string) ($configuration['host'] ?? ''))); $port = (int) ($configuration['port'] ?? 636); $baseDn = trim((string) ($configuration['baseDn'] ?? '')); $bindDn = trim((string) ($configuration['bindDn'] ?? '')); $userFilter = trim((string) ($configuration['userFilter'] ?? '')); $groupMappings = (array) ($configuration['groupMappings'] ?? []); $ca = trim((string) ($configuration['caCertificate'] ?? ''));
+            $host = strtolower(trim((string) ($configuration['host'] ?? '')));
+            $port = (int) ($configuration['port'] ?? 636);
+            $baseDn = trim((string) ($configuration['baseDn'] ?? ''));
+            $bindDn = trim((string) ($configuration['bindDn'] ?? ''));
+            $userFilter = trim((string) ($configuration['userFilter'] ?? ''));
+            $groupMappings = (array) ($configuration['groupMappings'] ?? []);
+            $ca = trim((string) ($configuration['caCertificate'] ?? ''));
             if (!str_starts_with($host, 'ldaps://') || 636 !== $port || '' === $baseDn || '' === $bindDn || !str_contains($userFilter, '{username}') || [] === $groupMappings || ('' !== $ca && (!str_contains($ca, 'BEGIN CERTIFICATE') || !str_contains($ca, 'END CERTIFICATE')))) {
                 throw new \InvalidArgumentException('LDAPS exige ldaps://, port 636, base DN, bind DN, filtre utilisateur, groupes et une CA PEM valide si fournie.');
             }

@@ -75,6 +75,9 @@ final class PlatformIntegrationControllerTest extends WebTestCase
 
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'DIRECTORY', 'provider' => 'ACTIVE_DIRECTORY', 'name' => 'LDAP non chiffré', 'credential' => 'secret', 'configuration' => ['host' => 'ldap://ad.example.test', 'port' => 389]]);
         self::assertResponseStatusCodeSame(422);
+        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'OIDC', 'provider' => 'MICROSOFT_ENTRA', 'name' => 'Entra incomplet', 'configuration' => ['issuer' => 'https://login.microsoftonline.com/organizations/v2.0'], 'enabled' => true]);
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString('SSO', (string) $client->getResponse()->getContent());
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->jsonRequest('PUT', '/api/v1/integrations/'.$created['id'], ['name' => 'Vol']);

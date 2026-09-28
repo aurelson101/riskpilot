@@ -64,8 +64,12 @@ final readonly class EmailSettingsController
         $senderEmail = mb_strtolower(trim((string) ($input['senderEmail'] ?? '')));
         $senderName = trim((string) ($input['senderName'] ?? 'RiskPilot'));
         $replyTo = isset($input['replyTo']) ? trim((string) $input['replyTo']) : null;
-        if ('' === $host || $port < 1 || $port > 65535 || !in_array($encryption, ['tls', 'ssl', 'none'], true) || '' === $username || false === filter_var($senderEmail, FILTER_VALIDATE_EMAIL) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
+        $enabled = (bool) ($input['enabled'] ?? false);
+        if (!$this->validSmtpHost($host) || $port < 1 || $port > 65535 || !in_array($encryption, ['tls', 'ssl', 'none'], true) || '' === $username || mb_strlen($username) > 255 || '' === $senderName || mb_strlen($senderName) > 180 || preg_match('/[\r\n]/', $senderName) || false === filter_var($senderEmail, FILTER_VALIDATE_EMAIL) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
             return $this->error('Vérifiez le serveur, le compte SMTP et les adresses email.');
+        }
+        if ($enabled && 'none' === $encryption) {
+            return $this->error('Le chiffrement TLS est obligatoire pour activer les notifications.');
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new EmailSettings($user->getOrganization());
         $password = (string) ($input['password'] ?? '');
@@ -75,7 +79,7 @@ final readonly class EmailSettingsController
         if (null === $settings->getEncryptedPassword()) {
             return $this->error('Le mot de passe SMTP est obligatoire.');
         }
-        $settings->configure($provider, $host, $port, $encryption, $username, $senderEmail, '' === $senderName ? 'RiskPilot' : $senderName, $replyTo, (bool) ($input['enabled'] ?? false));
+        $settings->configure($provider, $host, $port, $encryption, $username, $senderEmail, $senderName, $replyTo, $enabled);
         $this->entityManager->persist($settings);
         $this->entityManager->flush();
 
@@ -152,6 +156,12 @@ final readonly class EmailSettingsController
         if (!$settings instanceof EmailSettings) {
             return $this->error('Enregistrez la configuration avant de la tester.');
         }
+        if (!$this->isReady($settings)) {
+            return $this->error('La configuration enregistrée est incomplète. Enregistrez les identifiants ou connectez le compte OAuth.');
+        }
+        if ('none' === $settings->getEncryption() && !in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
+            return $this->error('Le test SMTP sans chiffrement est désactivé. Sélectionnez STARTTLS ou TLS implicite.');
+        }
         try {
             $this->mailer->sendWithSettings($settings, $recipient, 'Test de messagerie RiskPilot', 'Votre configuration de messagerie RiskPilot fonctionne correctement.');
         } catch (\Throwable) {
@@ -164,13 +174,13 @@ final readonly class EmailSettingsController
     /** @return array<string, mixed> */
     private function serialize(EmailSettings $settings): array
     {
-        return ['provider' => $settings->getProvider(), 'host' => $settings->getHost(), 'port' => $settings->getPort(), 'encryption' => $settings->getEncryption(), 'username' => $settings->getUsername(), 'passwordConfigured' => null !== $settings->getEncryptedPassword(), 'senderEmail' => $settings->getSenderEmail(), 'senderName' => $settings->getSenderName(), 'replyTo' => $settings->getReplyTo(), 'enabled' => $settings->isEnabled(), 'oauthClientId' => $settings->getOauthClientId(), 'oauthClientSecretConfigured' => null !== $settings->getEncryptedOauthClientSecret(), 'oauthTenant' => $settings->getOauthTenant(), 'oauthConnected' => null !== $settings->getEncryptedRefreshToken(), 'connectedEmail' => $settings->getConnectedEmail(), 'updatedAt' => $settings->getUpdatedAt()->format(DATE_ATOM)];
+        return ['provider' => $settings->getProvider(), 'host' => $settings->getHost(), 'port' => $settings->getPort(), 'encryption' => $settings->getEncryption(), 'username' => $settings->getUsername(), 'passwordConfigured' => null !== $settings->getEncryptedPassword(), 'senderEmail' => $settings->getSenderEmail(), 'senderName' => $settings->getSenderName(), 'replyTo' => $settings->getReplyTo(), 'enabled' => $settings->isEnabled(), 'ready' => $this->isReady($settings), 'oauthClientId' => $settings->getOauthClientId(), 'oauthClientSecretConfigured' => null !== $settings->getEncryptedOauthClientSecret(), 'oauthTenant' => $settings->getOauthTenant(), 'oauthConnected' => null !== $settings->getEncryptedRefreshToken(), 'connectedEmail' => $settings->getConnectedEmail(), 'updatedAt' => $settings->getUpdatedAt()->format(DATE_ATOM)];
     }
 
     /** @return array<string, mixed> */
     private function defaults(): array
     {
-        return ['provider' => 'SMTP2GO', ...self::PRESETS['SMTP2GO'], 'username' => '', 'passwordConfigured' => false, 'senderEmail' => '', 'senderName' => 'RiskPilot', 'replyTo' => null, 'enabled' => false, 'oauthClientId' => null, 'oauthClientSecretConfigured' => false, 'oauthTenant' => null, 'oauthConnected' => false, 'connectedEmail' => null, 'updatedAt' => null];
+        return ['provider' => 'SMTP2GO', ...self::PRESETS['SMTP2GO'], 'username' => '', 'passwordConfigured' => false, 'senderEmail' => '', 'senderName' => 'RiskPilot', 'replyTo' => null, 'enabled' => false, 'ready' => false, 'oauthClientId' => null, 'oauthClientSecretConfigured' => false, 'oauthTenant' => 'organizations', 'oauthConnected' => false, 'connectedEmail' => null, 'updatedAt' => null];
     }
 
     private function error(string $message): JsonResponse
@@ -178,24 +188,54 @@ final readonly class EmailSettingsController
         return new JsonResponse(['code' => 'INVALID_EMAIL_SETTINGS', 'message' => $message], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
     }
 
+    private function isReady(EmailSettings $settings): bool
+    {
+        if (in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
+            return null !== $settings->getEncryptedRefreshToken() && null !== $settings->getConnectedEmail();
+        }
+
+        return null !== $settings->getEncryptedPassword() && '' !== $settings->getSenderEmail();
+    }
+
+    private function validSmtpHost(string $host): bool
+    {
+        if (false !== filter_var($host, FILTER_VALIDATE_IP)) {
+            return false !== filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        }
+
+        return str_contains($host, '.') && false !== filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME);
+    }
+
     /** @param array<string, mixed> $input */
     private function updateOauth(User $user, string $provider, array $input): JsonResponse
     {
         $clientId = trim((string) ($input['oauthClientId'] ?? ''));
         $clientSecret = trim((string) ($input['oauthClientSecret'] ?? ''));
-        $tenant = 'MICROSOFT_365' === $provider ? trim((string) ($input['oauthTenant'] ?? 'common')) : null;
+        $tenantInput = trim((string) ($input['oauthTenant'] ?? ''));
+        $tenant = 'MICROSOFT_365' === $provider ? ('' === $tenantInput ? 'organizations' : $tenantInput) : null;
         $senderName = trim((string) ($input['senderName'] ?? 'RiskPilot'));
         $replyTo = isset($input['replyTo']) ? trim((string) $input['replyTo']) : null;
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new EmailSettings($user->getOrganization());
         $clientSecretRequired = null === $settings->getEncryptedOauthClientSecret() || $settings->getProvider() !== $provider;
-        if ('' === $clientId || ('' === $clientSecret && $clientSecretRequired) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
+        if ('' === $clientId || mb_strlen($clientId) > 255 || ('' === $clientSecret && $clientSecretRequired) || '' === $senderName || mb_strlen($senderName) > 180 || preg_match('/[\r\n]/', $senderName) || ('MICROSOFT_365' === $provider && !$this->validOauthTenant($tenant)) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
             return $this->error('Renseignez un client ID, un secret OAuth et une adresse de réponse valide.');
         }
-        $settings->configureOauth($provider, $clientId, '' === $clientSecret ? null : $this->cipher->encrypt($clientSecret), $tenant, '' === $senderName ? 'RiskPilot' : $senderName, $replyTo);
+        $settings->configureOauth($provider, $clientId, '' === $clientSecret ? null : $this->cipher->encrypt($clientSecret), $tenant, $senderName, $replyTo);
         $this->entityManager->persist($settings);
         $this->entityManager->flush();
 
         return new JsonResponse($this->serialize($settings));
+    }
+
+    private function validOauthTenant(?string $tenant): bool
+    {
+        if (null === $tenant || '' === $tenant || mb_strlen($tenant) > 100 || str_contains($tenant, '..')) {
+            return false;
+        }
+
+        return 'organizations' === $tenant
+            || 1 === preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/i', $tenant)
+            || false !== filter_var($tenant, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME);
     }
 
     private function admin(): User

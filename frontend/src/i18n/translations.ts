@@ -46,7 +46,10 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Retirer cette question", "Remove this question"],
   ["Ajouter une question", "Add a question"],
   ["Rappels avant l’échéance (jours)", "Reminders before due date (days)"],
-  ["Créez d’abord un questionnaire actif.", "Create an active questionnaire first."],
+  [
+    "Créez d’abord un questionnaire actif.",
+    "Create an active questionnaire first.",
+  ],
   ["Informations partagées avec l’IA", "Information shared with AI"],
   ["Niveau de maturité", "Maturity level"],
   ["Statut de conformité", "Compliance status"],
@@ -605,6 +608,80 @@ const pairs: Array<[fr: string, en: string]> = [
   ["Enregistrer un exercice", "Record an exercise"],
   ["Envoyer le lien", "Send link"],
   ["Envoyer un email de test", "Send a test email"],
+  ["Envoi…", "Sending…"],
+  [
+    "Messagerie prête et activée pour les notifications.",
+    "Email is ready and enabled for notifications.",
+  ],
+  [
+    "Messagerie prête, mais notifications désactivées.",
+    "Email is ready, but notifications are disabled.",
+  ],
+  [
+    "Configuration incomplète : enregistrez les identifiants requis.",
+    "Incomplete configuration: save the required credentials.",
+  ],
+  [
+    "STARTTLS ou TLS implicite est obligatoire pour activer et tester la messagerie.",
+    "STARTTLS or implicit TLS is required to enable and test email.",
+  ],
+  [
+    "Enregistrez les modifications avant de tester l’envoi.",
+    "Save changes before testing delivery.",
+  ],
+  [
+    "Envoi uniquement : SMTP, API Gmail ou Microsoft Graph. Le SSO OIDC se configure séparément dans Identité et intégrations.",
+    "Sending only: SMTP, Gmail API, or Microsoft Graph. OIDC SSO is configured separately under Identity and integrations.",
+  ],
+  [
+    "Cette connexion OAuth sert uniquement à envoyer des emails, pas à connecter les utilisateurs. Créez une application Web et déclarez exactement cette URI de redirection :",
+    "This OAuth connection is only used to send email, not to sign users in. Create a web application and declare this exact redirect URI:",
+  ],
+  [
+    "Microsoft Graph requiert les permissions déléguées openid, email, offline_access, User.Read et Mail.Send. Un consentement administrateur peut être nécessaire.",
+    "Microsoft Graph requires the delegated permissions openid, email, offline_access, User.Read, and Mail.Send. Administrator consent may be required.",
+  ],
+  [
+    "Identifiant du tenant, domaine vérifié ou organizations pour le multitenant professionnel.",
+    "Tenant ID, verified domain, or organizations for professional multitenancy.",
+  ],
+  [
+    "Préparation SSO — OpenID Connect (OIDC)",
+    "SSO setup — OpenID Connect (OIDC)",
+  ],
+  ["Préparation SSO — SAML 2.0", "SSO setup — SAML 2.0"],
+  [
+    "Annuaire — Active Directory LDAPS",
+    "Directory — Active Directory over LDAPS",
+  ],
+  ["Provisioning — SCIM", "Provisioning — SCIM"],
+  ["Automatisation — Clé API", "Automation — API key"],
+  ["Automatisation — Webhook", "Automation — Webhook"],
+  ["OIDC générique", "Generic OIDC"],
+  ["SAML générique", "Generic SAML"],
+  ["SCIM générique", "Generic SCIM"],
+  ["Google Workspace", "Google Workspace"],
+  ["Microsoft Entra ID", "Microsoft Entra ID"],
+  ["Active Directory", "Active Directory"],
+  ["API RiskPilot", "RiskPilot API"],
+  ["Webhook HTTPS", "HTTPS webhook"],
+  [
+    "Authentification SSO, provisioning des identités et automatisations techniques. La messagerie SMTP, Gmail et Microsoft Graph reste dans Paramètres de messagerie.",
+    "SSO authentication, identity provisioning, and technical automation. SMTP, Gmail, and Microsoft Graph email remains under Email settings.",
+  ],
+  [
+    "OIDC et SAML servent uniquement à connecter les utilisateurs. OAuth Gmail et Microsoft Graph servent uniquement à envoyer les emails : les secrets, permissions et callbacks ne sont pas interchangeables.",
+    "OIDC and SAML are only used to sign users in. Gmail and Microsoft Graph OAuth are only used to send email: secrets, permissions, and callbacks are not interchangeable.",
+  ],
+  [
+    "Cette fiche prépare le fournisseur SSO, mais la connexion OIDC ou SAML n’est pas encore raccordée à l’écran de connexion. Elle reste inactive et ne configure ni Microsoft Graph ni l’envoi d’email.",
+    "This record prepares the SSO provider, but OIDC or SAML is not connected to the sign-in screen yet. It remains inactive and configures neither Microsoft Graph nor email delivery.",
+  ],
+  [
+    "Activation disponible après raccordement du SSO",
+    "Activation available after SSO is connected",
+  ],
+  ["Configuration préparatoire", "Setup only"],
   ["Espace de travail Google — OAuth 2.0", "Google Workspace — OAuth 2.0"],
   ["Exercice", "Exercise"],
   ["exercice(s) · prochain :", "exercise(s) · next:"],

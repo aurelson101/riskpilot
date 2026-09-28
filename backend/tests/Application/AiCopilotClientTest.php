@@ -132,7 +132,7 @@ JSON], JSON_THROW_ON_ERROR), ['http_code' => 200]));
 
         $result = (new AiCopilotClient($http, $cipher))->pilot($settings, 'Show me the risks', [], 'en', 'safety-user-1', '/dashboard', [
             ['type' => 'NAVIGATE', 'label' => 'Risks', 'path' => '/risks'],
-        ]);
+        ], ['summary' => ['risks' => 3, 'overdueActions' => 1]]);
 
         self::assertSame('Open the risk register.', $result['answer']);
         self::assertSame('/risks', $result['actions'][0]['path']);
@@ -141,5 +141,7 @@ JSON], JSON_THROW_ON_ERROR), ['http_code' => 200]));
         self::assertStringContainsString('/dashboard', $body['instructions']);
         self::assertStringContainsString('explicit confirmation', $body['instructions']);
         self::assertStringContainsString('Never answer that you cannot create', $body['instructions']);
+        self::assertStringContainsString('TENANT_GRC_CONTEXT', $body['instructions']);
+        self::assertStringContainsString('"overdueActions":1', $body['instructions']);
     }
 }

@@ -43,6 +43,36 @@ const initial = {
   caCertificate: "",
   enabled: false,
 };
+const integrationTypes = [
+  { value: "OIDC", label: "Préparation SSO — OpenID Connect (OIDC)" },
+  { value: "SAML", label: "Préparation SSO — SAML 2.0" },
+  { value: "DIRECTORY", label: "Annuaire — Active Directory LDAPS" },
+  { value: "SCIM", label: "Provisioning — SCIM" },
+  { value: "API_KEY", label: "Automatisation — Clé API" },
+  { value: "WEBHOOK", label: "Automatisation — Webhook" },
+] as const;
+const providersByType: Record<
+  string,
+  Array<{ value: string; label: string }>
+> = {
+  OIDC: [
+    { value: "GOOGLE_WORKSPACE", label: "Google Workspace" },
+    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
+    { value: "GENERIC", label: "OIDC générique" },
+  ],
+  SAML: [
+    { value: "GOOGLE_WORKSPACE", label: "Google Workspace" },
+    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
+    { value: "GENERIC", label: "SAML générique" },
+  ],
+  DIRECTORY: [{ value: "ACTIVE_DIRECTORY", label: "Active Directory" }],
+  SCIM: [
+    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
+    { value: "GENERIC", label: "SCIM générique" },
+  ],
+  API_KEY: [{ value: "GENERIC", label: "API RiskPilot" }],
+  WEBHOOK: [{ value: "GENERIC", label: "Webhook HTTPS" }],
+};
 
 export function IntegrationSettingsPage() {
   const cache = useQueryClient();
@@ -54,6 +84,7 @@ export function IntegrationSettingsPage() {
   const [form, setForm] = useState(initial);
   const [secret, setSecret] = useState<string | null>(null);
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
+  const isSsoDraft = form.type === "OIDC" || form.type === "SAML";
   const create = useMutation({
     mutationFn: async () => {
       const configuration =
@@ -93,7 +124,7 @@ export function IntegrationSettingsPage() {
             ...(form.type === "DIRECTORY"
               ? { credential: form.credential }
               : {}),
-            enabled: form.enabled,
+            enabled: isSsoDraft ? false : form.enabled,
           },
         )
       ).data;
@@ -115,11 +146,17 @@ export function IntegrationSettingsPage() {
           Identité et intégrations
         </Typography>
         <Typography color="text.secondary">
-          OIDC/SAML, AD en LDAPS, provisioning SCIM, clés API limitées et
-          webhooks signés.
+          Authentification SSO, provisioning des identités et automatisations
+          techniques. La messagerie SMTP, Gmail et Microsoft Graph reste dans
+          Paramètres de messagerie.
         </Typography>
       </div>
       <AiCopilotSettingsPanel />
+      <Alert severity="info">
+        OIDC et SAML servent uniquement à connecter les utilisateurs. OAuth
+        Gmail et Microsoft Graph servent uniquement à envoyer les emails : les
+        secrets, permissions et callbacks ne sont pas interchangeables.
+      </Alert>
       {secret && (
         <Alert severity="warning">
           Copiez ce secret maintenant, il ne sera plus affiché :{" "}
@@ -135,19 +172,22 @@ export function IntegrationSettingsPage() {
                 select
                 label="Type"
                 value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                onChange={(e) => {
+                  const type = e.target.value;
+                  setForm({
+                    ...form,
+                    type,
+                    provider: providersByType[type][0].value,
+                    enabled: ["OIDC", "SAML"].includes(type)
+                      ? false
+                      : form.enabled,
+                  });
+                }}
                 fullWidth
               >
-                {[
-                  "OIDC",
-                  "SAML",
-                  "DIRECTORY",
-                  "SCIM",
-                  "API_KEY",
-                  "WEBHOOK",
-                ].map((item) => (
-                  <MenuItem key={item} value={item}>
-                    {item}
+                {integrationTypes.map((item) => (
+                  <MenuItem key={item.value} value={item.value}>
+                    {item.label}
                   </MenuItem>
                 ))}
               </TextField>
@@ -158,14 +198,9 @@ export function IntegrationSettingsPage() {
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
                 fullWidth
               >
-                {[
-                  "GOOGLE_WORKSPACE",
-                  "MICROSOFT_ENTRA",
-                  "ACTIVE_DIRECTORY",
-                  "GENERIC",
-                ].map((item) => (
-                  <MenuItem key={item} value={item}>
-                    {item}
+                {providersByType[form.type].map((item) => (
+                  <MenuItem key={item.value} value={item.value}>
+                    {item.label}
                   </MenuItem>
                 ))}
               </TextField>
@@ -176,6 +211,14 @@ export function IntegrationSettingsPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
+            {(form.type === "OIDC" || form.type === "SAML") && (
+              <Alert severity="warning">
+                Cette fiche prépare le fournisseur SSO, mais la connexion OIDC
+                ou SAML n’est pas encore raccordée à l’écran de connexion. Elle
+                reste inactive et ne configure ni Microsoft Graph ni l’envoi
+                d’email.
+              </Alert>
+            )}
             {form.type === "DIRECTORY" ? (
               <Stack spacing={2}>
                 <TextField
@@ -288,12 +331,17 @@ export function IntegrationSettingsPage() {
               control={
                 <Switch
                   checked={form.enabled}
+                  disabled={isSsoDraft}
                   onChange={(e) =>
                     setForm({ ...form, enabled: e.target.checked })
                   }
                 />
               }
-              label="Activer après enregistrement"
+              label={
+                isSsoDraft
+                  ? "Activation disponible après raccordement du SSO"
+                  : "Activer après enregistrement"
+              }
             />
             <Button
               type="submit"
@@ -319,8 +367,18 @@ export function IntegrationSettingsPage() {
                 </Typography>
                 <Chip label={item.type} />
                 <Chip
-                  color={item.enabled ? "success" : "default"}
-                  label={item.enabled ? "Actif" : "Inactif"}
+                  color={
+                    !["OIDC", "SAML"].includes(item.type) && item.enabled
+                      ? "success"
+                      : "default"
+                  }
+                  label={
+                    ["OIDC", "SAML"].includes(item.type)
+                      ? "Configuration préparatoire"
+                      : item.enabled
+                        ? "Actif"
+                        : "Inactif"
+                  }
                 />
                 {item.credentialPrefix && (
                   <Typography variant="body2">
