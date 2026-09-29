@@ -118,7 +118,7 @@ final readonly class EmailSettingsController
         }
         try {
             $redirectUri = rtrim($this->appUrl, '/').$request->getPathInfo();
-            $tokens = $this->oauth->exchangeCode($settings, $redirectUri, (string) $request->query->get('code', ''));
+            $tokens = $this->oauth->exchangeCode($settings, $redirectUri, (string) $request->query->get('code', ''), $state);
             $email = $this->oauth->connectedEmail($settings, $tokens['access_token']);
             $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.max(60, $tokens['expires_in']).' seconds'), $email);
             $this->entityManager->flush();

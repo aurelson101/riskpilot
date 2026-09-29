@@ -15,6 +15,54 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OauthMailProviderTest extends TestCase
 {
+    public function testOauthAuthorizationUsesMinimalScopesStateAndPkce(): void
+    {
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $provider = new OauthMailProvider($cipher, $entityManager, new MockHttpClient());
+        $cases = [
+            ['GOOGLE_WORKSPACE', null, ['openid', 'email', 'https://www.googleapis.com/auth/gmail.send']],
+            ['MICROSOFT_365', 'organizations', ['openid', 'email', 'offline_access', 'User.Read', 'Mail.Send']],
+        ];
+
+        foreach ($cases as [$providerName, $tenant, $expectedScopes]) {
+            $settings = new EmailSettings(new Organization('Tenant'));
+            $settings->configureOauth($providerName, 'client-id', $cipher->encrypt('client-secret'), $tenant, 'RiskPilot', null);
+            $url = $provider->authorizationUrl($settings, 'https://riskpilot.test/callback', 'random-state');
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+            self::assertSame('random-state', $query['state']);
+            self::assertSame('S256', $query['code_challenge_method']);
+            self::assertSame(43, strlen($query['code_challenge']));
+            self::assertSame($expectedScopes, explode(' ', $query['scope']));
+            self::assertArrayNotHasKey('client_secret', $query);
+        }
+    }
+
+    public function testTokenExchangeUsesThePkceVerifierBoundToState(): void
+    {
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = compact('method', 'url', 'options');
+
+            return new MockResponse(json_encode(['access_token' => 'access-token', 'expires_in' => 3600], JSON_THROW_ON_ERROR));
+        });
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('GOOGLE_WORKSPACE', 'client-id', $cipher->encrypt('client-secret'), null, 'RiskPilot', null);
+        $provider = new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), $http);
+        $authorizationUrl = $provider->authorizationUrl($settings, 'https://riskpilot.test/callback', 'random-state');
+        parse_str((string) parse_url($authorizationUrl, PHP_URL_QUERY), $authorizationQuery);
+
+        $provider->exchangeCode($settings, 'https://riskpilot.test/callback', 'authorization-code', 'random-state');
+        parse_str($captured['options']['body'], $tokenBody);
+
+        $challenge = rtrim(strtr(base64_encode(hash('sha256', $tokenBody['code_verifier'], true)), '+/', '-_'), '=');
+        self::assertSame($authorizationQuery['code_challenge'], $challenge);
+        self::assertSame('authorization-code', $tokenBody['code']);
+        self::assertSame('client-secret', $tokenBody['client_secret']);
+    }
+
     public function testMicrosoftGraphUsesDelegatedMailSendAndTheConnectedSender(): void
     {
         $captured = [];
@@ -39,5 +87,27 @@ final class OauthMailProviderTest extends TestCase
         self::assertSame('RiskPilot GRC', $payload['message']['from']['emailAddress']['name']);
         self::assertSame('reply@example.test', $payload['message']['replyTo'][0]['emailAddress']['address']);
         self::assertTrue($payload['saveToSentItems']);
+    }
+
+    public function testGoogleUsesGmailSendForTheConnectedAccount(): void
+    {
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = compact('method', 'url', 'options');
+
+            return new MockResponse('{}', ['http_code' => 200]);
+        });
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('GOOGLE_WORKSPACE', 'client-id', $cipher->encrypt('client-secret'), null, 'RiskPilot GRC', 'reply@example.test');
+        $settings->connectOauth($cipher->encrypt('access-token'), $cipher->encrypt('refresh-token'), new \DateTimeImmutable('+1 hour'), 'riskpilot@example.test');
+
+        (new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), $http))->send($settings, 'recipient@example.test', 'Risk review', 'A review is due.');
+
+        self::assertSame('POST', $captured['method']);
+        self::assertSame('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', $captured['url']);
+        self::assertSame('Authorization: Bearer access-token', $captured['options']['normalized_headers']['authorization'][0]);
+        $payload = json_decode($captured['options']['body'], true, flags: JSON_THROW_ON_ERROR);
+        self::assertNotEmpty($payload['raw']);
     }
 }

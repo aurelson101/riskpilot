@@ -20,18 +20,23 @@ final readonly class OauthMailProvider
     public function authorizationUrl(EmailSettings $settings, string $redirectUri, string $state): string
     {
         $clientId = $settings->getOauthClientId() ?? throw new \RuntimeException('Client OAuth manquant.');
+        $codeChallenge = $this->codeChallenge($state);
         if ('GOOGLE_WORKSPACE' === $settings->getProvider()) {
-            return 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email https://www.googleapis.com/auth/gmail.send', 'access_type' => 'offline', 'prompt' => 'consent', 'include_granted_scopes' => 'true', 'state' => $state], '', '&', PHP_QUERY_RFC3986);
+            return 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email https://www.googleapis.com/auth/gmail.send', 'access_type' => 'offline', 'prompt' => 'consent', 'include_granted_scopes' => 'true', 'state' => $state, 'code_challenge' => $codeChallenge, 'code_challenge_method' => 'S256'], '', '&', PHP_QUERY_RFC3986);
         }
         $tenant = rawurlencode($settings->getOauthTenant() ?? 'organizations');
 
-        return 'https://login.microsoftonline.com/'.$tenant.'/oauth2/v2.0/authorize?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'response_mode' => 'query', 'scope' => 'openid email offline_access User.Read Mail.Send', 'state' => $state], '', '&', PHP_QUERY_RFC3986);
+        return 'https://login.microsoftonline.com/'.$tenant.'/oauth2/v2.0/authorize?'.http_build_query(['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'response_mode' => 'query', 'scope' => 'openid email offline_access User.Read Mail.Send', 'state' => $state, 'code_challenge' => $codeChallenge, 'code_challenge_method' => 'S256'], '', '&', PHP_QUERY_RFC3986);
     }
 
     /** @return array{access_token:string, refresh_token?:string, expires_in:int} */
-    public function exchangeCode(EmailSettings $settings, string $redirectUri, string $code): array
+    public function exchangeCode(EmailSettings $settings, string $redirectUri, string $code, string $state): array
     {
-        return $this->tokenRequest($settings, ['grant_type' => 'authorization_code', 'code' => $code, 'redirect_uri' => $redirectUri]);
+        if ('' === $code || '' === $state) {
+            throw new \RuntimeException('Réponse OAuth incomplète.');
+        }
+
+        return $this->tokenRequest($settings, ['grant_type' => 'authorization_code', 'code' => $code, 'redirect_uri' => $redirectUri, 'code_verifier' => $this->codeVerifier($state)]);
     }
 
     public function connectedEmail(EmailSettings $settings, string $accessToken): string
@@ -111,5 +116,15 @@ final readonly class OauthMailProvider
         }
 
         return ['access_token' => $data['access_token'], 'expires_in' => (int) ($data['expires_in'] ?? 3600), ...(isset($data['refresh_token']) && is_string($data['refresh_token']) ? ['refresh_token' => $data['refresh_token']] : [])];
+    }
+
+    private function codeVerifier(string $state): string
+    {
+        return $this->cipher->deriveUrlSafe('oauth-mail-pkce', $state);
+    }
+
+    private function codeChallenge(string $state): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', $this->codeVerifier($state), true)), '+/', '-_'), '=');
     }
 }

@@ -34,4 +34,11 @@ final readonly class SecretCipher
 
         return $plain;
     }
+
+    public function deriveUrlSafe(string $purpose, string $value): string
+    {
+        $derived = sodium_crypto_generichash($purpose."\0".$value, $this->key, 32);
+
+        return rtrim(strtr(base64_encode($derived), '+/', '-_'), '=');
+    }
 }

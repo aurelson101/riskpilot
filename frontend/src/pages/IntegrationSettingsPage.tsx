@@ -29,7 +29,14 @@ type Integration = {
   credentialConfigured?: boolean;
   enabled: boolean;
 };
-type IntegrationType = "API_KEY" | "DIRECTORY";
+type IntegrationType = "API_KEY" | "DIRECTORY" | "OIDC_DIAGNOSTIC";
+type OidcResult = {
+  validated: boolean;
+  issuer: string;
+  authorizationCode: boolean;
+  pkceS256: boolean;
+  signingAlgorithms: string[];
+};
 type EmailSummary = {
   provider: string;
   enabled: boolean;
@@ -47,9 +54,12 @@ type Form = {
   bindDn: string;
   credential: string;
   userFilter: string;
+  testUsername: string;
   groupDn: string;
   groupRole: string;
   caCertificate: string;
+  oidcProvider: "GOOGLE_WORKSPACE" | "MICROSOFT_ENTRA";
+  issuer: string;
   enabled: boolean;
 };
 
@@ -63,9 +73,12 @@ const initial: Form = {
   bindDn: "",
   credential: "",
   userFilter: "(&(objectClass=user)(sAMAccountName={username}))",
+  testUsername: "",
   groupDn: "",
   groupRole: "ROLE_RISK_MANAGER",
   caCertificate: "",
+  oidcProvider: "GOOGLE_WORKSPACE",
+  issuer: "https://accounts.google.com",
   enabled: false,
 };
 const scopes = [
@@ -111,9 +124,18 @@ export function IntegrationSettingsPage() {
   const [form, setForm] = useState<Form>(initial);
   const [secret, setSecret] = useState<string | null>(null);
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
+  const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: async () => {
+      if (form.type === "OIDC_DIAGNOSTIC") {
+        const response = await api.post<OidcResult>(
+          "/v1/integrations/oidc-discovery-test",
+          { provider: form.oidcProvider, issuer: form.issuer },
+        );
+
+        return { oidc: response.data };
+      }
       const directory = form.type === "DIRECTORY";
       const configuration = directory
         ? {
@@ -122,13 +144,14 @@ export function IntegrationSettingsPage() {
             baseDn: form.baseDn,
             bindDn: form.bindDn,
             userFilter: form.userFilter,
+            testUsername: form.testUsername,
             groupMappings: { [form.groupDn]: form.groupRole },
             ...(form.caCertificate.trim()
               ? { caCertificate: form.caCertificate }
               : {}),
           }
         : { scopes: form.scopes };
-      return (
+      const created = (
         await api.post<Integration & { secret: string | null }>(
           "/v1/integrations",
           {
@@ -141,10 +164,13 @@ export function IntegrationSettingsPage() {
           },
         )
       ).data;
+
+      return { created };
     },
     onSuccess: async (data) => {
-      setSecret(data.secret);
-      setForm(initial);
+      setSecret(data.created?.secret ?? null);
+      setOidcResult(data.oidc ?? null);
+      if (data.created) setForm(initial);
       setOperationError(null);
       await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
     },
@@ -160,6 +186,7 @@ export function IntegrationSettingsPage() {
   function submit(event: FormEvent) {
     event.preventDefault();
     setSecret(null);
+    setOidcResult(null);
     setOperationError(null);
     create.mutate();
   }
@@ -242,18 +269,19 @@ export function IntegrationSettingsPage() {
       </Card>
 
       <Alert severity="info">
-        Les configurations SSO OIDC/SAML et SCIM sont masquées tant que le
-        parcours complet de connexion ou de provisioning n’est pas disponible.
+        La découverte OIDC Google/Entra peut être vérifiée ici. L’activation du
+        SSO OIDC/SAML et du provisioning SCIM reste masquée tant que le parcours
+        complet de connexion n’est pas disponible.
       </Alert>
 
       <Card>
         <CardContent component="form" onSubmit={submit}>
           <Stack spacing={2}>
             <div>
-              <Typography variant="h6">Nouvel accès technique</Typography>
+              <Typography variant="h6">Nouvel accès ou diagnostic</Typography>
               <Typography color="text.secondary">
-                Créez une clé API ou vérifiez un annuaire Microsoft AD sécurisé
-                par LDAPS.
+                Créez une clé API, vérifiez un annuaire LDAPS ou la découverte
+                OIDC d’un fournisseur d’identité.
               </Typography>
             </div>
             <TextField
@@ -271,19 +299,24 @@ export function IntegrationSettingsPage() {
               <MenuItem value="DIRECTORY">
                 Diagnostic annuaire Microsoft AD (LDAPS)
               </MenuItem>
+              <MenuItem value="OIDC_DIAGNOSTIC">
+                Diagnostic SSO — découverte OIDC
+              </MenuItem>
             </TextField>
-            <TextField
-              required
-              label={
-                form.type === "DIRECTORY"
-                  ? "Nom de l’annuaire"
-                  : "Nom de l’application"
-              }
-              value={form.name}
-              onChange={(event) =>
-                setForm({ ...form, name: event.target.value })
-              }
-            />
+            {form.type !== "OIDC_DIAGNOSTIC" && (
+              <TextField
+                required
+                label={
+                  form.type === "DIRECTORY"
+                    ? "Nom de l’annuaire"
+                    : "Nom de l’application"
+                }
+                value={form.name}
+                onChange={(event) =>
+                  setForm({ ...form, name: event.target.value })
+                }
+              />
+            )}
             {form.type === "API_KEY" ? (
               <>
                 <Typography fontWeight={700}>Droits accordés</Typography>
@@ -322,7 +355,7 @@ export function IntegrationSettingsPage() {
                   label="Activer la clé dès sa création"
                 />
               </>
-            ) : (
+            ) : form.type === "DIRECTORY" ? (
               <Stack spacing={2}>
                 <Alert severity="info">
                   Ce diagnostic vérifie le chiffrement, le bind et la recherche.
@@ -385,6 +418,15 @@ export function IntegrationSettingsPage() {
                   }
                   helperText="Le filtre doit contenir {username}."
                 />
+                <TextField
+                  required
+                  label="Utilisateur de test"
+                  value={form.testUsername}
+                  onChange={(event) =>
+                    setForm({ ...form, testUsername: event.target.value })
+                  }
+                  helperText="Compte non privilégié utilisé uniquement pour vérifier la recherche."
+                />
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     required
@@ -421,6 +463,48 @@ export function IntegrationSettingsPage() {
                   }
                 />
               </Stack>
+            ) : (
+              <Stack spacing={2}>
+                <Alert severity="info">
+                  Ce diagnostic contrôle la découverte, le flux Authorization
+                  Code et les algorithmes de signature. Il n’active pas la
+                  connexion des utilisateurs et ne demande aucun secret.
+                </Alert>
+                <TextField
+                  select
+                  label="Fournisseur d’identité"
+                  value={form.oidcProvider}
+                  onChange={(event) => {
+                    const provider = event.target.value as Form["oidcProvider"];
+                    setForm({
+                      ...form,
+                      oidcProvider: provider,
+                      issuer:
+                        provider === "GOOGLE_WORKSPACE"
+                          ? "https://accounts.google.com"
+                          : "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0",
+                    });
+                  }}
+                >
+                  <MenuItem value="GOOGLE_WORKSPACE">Google Workspace</MenuItem>
+                  <MenuItem value="MICROSOFT_ENTRA">
+                    Microsoft Entra ID
+                  </MenuItem>
+                </TextField>
+                <TextField
+                  required
+                  label="Émetteur OIDC"
+                  value={form.issuer}
+                  onChange={(event) =>
+                    setForm({ ...form, issuer: event.target.value })
+                  }
+                  helperText={
+                    form.oidcProvider === "MICROSOFT_ENTRA"
+                      ? "Remplacez les zéros par l’identifiant UUID du tenant Entra ID."
+                      : "Émetteur officiel Google, sans chemin supplémentaire."
+                  }
+                />
+              </Stack>
             )}
             <Button
               type="submit"
@@ -432,7 +516,9 @@ export function IntegrationSettingsPage() {
             >
               {form.type === "DIRECTORY"
                 ? "Enregistrer le diagnostic"
-                : "Créer la clé API"}
+                : form.type === "OIDC_DIAGNOSTIC"
+                  ? "Vérifier la découverte OIDC"
+                  : "Créer la clé API"}
             </Button>
           </Stack>
         </CardContent>
@@ -504,6 +590,14 @@ export function IntegrationSettingsPage() {
           }
         >
           {directoryResult}
+        </Alert>
+      )}
+
+      {oidcResult && (
+        <Alert severity="success">
+          Découverte OIDC validée pour {oidcResult.issuer}. Authorization Code :
+          oui · PKCE S256 annoncé : {oidcResult.pkceS256 ? "oui" : "non"} ·
+          signatures : {oidcResult.signingAlgorithms.join(", ")}.
         </Alert>
       )}
 

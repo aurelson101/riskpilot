@@ -684,12 +684,16 @@ const pairs: Array<[fr: string, en: string]> = [
     "Sending only: SMTP, Gmail API, or Microsoft Graph. OIDC SSO is configured separately under Identity and integrations.",
   ],
   [
-    "Cette connexion OAuth sert uniquement à envoyer des emails, pas à connecter les utilisateurs. Créez une application Web et déclarez exactement cette URI de redirection :",
-    "This OAuth connection is only used to send email, not to sign users in. Create a web application and declare this exact redirect URI:",
+    "Cette connexion OAuth sert uniquement à envoyer des emails, pas à connecter les utilisateurs. Créez une application Web et déclarez exactement cette URI de redirection. RiskPilot protège automatiquement le flux avec PKCE S256 :",
+    "This OAuth connection is only used to send email, not to sign users in. Create a web application and declare this exact redirect URI. RiskPilot automatically protects the flow with PKCE S256:",
   ],
   [
-    "Microsoft Graph requiert les permissions déléguées openid, email, offline_access, User.Read et Mail.Send. Un consentement administrateur peut être nécessaire.",
-    "Microsoft Graph requires the delegated permissions openid, email, offline_access, User.Read, and Mail.Send. Administrator consent may be required.",
+    "Activez l’API Gmail et autorisez uniquement openid, email et gmail.send. Le mode hors ligne permet de renouveler l’accès sans redemander une connexion à chaque notification.",
+    "Enable the Gmail API and allow only openid, email, and gmail.send. Offline access renews access without requesting sign-in for every notification.",
+  ],
+  [
+    "Enregistrez une plateforme Web. Microsoft Graph utilise les permissions déléguées openid, email, offline_access, User.Read et Mail.Send. Un consentement administrateur peut être nécessaire selon la politique du tenant.",
+    "Register a Web platform. Microsoft Graph uses the delegated permissions openid, email, offline_access, User.Read, and Mail.Send. Administrator consent may be required by tenant policy.",
   ],
   [
     "Identifiant du tenant, domaine vérifié ou organizations pour le multitenant professionnel.",
@@ -752,25 +756,36 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Configurer", "Configure"],
   [
-    "Les configurations SSO OIDC/SAML et SCIM sont masquées tant que le parcours complet de connexion ou de provisioning n’est pas disponible.",
-    "OIDC/SAML SSO and SCIM configurations remain hidden until the complete sign-in or provisioning workflow is available.",
+    "La découverte OIDC Google/Entra peut être vérifiée ici. L’activation du SSO OIDC/SAML et du provisioning SCIM reste masquée tant que le parcours complet de connexion n’est pas disponible.",
+    "Google/Entra OIDC discovery can be checked here. OIDC/SAML SSO and SCIM provisioning remain hidden until the complete sign-in workflow is available.",
   ],
-  ["Nouvel accès technique", "New technical access"],
+  ["Nouvel accès ou diagnostic", "New access or diagnostic"],
   [
-    "Créez une clé API ou vérifiez un annuaire Microsoft AD sécurisé par LDAPS.",
-    "Create an API key or verify a Microsoft AD directory secured with LDAPS.",
+    "Créez une clé API, vérifiez un annuaire LDAPS ou la découverte OIDC d’un fournisseur d’identité.",
+    "Create an API key, verify an LDAPS directory, or check identity-provider OIDC discovery.",
   ],
   ["Accès API RiskPilot", "RiskPilot API access"],
   [
     "Diagnostic annuaire Microsoft AD (LDAPS)",
     "Microsoft AD directory diagnostic (LDAPS)",
   ],
+  ["Diagnostic SSO — découverte OIDC", "SSO diagnostic — OIDC discovery"],
   ["Groupe Microsoft AD", "Microsoft AD group"],
   ["Droits accordés", "Granted permissions"],
   [
     "Ce diagnostic vérifie le chiffrement, le bind et la recherche. Il n’active pas la connexion des utilisateurs.",
     "This diagnostic checks encryption, bind, and search. It does not enable user sign-in.",
   ],
+  [
+    "Ce diagnostic contrôle la découverte, le flux Authorization Code et les algorithmes de signature. Il n’active pas la connexion des utilisateurs et ne demande aucun secret.",
+    "This diagnostic checks discovery, the Authorization Code flow, and signing algorithms. It does not enable user sign-in or request any secret.",
+  ],
+  ["Découverte OIDC validée pour", "OIDC discovery validated for"],
+  [
+    ". Authorization Code : oui · PKCE S256 annoncé :",
+    ". Authorization Code: yes · PKCE S256 advertised:",
+  ],
+  ["· signatures :", "· signatures:"],
   ["Gestionnaire des risques", "Risk manager"],
   ["Accès configurés", "Configured access"],
   ["Aucun accès technique configuré.", "No technical access configured."],

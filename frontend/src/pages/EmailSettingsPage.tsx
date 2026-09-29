@@ -266,14 +266,23 @@ export function EmailSettingsPage() {
                 <Alert severity="info">
                   Cette connexion OAuth sert uniquement à envoyer des emails,
                   pas à connecter les utilisateurs. Créez une application Web et
-                  déclarez exactement cette URI de redirection :<br />
+                  déclarez exactement cette URI de redirection. RiskPilot
+                  protège automatiquement le flux avec PKCE S256 :<br />
                   <strong>{callback}</strong>
                 </Alert>
+                {form.provider === "GOOGLE_WORKSPACE" && (
+                  <Alert severity="info">
+                    Activez l’API Gmail et autorisez uniquement openid, email et
+                    gmail.send. Le mode hors ligne permet de renouveler l’accès
+                    sans redemander une connexion à chaque notification.
+                  </Alert>
+                )}
                 {form.provider === "MICROSOFT_365" && (
                   <Alert severity="info">
-                    Microsoft Graph requiert les permissions déléguées openid,
-                    email, offline_access, User.Read et Mail.Send. Un
-                    consentement administrateur peut être nécessaire.
+                    Enregistrez une plateforme Web. Microsoft Graph utilise les
+                    permissions déléguées openid, email, offline_access,
+                    User.Read et Mail.Send. Un consentement administrateur peut
+                    être nécessaire selon la politique du tenant.
                   </Alert>
                 )}
                 <TextField

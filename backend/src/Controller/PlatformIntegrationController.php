@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Application\CurrentUser;
 use App\Application\DirectoryConnectionTester;
+use App\Application\OidcDiscoveryValidator;
 use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
@@ -17,8 +18,20 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/v1/integrations')] final readonly class PlatformIntegrationController
 {
-    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager, private SecretCipher $cipher, private DirectoryConnectionTester $directoryTester)
+    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager, private SecretCipher $cipher, private DirectoryConnectionTester $directoryTester, private OidcDiscoveryValidator $oidcDiscoveryValidator)
     {
+    }
+
+    #[Route('/oidc-discovery-test', methods: ['POST'])]
+    public function oidcDiscoveryTest(Request $request): JsonResponse
+    {
+        $this->admin();
+        $data = $request->toArray();
+        try {
+            return new JsonResponse($this->oidcDiscoveryValidator->validate((string) ($data['provider'] ?? ''), (string) ($data['issuer'] ?? '')));
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['code' => 'OIDC_DISCOVERY_TEST_FAILED', 'message' => $e->getMessage(), 'validated' => false], 422);
+        }
     }
 
     #[Route('', methods: ['GET'])]
