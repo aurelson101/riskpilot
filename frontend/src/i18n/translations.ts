@@ -785,6 +785,10 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Risques PDF", "Risks PDF"],
   ["Actions PDF", "Actions PDF"],
+  [
+    "L’export de conformité n’a pas pu être généré.",
+    "The compliance export could not be generated.",
+  ],
   ["Espace de travail Google — OAuth 2.0", "Google Workspace — OAuth 2.0"],
   ["Exercice", "Exercise"],
   ["exercice(s) · prochain :", "exercise(s) · next:"],

@@ -27,7 +27,7 @@ import {
   InputLabel,
   TextField,
 } from "@mui/material";
-import { Add, SmartToyOutlined } from "@mui/icons-material";
+import { Add, DownloadOutlined, SmartToyOutlined } from "@mui/icons-material";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   PolarAngleAxis,
@@ -39,6 +39,7 @@ import {
   Tooltip,
 } from "recharts";
 import { api } from "../api/client";
+import { downloadApiFile } from "../api/download";
 import type {
   ComplianceAssessment,
   ComplianceResult,
@@ -99,6 +100,8 @@ export function CompliancePage() {
     null,
   );
   const [guidedResultId, setGuidedResultId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [exportError, setExportError] = useState(false);
   const client = useQueryClient();
   const [assessmentDialog, setAssessmentDialog] = useState(false);
   const [copilotResult, setCopilotResult] = useState<ComplianceResult | null>(
@@ -218,6 +221,21 @@ export function CompliancePage() {
   const selectedAssessmentRecord = assessments.data?.find(
     (assessment) => assessment.id === selectedAssessment,
   );
+  const exportAssessment = async (format: "csv" | "xlsx" | "pdf") => {
+    if (selectedAssessment === null) return;
+    setExporting(format);
+    setExportError(false);
+    try {
+      await downloadApiFile(
+        `/exports/compliance/${selectedAssessment}.${format}`,
+        `conformite-${selectedAssessment}.${format}`,
+      );
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(null);
+    }
+  };
   const canEditSelected = Boolean(
     selectedAssessmentRecord &&
     (canAssess || selectedAssessmentRecord.assessor.id === user?.id),
@@ -445,36 +463,69 @@ export function CompliancePage() {
                       </Typography>
                     </Box>
                     {selectedAssessmentRecord && (
-                      <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel id="assessment-status-label">
-                          État de l’évaluation
-                        </InputLabel>
-                        <Select
-                          labelId="assessment-status-label"
-                          label="État de l’évaluation"
-                          value={selectedAssessmentRecord.status}
-                          disabled={
-                            !canEditSelected || updateAssessmentStatus.isPending
-                          }
-                          onChange={(event) =>
-                            updateAssessmentStatus.mutate({
-                              assessment: selectedAssessmentRecord,
-                              status: event.target
-                                .value as ComplianceAssessment["status"],
-                            })
-                          }
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1}
+                        alignItems={{ md: "center" }}
+                      >
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          flexWrap="wrap"
+                          useFlexGap
                         >
-                          {Object.entries(assessmentStatusLabels).map(
-                            ([status, label]) => (
-                              <MenuItem key={status} value={status}>
-                                {label}
-                              </MenuItem>
-                            ),
-                          )}
-                        </Select>
-                      </FormControl>
+                          {(["csv", "xlsx", "pdf"] as const).map((format) => (
+                            <Button
+                              key={format}
+                              size="small"
+                              variant="outlined"
+                              startIcon={<DownloadOutlined />}
+                              disabled={exporting !== null}
+                              onClick={() => void exportAssessment(format)}
+                            >
+                              {format === "xlsx"
+                                ? "Excel"
+                                : format.toUpperCase()}
+                            </Button>
+                          ))}
+                        </Stack>
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                          <InputLabel id="assessment-status-label">
+                            État de l’évaluation
+                          </InputLabel>
+                          <Select
+                            labelId="assessment-status-label"
+                            label="État de l’évaluation"
+                            value={selectedAssessmentRecord.status}
+                            disabled={
+                              !canEditSelected ||
+                              updateAssessmentStatus.isPending
+                            }
+                            onChange={(event) =>
+                              updateAssessmentStatus.mutate({
+                                assessment: selectedAssessmentRecord,
+                                status: event.target
+                                  .value as ComplianceAssessment["status"],
+                              })
+                            }
+                          >
+                            {Object.entries(assessmentStatusLabels).map(
+                              ([status, label]) => (
+                                <MenuItem key={status} value={status}>
+                                  {label}
+                                </MenuItem>
+                              ),
+                            )}
+                          </Select>
+                        </FormControl>
+                      </Stack>
                     )}
                   </Stack>
+                  {exportError && (
+                    <Alert severity="error">
+                      L’export de conformité n’a pas pu être généré.
+                    </Alert>
+                  )}
                   {updateAssessmentStatus.isError && (
                     <Alert severity="error">
                       Le changement d’état de l’évaluation a échoué.
