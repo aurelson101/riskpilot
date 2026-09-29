@@ -252,8 +252,8 @@ export function IntegrationSettingsPage() {
             <div>
               <Typography variant="h6">Nouvel accès technique</Typography>
               <Typography color="text.secondary">
-                Créez une clé API ou vérifiez une connexion Active Directory en
-                LDAPS.
+                Créez une clé API ou vérifiez un annuaire Microsoft AD sécurisé
+                par LDAPS.
               </Typography>
             </div>
             <TextField
@@ -269,7 +269,7 @@ export function IntegrationSettingsPage() {
             >
               <MenuItem value="API_KEY">Accès API RiskPilot</MenuItem>
               <MenuItem value="DIRECTORY">
-                Diagnostic Active Directory (LDAPS)
+                Diagnostic annuaire Microsoft AD (LDAPS)
               </MenuItem>
             </TextField>
             <TextField
@@ -389,7 +389,7 @@ export function IntegrationSettingsPage() {
                   <TextField
                     required
                     fullWidth
-                    label="Groupe Active Directory"
+                    label="Groupe Microsoft AD"
                     value={form.groupDn}
                     onChange={(event) =>
                       setForm({ ...form, groupDn: event.target.value })

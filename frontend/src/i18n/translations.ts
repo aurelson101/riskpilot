@@ -757,14 +757,15 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Nouvel accès technique", "New technical access"],
   [
-    "Créez une clé API ou vérifiez une connexion Active Directory en LDAPS.",
-    "Create an API key or verify an Active Directory connection over LDAPS.",
+    "Créez une clé API ou vérifiez un annuaire Microsoft AD sécurisé par LDAPS.",
+    "Create an API key or verify a Microsoft AD directory secured with LDAPS.",
   ],
   ["Accès API RiskPilot", "RiskPilot API access"],
   [
-    "Diagnostic Active Directory (LDAPS)",
-    "Active Directory diagnostic (LDAPS)",
+    "Diagnostic annuaire Microsoft AD (LDAPS)",
+    "Microsoft AD directory diagnostic (LDAPS)",
   ],
+  ["Groupe Microsoft AD", "Microsoft AD group"],
   ["Droits accordés", "Granted permissions"],
   [
     "Ce diagnostic vérifie le chiffrement, le bind et la recherche. Il n’active pas la connexion des utilisateurs.",
