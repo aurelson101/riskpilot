@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\DirectoryConnectionTester;
 use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use App\Security\SecretCipher;
-use App\Application\DirectoryConnectionTester;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -34,15 +34,23 @@ use Symfony\Component\Routing\Attribute\Route;
     {
         $actor = $this->admin();
         $data = $request->toArray();
+        $type = strtoupper(trim((string) ($data['type'] ?? '')));
+        if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR'], true)) {
+            return $this->invalid('Cette intégration n’est pas encore raccordée à un parcours complet et ne peut pas être activée.');
+        }
         try {
-            $item = new PlatformIntegration($actor->getOrganization(), (string) ($data['type'] ?? ''), (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), (array) ($data['configuration'] ?? []), (bool) ($data['enabled'] ?? false));
+            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), (array) ($data['configuration'] ?? []), (bool) ($data['enabled'] ?? false));
             $plainSecret = null;
             if (in_array($item->getType(), ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
                 $item->setCredential($plainSecret);
             }
             if ('DIRECTORY' === $item->getType()) {
-                $password = (string) ($data['credential'] ?? ''); if ('' === $password) throw new \InvalidArgumentException('Le mot de passe de bind est obligatoire.'); $item->setEncryptedCredential($this->cipher->encrypt($password));
+                $password = (string) ($data['credential'] ?? '');
+                if ('' === $password) {
+                    throw new \InvalidArgumentException('Le mot de passe de bind est obligatoire.');
+                }
+                $item->setEncryptedCredential($this->cipher->encrypt($password));
             }
             $this->entityManager->persist($item);
             $this->entityManager->flush();
@@ -56,10 +64,20 @@ use Symfony\Component\Routing\Attribute\Route;
     #[Route('/{id}/directory-test', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function directoryTest(int $id): JsonResponse
     {
-        $actor = $this->admin(); $item = $this->repository->find($id);
-        if (!$item instanceof PlatformIntegration || $item->getOrganization() !== $actor->getOrganization() || 'DIRECTORY' !== $item->getType()) return $this->notFound();
-        try { $result = $this->directoryTester->test($item); $item->markUsed(); $this->entityManager->flush(); return new JsonResponse($result); }
-        catch (\RuntimeException $e) { return new JsonResponse(['code' => 'DIRECTORY_TEST_FAILED', 'message' => $e->getMessage(), 'validated' => false], 422); }
+        $actor = $this->admin();
+        $item = $this->repository->find($id);
+        if (!$item instanceof PlatformIntegration || $item->getOrganization() !== $actor->getOrganization() || 'DIRECTORY' !== $item->getType()) {
+            return $this->notFound();
+        }
+        try {
+            $result = $this->directoryTester->test($item);
+            $item->markUsed();
+            $this->entityManager->flush();
+
+            return new JsonResponse($result);
+        } catch (\RuntimeException $e) {
+            return new JsonResponse(['code' => 'DIRECTORY_TEST_FAILED', 'message' => $e->getMessage(), 'validated' => false], 422);
+        }
     }
 
     #[Route('/{id}', requirements: ['id' => '\\d+'], methods: ['PUT'])]

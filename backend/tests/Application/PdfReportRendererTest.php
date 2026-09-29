@@ -59,4 +59,27 @@ final class PdfReportRendererTest extends TestCase
         self::assertStringContainsString('/Subject', $first);
         self::assertStringContainsString('/Keywords', $first);
     }
+
+    public function testDetailedExportKeepsEveryFieldAndEveryRecord(): void
+    {
+        $renderer = new PdfReportRenderer();
+        $method = new \ReflectionMethod($renderer, 'dataExportDocument');
+        $html = $method->invoke($renderer, 'Registre des risques', [
+            'organization' => 'Example Ltd',
+            'generatedAt' => '2026-09-29T10:00:00+00:00',
+            'generatedBy' => 'Risk Manager',
+            'rows' => [
+                ['ID', 'Scénario', 'Description', 'Score résiduel'],
+                [1, 'Rançongiciel', 'Interruption des opérations', 12],
+                [2, 'Fuite de données', null, 8],
+            ],
+        ], 'fr');
+
+        self::assertIsString($html);
+        self::assertStringContainsString('2</strong> enregistrement(s) exporté(s)', $html);
+        self::assertStringContainsString('Rançongiciel', $html);
+        self::assertStringContainsString('Fuite de données', $html);
+        self::assertStringContainsString('Score résiduel', $html);
+        self::assertStringContainsString('Non renseigné', $html);
+    }
 }

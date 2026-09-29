@@ -5,16 +5,19 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   FormControlLabel,
+  FormGroup,
   MenuItem,
   Stack,
   Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { AiCopilotSettingsPanel } from "../components/AiCopilotSettingsPanel";
 
 type Integration = {
   id: number;
@@ -26,12 +29,34 @@ type Integration = {
   credentialConfigured?: boolean;
   enabled: boolean;
 };
-const initial = {
-  type: "OIDC",
-  provider: "GOOGLE_WORKSPACE",
+type IntegrationType = "API_KEY" | "DIRECTORY";
+type EmailSummary = {
+  provider: string;
+  enabled: boolean;
+  ready: boolean;
+  oauthConnected: boolean;
+  connectedEmail: string | null;
+};
+type Form = {
+  type: IntegrationType;
+  name: string;
+  scopes: string[];
+  host: string;
+  port: string;
+  baseDn: string;
+  bindDn: string;
+  credential: string;
+  userFilter: string;
+  groupDn: string;
+  groupRole: string;
+  caCertificate: string;
+  enabled: boolean;
+};
+
+const initial: Form = {
+  type: "API_KEY",
   name: "",
-  issuer: "",
-  scopes: "risks:read",
+  scopes: ["risks:read"],
   host: "ldaps://",
   port: "636",
   baseDn: "",
@@ -43,88 +68,76 @@ const initial = {
   caCertificate: "",
   enabled: false,
 };
-const integrationTypes = [
-  { value: "OIDC", label: "Préparation SSO — OpenID Connect (OIDC)" },
-  { value: "SAML", label: "Préparation SSO — SAML 2.0" },
-  { value: "DIRECTORY", label: "Annuaire — Active Directory LDAPS" },
-  { value: "SCIM", label: "Provisioning — SCIM" },
-  { value: "API_KEY", label: "Automatisation — Clé API" },
-  { value: "WEBHOOK", label: "Automatisation — Webhook" },
+const scopes = [
+  ["risks:read", "Lire les risques"],
+  ["controls:read", "Lire les mesures de sécurité"],
+  ["actions:read", "Lire les plans d’action"],
+  ["events:write", "Écrire des événements"],
 ] as const;
-const providersByType: Record<
-  string,
-  Array<{ value: string; label: string }>
-> = {
-  OIDC: [
-    { value: "GOOGLE_WORKSPACE", label: "Google Workspace" },
-    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
-    { value: "GENERIC", label: "OIDC générique" },
-  ],
-  SAML: [
-    { value: "GOOGLE_WORKSPACE", label: "Google Workspace" },
-    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
-    { value: "GENERIC", label: "SAML générique" },
-  ],
-  DIRECTORY: [{ value: "ACTIVE_DIRECTORY", label: "Active Directory" }],
-  SCIM: [
-    { value: "MICROSOFT_ENTRA", label: "Microsoft Entra ID" },
-    { value: "GENERIC", label: "SCIM générique" },
-  ],
-  API_KEY: [{ value: "GENERIC", label: "API RiskPilot" }],
-  WEBHOOK: [{ value: "GENERIC", label: "Webhook HTTPS" }],
+const emailProviders: Record<string, string> = {
+  SMTP2GO: "SMTP2GO",
+  GOOGLE_WORKSPACE: "API Gmail",
+  MICROSOFT_365: "Microsoft Graph",
+  CUSTOM: "SMTP personnalisé",
+};
+const typeLabels: Record<string, string> = {
+  API_KEY: "Accès API",
+  DIRECTORY: "Diagnostic LDAPS",
+  OIDC: "Configuration OIDC",
+  SAML: "Configuration SAML",
+  SCIM: "Configuration SCIM",
+  WEBHOOK: "Configuration webhook",
+  CONNECTOR: "Connecteur métier",
 };
 
+function errorMessage(error: unknown): string {
+  return axios.isAxiosError<{ message?: string }>(error)
+    ? (error.response?.data?.message ?? "L’opération a échoué.")
+    : "L’opération a échoué.";
+}
+
 export function IntegrationSettingsPage() {
+  const navigate = useNavigate();
   const cache = useQueryClient();
-  const query = useQuery({
+  const integrations = useQuery({
     queryKey: ["platform-integrations"],
     queryFn: async () =>
       (await api.get<{ items: Integration[] }>("/v1/integrations")).data.items,
   });
-  const [form, setForm] = useState(initial);
+  const email = useQuery({
+    queryKey: ["email-settings"],
+    queryFn: async () => (await api.get<EmailSummary>("/settings/email")).data,
+  });
+  const [form, setForm] = useState<Form>(initial);
   const [secret, setSecret] = useState<string | null>(null);
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
-  const isSsoDraft = form.type === "OIDC" || form.type === "SAML";
+  const [operationError, setOperationError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: async () => {
-      const configuration =
-        form.type === "API_KEY"
-          ? {
-              scopes: form.scopes
-                .split(",")
-                .map((value) => value.trim())
-                .filter(Boolean),
-            }
-          : form.type === "WEBHOOK"
-            ? { url: form.issuer, events: ["risk.updated", "action.overdue"] }
-            : form.type === "DIRECTORY"
-              ? {
-                  host: form.host,
-                  port: Number(form.port),
-                  baseDn: form.baseDn,
-                  bindDn: form.bindDn,
-                  userFilter: form.userFilter,
-                  groupMappings: { [form.groupDn]: form.groupRole },
-                  ...(form.caCertificate.trim()
-                    ? { caCertificate: form.caCertificate }
-                    : {}),
-                }
-              : {
-                  issuer: form.issuer,
-                  groupRoleMappings: { "riskpilot-admins": "ROLE_ADMIN" },
-                };
+      const directory = form.type === "DIRECTORY";
+      const configuration = directory
+        ? {
+            host: form.host,
+            port: Number(form.port),
+            baseDn: form.baseDn,
+            bindDn: form.bindDn,
+            userFilter: form.userFilter,
+            groupMappings: { [form.groupDn]: form.groupRole },
+            ...(form.caCertificate.trim()
+              ? { caCertificate: form.caCertificate }
+              : {}),
+          }
+        : { scopes: form.scopes };
       return (
         await api.post<Integration & { secret: string | null }>(
           "/v1/integrations",
           {
             type: form.type,
-            provider: form.provider,
+            provider: directory ? "ACTIVE_DIRECTORY" : "GENERIC",
             name: form.name,
             configuration,
-            ...(form.type === "DIRECTORY"
-              ? { credential: form.credential }
-              : {}),
-            enabled: isSsoDraft ? false : form.enabled,
+            ...(directory ? { credential: form.credential } : {}),
+            enabled: directory ? false : form.enabled,
           },
         )
       ).data;
@@ -132,129 +145,234 @@ export function IntegrationSettingsPage() {
     onSuccess: async (data) => {
       setSecret(data.secret);
       setForm(initial);
+      setOperationError(null);
       await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
     },
+    onError: (error) => setOperationError(errorMessage(error)),
   });
+  const supported = integrations.data?.filter((item) =>
+    ["API_KEY", "DIRECTORY"].includes(item.type),
+  );
+  const legacy = integrations.data?.filter(
+    (item) => !["API_KEY", "DIRECTORY", "CONNECTOR"].includes(item.type),
+  );
+
   function submit(event: FormEvent) {
     event.preventDefault();
+    setSecret(null);
+    setOperationError(null);
     create.mutate();
   }
+
+  async function remove(item: Integration) {
+    if (!window.confirm(`Supprimer « ${item.name} » ?`)) return;
+    try {
+      await api.delete(`/v1/integrations/${item.id}`);
+      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
+  }
+
+  async function toggle(item: Integration) {
+    try {
+      await api.put(`/v1/integrations/${item.id}`, {
+        name: item.name,
+        configuration: item.configuration,
+        enabled: !item.enabled,
+      });
+      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
+  }
+
   return (
-    <Stack spacing={2}>
+    <Stack spacing={3} maxWidth={1000}>
       <div>
-        <Typography variant="h5" fontWeight={700}>
-          Identité et intégrations
+        <Typography variant="h4" fontWeight={750}>
+          Intégrations
         </Typography>
         <Typography color="text.secondary">
-          Authentification SSO, provisioning des identités et automatisations
-          techniques. La messagerie SMTP, Gmail et Microsoft Graph reste dans
-          Paramètres de messagerie.
+          Configurez chaque service dans son espace, avec ses propres droits et
+          secrets.
         </Typography>
       </div>
-      <AiCopilotSettingsPanel />
-      <Alert severity="info">
-        OIDC et SAML servent uniquement à connecter les utilisateurs. OAuth
-        Gmail et Microsoft Graph servent uniquement à envoyer les emails : les
-        secrets, permissions et callbacks ne sont pas interchangeables.
-      </Alert>
+      {operationError && <Alert severity="error">{operationError}</Alert>}
       {secret && (
         <Alert severity="warning">
-          Copiez ce secret maintenant, il ne sera plus affiché :{" "}
+          Copiez cette clé maintenant, elle ne sera plus affichée :{" "}
           <strong>{secret}</strong>
         </Alert>
       )}
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ sm: "center" }}
+            spacing={2}
+          >
+            <div style={{ flex: 1 }}>
+              <Typography variant="h6">Messagerie</Typography>
+              <Typography color="text.secondary">
+                SMTP, API Gmail ou Microsoft Graph pour les notifications.
+              </Typography>
+            </div>
+            {email.data && (
+              <Chip
+                color={
+                  email.data.ready && email.data.enabled ? "success" : "default"
+                }
+                label={`${emailProviders[email.data.provider] ?? email.data.provider} · ${
+                  email.data.ready && email.data.enabled
+                    ? "opérationnel"
+                    : "à configurer"
+                }`}
+              />
+            )}
+            <Button
+              variant="outlined"
+              onClick={() => navigate("/administration/email-settings")}
+            >
+              Configurer
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Alert severity="info">
+        Les configurations SSO OIDC/SAML et SCIM sont masquées tant que le
+        parcours complet de connexion ou de provisioning n’est pas disponible.
+      </Alert>
+
       <Card>
         <CardContent component="form" onSubmit={submit}>
           <Stack spacing={2}>
-            <Typography variant="h6">Nouvelle intégration</Typography>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-              <TextField
-                select
-                label="Type"
-                value={form.type}
-                onChange={(e) => {
-                  const type = e.target.value;
-                  setForm({
-                    ...form,
-                    type,
-                    provider: providersByType[type][0].value,
-                    enabled: ["OIDC", "SAML"].includes(type)
-                      ? false
-                      : form.enabled,
-                  });
-                }}
-                fullWidth
-              >
-                {integrationTypes.map((item) => (
-                  <MenuItem key={item.value} value={item.value}>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Fournisseur"
-                value={form.provider}
-                onChange={(e) => setForm({ ...form, provider: e.target.value })}
-                fullWidth
-              >
-                {providersByType[form.type].map((item) => (
-                  <MenuItem key={item.value} value={item.value}>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Stack>
+            <div>
+              <Typography variant="h6">Nouvel accès technique</Typography>
+              <Typography color="text.secondary">
+                Créez une clé API ou vérifiez une connexion Active Directory en
+                LDAPS.
+              </Typography>
+            </div>
+            <TextField
+              select
+              label="Usage"
+              value={form.type}
+              onChange={(event) =>
+                setForm({
+                  ...initial,
+                  type: event.target.value as IntegrationType,
+                })
+              }
+            >
+              <MenuItem value="API_KEY">Accès API RiskPilot</MenuItem>
+              <MenuItem value="DIRECTORY">
+                Diagnostic Active Directory (LDAPS)
+              </MenuItem>
+            </TextField>
             <TextField
               required
-              label="Nom"
+              label={
+                form.type === "DIRECTORY"
+                  ? "Nom de l’annuaire"
+                  : "Nom de l’application"
+              }
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
             />
-            {(form.type === "OIDC" || form.type === "SAML") && (
-              <Alert severity="warning">
-                Cette fiche prépare le fournisseur SSO, mais la connexion OIDC
-                ou SAML n’est pas encore raccordée à l’écran de connexion. Elle
-                reste inactive et ne configure ni Microsoft Graph ni l’envoi
-                d’email.
-              </Alert>
-            )}
-            {form.type === "DIRECTORY" ? (
+            {form.type === "API_KEY" ? (
+              <>
+                <Typography fontWeight={700}>Droits accordés</Typography>
+                <FormGroup>
+                  {scopes.map(([value, label]) => (
+                    <FormControlLabel
+                      key={value}
+                      control={
+                        <Checkbox
+                          checked={form.scopes.includes(value)}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              scopes: event.target.checked
+                                ? [...form.scopes, value]
+                                : form.scopes.filter(
+                                    (scope) => scope !== value,
+                                  ),
+                            })
+                          }
+                        />
+                      }
+                      label={label}
+                    />
+                  ))}
+                </FormGroup>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.enabled}
+                      onChange={(event) =>
+                        setForm({ ...form, enabled: event.target.checked })
+                      }
+                    />
+                  }
+                  label="Activer la clé dès sa création"
+                />
+              </>
+            ) : (
               <Stack spacing={2}>
-                <TextField
-                  required
-                  label="Hôte LDAPS"
-                  value={form.host}
-                  onChange={(e) => setForm({ ...form, host: e.target.value })}
-                  helperText="Format obligatoire : ldaps://ad.exemple.fr"
-                />
-                <TextField
-                  required
-                  label="Port"
-                  type="number"
-                  value={form.port}
-                  onChange={(e) => setForm({ ...form, port: e.target.value })}
-                  helperText="636 uniquement"
-                />
+                <Alert severity="info">
+                  Ce diagnostic vérifie le chiffrement, le bind et la recherche.
+                  Il n’active pas la connexion des utilisateurs.
+                </Alert>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Serveur LDAPS"
+                    value={form.host}
+                    onChange={(event) =>
+                      setForm({ ...form, host: event.target.value })
+                    }
+                    helperText="Exemple : ldaps://ad.example.com"
+                  />
+                  <TextField
+                    required
+                    label="Port"
+                    type="number"
+                    value={form.port}
+                    onChange={(event) =>
+                      setForm({ ...form, port: event.target.value })
+                    }
+                    inputProps={{ min: 636, max: 636 }}
+                  />
+                </Stack>
                 <TextField
                   required
                   label="Base DN"
                   value={form.baseDn}
-                  onChange={(e) => setForm({ ...form, baseDn: e.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, baseDn: event.target.value })
+                  }
                 />
                 <TextField
                   required
                   label="Bind DN"
                   value={form.bindDn}
-                  onChange={(e) => setForm({ ...form, bindDn: e.target.value })}
+                  onChange={(event) =>
+                    setForm({ ...form, bindDn: event.target.value })
+                  }
                 />
                 <TextField
                   required
                   type="password"
                   label="Mot de passe du compte de service"
                   value={form.credential}
-                  onChange={(e) =>
-                    setForm({ ...form, credential: e.target.value })
+                  onChange={(event) =>
+                    setForm({ ...form, credential: event.target.value })
                   }
                   autoComplete="new-password"
                 />
@@ -262,19 +380,19 @@ export function IntegrationSettingsPage() {
                   required
                   label="Filtre utilisateur"
                   value={form.userFilter}
-                  onChange={(e) =>
-                    setForm({ ...form, userFilter: e.target.value })
+                  onChange={(event) =>
+                    setForm({ ...form, userFilter: event.target.value })
                   }
-                  helperText="Doit contenir {username}"
+                  helperText="Le filtre doit contenir {username}."
                 />
-                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     required
                     fullWidth
-                    label="DN du groupe AD"
+                    label="Groupe Active Directory"
                     value={form.groupDn}
-                    onChange={(e) =>
-                      setForm({ ...form, groupDn: e.target.value })
+                    onChange={(event) =>
+                      setForm({ ...form, groupDn: event.target.value })
                     }
                   />
                   <TextField
@@ -282,108 +400,74 @@ export function IntegrationSettingsPage() {
                     fullWidth
                     label="Rôle RiskPilot"
                     value={form.groupRole}
-                    onChange={(e) =>
-                      setForm({ ...form, groupRole: e.target.value })
+                    onChange={(event) =>
+                      setForm({ ...form, groupRole: event.target.value })
                     }
                   >
-                    {["ROLE_VIEWER", "ROLE_RISK_MANAGER", "ROLE_ADMIN"].map(
-                      (role) => (
-                        <MenuItem key={role} value={role}>
-                          {role}
-                        </MenuItem>
-                      ),
-                    )}
+                    <MenuItem value="ROLE_VIEWER">Lecteur</MenuItem>
+                    <MenuItem value="ROLE_RISK_MANAGER">
+                      Gestionnaire des risques
+                    </MenuItem>
+                    <MenuItem value="ROLE_ADMIN">Administrateur</MenuItem>
                   </TextField>
                 </Stack>
                 <TextField
                   multiline
                   minRows={4}
-                  label="CA PEM (recommandée)"
+                  label="Autorité de certification PEM (facultatif)"
                   value={form.caCertificate}
-                  onChange={(e) =>
-                    setForm({ ...form, caCertificate: e.target.value })
+                  onChange={(event) =>
+                    setForm({ ...form, caCertificate: event.target.value })
                   }
-                  helperText="La validation TLS est explicitement attestée lorsque la CA est fournie."
                 />
               </Stack>
-            ) : form.type === "API_KEY" ? (
-              <TextField
-                label="Portées (séparées par des virgules)"
-                value={form.scopes}
-                onChange={(e) => setForm({ ...form, scopes: e.target.value })}
-                helperText="risks:read, controls:read, actions:read, events:write, scim:write"
-              />
-            ) : (
-              form.type !== "SCIM" && (
-                <TextField
-                  required
-                  label={
-                    form.type === "WEBHOOK"
-                      ? "URL HTTPS"
-                      : "Issuer / Metadata URL"
-                  }
-                  value={form.issuer}
-                  onChange={(e) => setForm({ ...form, issuer: e.target.value })}
-                />
-              )
             )}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.enabled}
-                  disabled={isSsoDraft}
-                  onChange={(e) =>
-                    setForm({ ...form, enabled: e.target.checked })
-                  }
-                />
-              }
-              label={
-                isSsoDraft
-                  ? "Activation disponible après raccordement du SSO"
-                  : "Activer après enregistrement"
-              }
-            />
             <Button
               type="submit"
               variant="contained"
-              disabled={create.isPending}
+              disabled={
+                create.isPending ||
+                (form.type === "API_KEY" && form.scopes.length === 0)
+              }
             >
-              Créer
+              {form.type === "DIRECTORY"
+                ? "Enregistrer le diagnostic"
+                : "Créer la clé API"}
             </Button>
           </Stack>
         </CardContent>
       </Card>
+
       <Stack spacing={1}>
-        {query.data?.map((item) => (
-          <Card key={item.id}>
+        <Typography variant="h6">Accès configurés</Typography>
+        {supported?.length === 0 && (
+          <Alert severity="info">Aucun accès technique configuré.</Alert>
+        )}
+        {supported?.map((item) => (
+          <Card key={item.id} variant="outlined">
             <CardContent>
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1}
                 alignItems={{ sm: "center" }}
               >
-                <Typography fontWeight={700} flex={1}>
-                  {item.name}
-                </Typography>
-                <Chip label={item.type} />
-                <Chip
-                  color={
-                    !["OIDC", "SAML"].includes(item.type) && item.enabled
-                      ? "success"
-                      : "default"
-                  }
-                  label={
-                    ["OIDC", "SAML"].includes(item.type)
-                      ? "Configuration préparatoire"
-                      : item.enabled
-                        ? "Actif"
-                        : "Inactif"
-                  }
-                />
-                {item.credentialPrefix && (
-                  <Typography variant="body2">
-                    {item.credentialPrefix}…
+                <div style={{ flex: 1 }}>
+                  <Typography fontWeight={700}>{item.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {typeLabels[item.type] ?? item.type}
+                    {item.credentialPrefix
+                      ? ` · ${item.credentialPrefix}…`
+                      : ""}
                   </Typography>
+                </div>
+                <Chip
+                  color={item.enabled ? "success" : "default"}
+                  label={item.enabled ? "Actif" : "Inactif"}
+                />
+                {item.type === "API_KEY" && (
+                  <Button onClick={() => toggle(item)}>
+                    {item.enabled ? "Désactiver" : "Activer"}
+                  </Button>
                 )}
                 {item.type === "DIRECTORY" && (
                   <Button
@@ -396,25 +480,15 @@ export function IntegrationSettingsPage() {
                         setDirectoryResult(
                           `LDAPS validé — ${response.data.matchedEntries} entrée(s) trouvée(s).`,
                         );
-                      } catch {
-                        setDirectoryResult(
-                          "Échec de validation LDAPS. Vérifiez la CA, le bind, le filtre et le réseau.",
-                        );
+                      } catch (error) {
+                        setDirectoryResult(errorMessage(error));
                       }
                     }}
                   >
                     Tester LDAPS
                   </Button>
                 )}
-                <Button
-                  color="error"
-                  onClick={async () => {
-                    await api.delete(`/v1/integrations/${item.id}`);
-                    await cache.invalidateQueries({
-                      queryKey: ["platform-integrations"],
-                    });
-                  }}
-                >
+                <Button color="error" onClick={() => remove(item)}>
                   Supprimer
                 </Button>
               </Stack>
@@ -422,6 +496,7 @@ export function IntegrationSettingsPage() {
           </Card>
         ))}
       </Stack>
+
       {directoryResult && (
         <Alert
           severity={
@@ -430,6 +505,38 @@ export function IntegrationSettingsPage() {
         >
           {directoryResult}
         </Alert>
+      )}
+
+      {legacy && legacy.length > 0 && (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={1}>
+              <Typography variant="h6">
+                Configurations non raccordées
+              </Typography>
+              <Typography color="text.secondary">
+                Ces anciennes fiches restent visibles pour pouvoir être
+                supprimées, mais elles ne sont pas présentées comme
+                opérationnelles.
+              </Typography>
+              {legacy.map((item) => (
+                <Stack
+                  key={item.id}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ sm: "center" }}
+                >
+                  <Typography flex={1}>{item.name}</Typography>
+                  <Chip label={typeLabels[item.type] ?? item.type} />
+                  <Chip label="Non raccordé" />
+                  <Button color="error" onClick={() => remove(item)}>
+                    Supprimer
+                  </Button>
+                </Stack>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
       )}
     </Stack>
   );

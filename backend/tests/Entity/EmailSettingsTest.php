@@ -27,4 +27,17 @@ final class EmailSettingsTest extends TestCase
         self::assertNull($settings->getEncryptedOauthClientSecret());
         self::assertNull($settings->getOauthClientId());
     }
+
+    public function testUpdatingOauthPresentationKeepsTheConnectedMailbox(): void
+    {
+        $settings = new EmailSettings(new Organization('Test'));
+        $settings->configureOauth('MICROSOFT_365', 'client-id', 'encrypted-secret', 'organizations', 'RiskPilot', null);
+        $settings->connectOauth('encrypted-access', 'encrypted-refresh', new \DateTimeImmutable('+1 hour'), 'sender@example.test');
+
+        $settings->configureOauth('MICROSOFT_365', 'client-id', null, 'organizations', 'RiskPilot GRC', 'reply@example.test');
+
+        self::assertSame('encrypted-refresh', $settings->getEncryptedRefreshToken());
+        self::assertSame('sender@example.test', $settings->getConnectedEmail());
+        self::assertTrue($settings->isEnabled());
+    }
 }

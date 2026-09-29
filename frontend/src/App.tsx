@@ -151,6 +151,11 @@ const EmailSettingsPage = lazy(() =>
     default: module.EmailSettingsPage,
   })),
 );
+const AiSettingsPage = lazy(() =>
+  import("./pages/AiSettingsPage").then((module) => ({
+    default: module.AiSettingsPage,
+  })),
+);
 const IsmsDocumentsPage = lazy(() =>
   import("./pages/IsmsDocumentsPage").then((module) => ({
     default: module.IsmsDocumentsPage,
@@ -366,7 +371,8 @@ function Layout() {
     "/administration/organizations": "Organisations",
     "/administration/audit-logs": "Journal d’audit",
     "/administration/email-settings": "Paramètres email",
-    "/administration/integrations": "Identité et intégrations",
+    "/administration/integrations": "Intégrations",
+    "/administration/ai-settings": "Intelligence artificielle",
     "/administration/action-fields": "Colonnes des actions",
     "/administration/rbac": "Rôles et permissions",
   };
@@ -758,8 +764,16 @@ function Layout() {
             <NavItem
               nested
               path="/administration/integrations"
-              label="Identité et intégrations"
+              label="Intégrations"
               icon={<AccountTreeOutlined fontSize="small" />}
+            />
+          )}
+          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/ai-settings"
+              label="Intelligence artificielle"
+              icon={<SmartToyOutlined fontSize="small" />}
             />
           )}
           {isAdmin && (
@@ -1088,6 +1102,14 @@ export default function App() {
                   element={
                     <RoleRoute allowedRoles={adminRoles}>
                       <IntegrationSettingsPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="administration/ai-settings"
+                  element={
+                    <RoleRoute allowedRoles={adminRoles}>
+                      <AiSettingsPage />
                     </RoleRoute>
                   }
                 />

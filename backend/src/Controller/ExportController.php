@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\PdfReportRenderer;
 use App\Application\XlsxExporter;
 use App\Repository\ActionPlanRepository;
 use App\Repository\ComplianceAssessmentRepository;
@@ -34,10 +35,11 @@ final readonly class ExportController
         private ComplianceAssessmentRepository $assessments,
         private ComplianceResultRepository $results,
         private XlsxExporter $xlsxExporter,
+        private PdfReportRenderer $pdfExporter,
     ) {
     }
 
-    #[Route('/risks.{format<csv|xlsx>}', methods: ['GET'])]
+    #[Route('/risks.{format<csv|xlsx|pdf>}', methods: ['GET'])]
     public function risks(string $format): Response
     {
         $rows = [[
@@ -64,7 +66,7 @@ final readonly class ExportController
         return $this->export($format, 'Registre des risques', 'registre-risques', $rows);
     }
 
-    #[Route('/actions.{format<csv|xlsx>}', methods: ['GET'])]
+    #[Route('/actions.{format<csv|xlsx|pdf>}', methods: ['GET'])]
     public function actions(string $format): Response
     {
         $rows = [[
@@ -91,7 +93,7 @@ final readonly class ExportController
         return $this->export($format, 'Plans d’action', 'plans-actions', $rows);
     }
 
-    #[Route('/compliance/{id<\d+>}.{format<csv|xlsx>}', methods: ['GET'])]
+    #[Route('/compliance/{id<\d+>}.{format<csv|xlsx|pdf>}', methods: ['GET'])]
     public function compliance(int $id, string $format): Response
     {
         $assessment = $this->assessments->findOneVisibleTo($id, $this->currentUser->get());
@@ -118,6 +120,29 @@ final readonly class ExportController
     /** @param list<list<int|float|string|null>> $rows */
     private function export(string $format, string $title, string $prefix, array $rows): Response
     {
+        if ('pdf' === $format) {
+            $actor = $this->currentUser->get();
+            $content = $this->pdfExporter->renderDataExport(
+                $title,
+                $actor->getOrganization()->getName(),
+                $rows,
+                $actor->getLocale(),
+                trim($actor->getFirstName().' '.$actor->getLastName()),
+            );
+            $hash = hash('sha256', $content);
+
+            return new Response($content, Response::HTTP_OK, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="'.$this->filename($prefix, 'pdf').'"',
+                'Content-Length' => (string) strlen($content),
+                'Content-Language' => $actor->getLocale(),
+                'Cache-Control' => 'private, no-store',
+                'Digest' => 'sha-256='.base64_encode(hex2bin($hash)),
+                'ETag' => '"'.$hash.'"',
+                'X-Content-Type-Options' => 'nosniff',
+                'X-RiskPilot-Document-SHA256' => $hash,
+            ]);
+        }
         if ('xlsx' === $format) {
             $content = $this->xlsxExporter->render($title, $this->currentUser->get()->getOrganization()->getName(), $rows);
 

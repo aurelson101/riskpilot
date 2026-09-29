@@ -531,6 +531,12 @@ final class TenantIsolationTest extends WebTestCase
         self::assertStringContainsString('Vraisemblance résiduelle', $content);
         self::assertStringContainsString('Risque A', $content);
         self::assertStringNotContainsString('Risque B', $content);
+
+        $this->client->request('GET', '/api/exports/risks.pdf');
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'application/pdf');
+        self::assertStringContainsString('organisation-a-registre-risques-', (string) $this->client->getResponse()->headers->get('content-disposition'));
+        self::assertStringStartsWith('%PDF-', (string) $this->client->getResponse()->getContent());
     }
 
     public function testActionExportsSupportActionsWithoutRiskAndProvideStyledExcel(): void

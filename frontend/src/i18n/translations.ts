@@ -732,6 +732,58 @@ const pairs: Array<[fr: string, en: string]> = [
     "Activation available after SSO is connected",
   ],
   ["Configuration préparatoire", "Setup only"],
+  ["Intégrations", "Integrations"],
+  ["Intelligence artificielle", "Artificial intelligence"],
+  [
+    "Fournisseur, modèle, clé et règles d’utilisation du copilote.",
+    "Provider, model, key, and copilot usage rules.",
+  ],
+  [
+    "Configurez chaque service dans son espace, avec ses propres droits et secrets.",
+    "Configure each service in its own area, with separate permissions and secrets.",
+  ],
+  [
+    "Copiez cette clé maintenant, elle ne sera plus affichée :",
+    "Copy this key now; it will not be shown again:",
+  ],
+  [
+    "SMTP, API Gmail ou Microsoft Graph pour les notifications.",
+    "SMTP, Gmail API, or Microsoft Graph for notifications.",
+  ],
+  ["Configurer", "Configure"],
+  [
+    "Les configurations SSO OIDC/SAML et SCIM sont masquées tant que le parcours complet de connexion ou de provisioning n’est pas disponible.",
+    "OIDC/SAML SSO and SCIM configurations remain hidden until the complete sign-in or provisioning workflow is available.",
+  ],
+  ["Nouvel accès technique", "New technical access"],
+  [
+    "Créez une clé API ou vérifiez une connexion Active Directory en LDAPS.",
+    "Create an API key or verify an Active Directory connection over LDAPS.",
+  ],
+  ["Accès API RiskPilot", "RiskPilot API access"],
+  [
+    "Diagnostic Active Directory (LDAPS)",
+    "Active Directory diagnostic (LDAPS)",
+  ],
+  ["Droits accordés", "Granted permissions"],
+  [
+    "Ce diagnostic vérifie le chiffrement, le bind et la recherche. Il n’active pas la connexion des utilisateurs.",
+    "This diagnostic checks encryption, bind, and search. It does not enable user sign-in.",
+  ],
+  ["Gestionnaire des risques", "Risk manager"],
+  ["Accès configurés", "Configured access"],
+  ["Aucun accès technique configuré.", "No technical access configured."],
+  ["Configurations non raccordées", "Unconnected configurations"],
+  [
+    "Ces anciennes fiches restent visibles pour pouvoir être supprimées, mais elles ne sont pas présentées comme opérationnelles.",
+    "These legacy records remain visible so they can be deleted, but they are not presented as operational.",
+  ],
+  [
+    "Excel propose un classeur mis en forme, filtrable et prêt à présenter. CSV conserve un format brut interopérable. PDF crée un dossier complet et paginé.",
+    "Excel provides a formatted, filterable workbook ready to present. CSV preserves a raw interoperable format. PDF creates a complete paginated file.",
+  ],
+  ["Risques PDF", "Risks PDF"],
+  ["Actions PDF", "Actions PDF"],
   ["Espace de travail Google — OAuth 2.0", "Google Workspace — OAuth 2.0"],
   ["Exercice", "Exercise"],
   ["exercice(s) · prochain :", "exercise(s) · next:"],

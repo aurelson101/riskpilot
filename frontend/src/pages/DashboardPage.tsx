@@ -68,7 +68,7 @@ export function DashboardPage() {
   ).map(([name, value]) => ({ name: levelLabels[name], value, level: name }));
   const download = async (
     resource: "risks" | "actions",
-    format: "csv" | "xlsx",
+    format: "csv" | "xlsx" | "pdf",
   ) => {
     const key = `${resource}-${format}`;
     setExporting(key);
@@ -140,10 +140,16 @@ export function DashboardPage() {
               <Typography fontWeight={750}>Exports détaillés</Typography>
               <Typography variant="body2" color="text.secondary">
                 Excel propose un classeur mis en forme, filtrable et prêt à
-                présenter. CSV conserve un format brut interopérable.
+                présenter. CSV conserve un format brut interopérable. PDF crée
+                un dossier complet et paginé.
               </Typography>
             </Box>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              flexWrap="wrap"
+              useFlexGap
+            >
               <Button
                 disabled={exporting !== null}
                 onClick={() => void download("risks", "csv")}
@@ -155,6 +161,18 @@ export function DashboardPage() {
                 onClick={() => void download("actions", "csv")}
               >
                 Actions CSV
+              </Button>
+              <Button
+                disabled={exporting !== null}
+                onClick={() => void download("risks", "pdf")}
+              >
+                Risques PDF
+              </Button>
+              <Button
+                disabled={exporting !== null}
+                onClick={() => void download("actions", "pdf")}
+              >
+                Actions PDF
               </Button>
             </Stack>
           </Stack>

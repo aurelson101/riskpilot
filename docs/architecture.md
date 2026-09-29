@@ -230,7 +230,7 @@ Le service `scheduler` exécute les maintenances périodiques, notamment l’exp
 
 ## Identité, API et intégrations
 
-`PlatformIntegration` isole chaque configuration par organisation et couvre OIDC, SAML, SCIM, clés de service et webhooks. Les clés sont préfixées pour une recherche indexable puis vérifiées par comparaison d’empreinte SHA-256 ; le secret en clair n’est retourné qu’une fois. Les webhooks utilisent une signature HMAC `sha256=HMAC_SHA256(timestamp.payload, SHA256(secret))`. L’API d’administration est versionnée sous `/api/v1/integrations`, applique le rôle administrateur et masque les identifiants appartenant à un autre tenant par une réponse 404. L’endpoint de service `/api/v1/service/status` valide la clé et expose seulement l’organisation et les portées associées.
+`PlatformIntegration` isole chaque configuration par organisation. La création exposée est limitée aux clés de service, diagnostics LDAPS et connecteurs métier effectivement raccordés ; les anciens enregistrements OIDC, SAML, SCIM ou webhook restent seulement listables et supprimables pour assurer la compatibilité. Les clés sont préfixées pour une recherche indexable puis vérifiées par comparaison d’empreinte SHA-256 ; le secret en clair n’est retourné qu’une fois. L’API d’administration est versionnée sous `/api/v1/integrations`, applique le rôle administrateur et masque les identifiants appartenant à un autre tenant par une réponse 404. L’endpoint de service `/api/v1/service/status` valide la clé et expose seulement l’organisation et les portées associées.
 
 ## Variables et secrets structurants
 

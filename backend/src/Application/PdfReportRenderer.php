@@ -31,6 +31,24 @@ final class PdfReportRenderer
         return $this->renderDocument($title, $this->executiveDocument($title, $data, $locale), $data, 'EXECUTIVE');
     }
 
+    /**
+     * @param list<list<int|float|string|null>> $rows
+     */
+    public function renderDataExport(string $title, string $organization, array $rows, string $locale = 'fr', ?string $generatedBy = null): string
+    {
+        if ([] === $rows) {
+            throw new \InvalidArgumentException('A PDF export requires a header row.');
+        }
+        $data = [
+            'organization' => $organization,
+            'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'generatedBy' => $generatedBy,
+            'rows' => $rows,
+        ];
+
+        return $this->renderDocument($title, $this->dataExportDocument($title, $data, $locale), $data, 'EXPORT');
+    }
+
     /** @param array<string, mixed> $data */
     private function renderDocument(string $title, string $html, array $data, string $type): string
     {
@@ -239,6 +257,46 @@ final class PdfReportRenderer
             '<div class="keep"><h2>5. '.$this->t('Conformité par référentiel', 'Compliance by framework', $locale).'</h2>'.$this->decisionTable([$this->t('Référentiel', 'Framework', $locale), $this->t('Score', 'Score', $locale)], $complianceRows, $this->t('Aucune évaluation de conformité.', 'No compliance assessment.', $locale)).'</div>'.
             '<div class="notice">'.$this->t('Ce document restitue les données visibles par l’utilisateur authentifié au moment de l’export. Il ne constitue pas une certification et doit être validé avant diffusion.', 'This document reflects data visible to the authenticated user at export time. It is not a certification and must be reviewed before distribution.', $locale).'</div>'.
             $this->footer($this->t('Rapport exécutif gouverné', 'Governed executive report', $locale), $organization, $documentId).'</body></html>';
+    }
+
+    /** @param array<string, mixed> $data */
+    private function dataExportDocument(string $title, array $data, string $locale): string
+    {
+        $locale = 'en' === $locale ? 'en' : 'fr';
+        $organization = (string) ($data['organization'] ?? $this->t('Organisation non renseignée', 'Organization not provided', $locale));
+        $rows = (array) ($data['rows'] ?? []);
+        $headers = array_map('strval', (array) array_shift($rows));
+        $documentId = $this->documentId('EXPORT', $data);
+        $records = '';
+        foreach ($rows as $index => $rawRow) {
+            $row = array_values((array) $rawRow);
+            $recordTitle = trim((string) ($row[1] ?? $row[0] ?? ''));
+            $recordTitle = '' === $recordTitle ? $this->t('Enregistrement', 'Record', $locale).' '.($index + 1) : $recordTitle;
+            $details = '';
+            for ($column = 0; $column < count($headers); $column += 2) {
+                $details .= '<tr>';
+                foreach ([$column, $column + 1] as $field) {
+                    if (!array_key_exists($field, $headers)) {
+                        $details .= '<th class="field-label"></th><td></td>';
+                        continue;
+                    }
+                    $value = trim((string) ($row[$field] ?? ''));
+                    $details .= '<th class="field-label">'.$this->escape($headers[$field]).'</th><td>'.('' === $value ? '<span class="empty">'.$this->t('Non renseigné', 'Not provided', $locale).'</span>' : nl2br($this->escape($value))).'</td>';
+                }
+                $details .= '</tr>';
+            }
+            $records .= '<section class="record"><h2>'.($index + 1).'. '.$this->escape($recordTitle).'</h2><table class="details"><tbody>'.$details.'</tbody></table></section>';
+        }
+        $count = count($rows);
+        $css = $this->sharedCss().'.record{page-break-before:always}.record h2{margin-top:0}.details{font-size:8px}.details .field-label{width:18%;background:#eaf5fb}.details td{width:32%}.export-summary{margin-top:18px}.export-summary strong{font-size:18px;color:#0369a1}';
+
+        return '<!doctype html><html lang="'.$locale.'"><head><meta charset="UTF-8"><title>'.$this->escape($title).'</title><style>'.$css.'</style></head><body>'.
+            $this->brandHeader($title, $organization, $documentId, $this->t('CONFIDENTIEL', 'CONFIDENTIAL', $locale), $this->t('Export complet', 'Complete export', $locale)).
+            '<div class="meta">'.$this->t('Généré le', 'Generated on', $locale).' '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''), $locale)).('' !== trim((string) ($data['generatedBy'] ?? '')) ? ' '.$this->t('par', 'by', $locale).' '.$this->escape((string) $data['generatedBy']) : '').'</div></header>'.
+            '<div class="export-summary"><strong>'.$count.'</strong> '.$this->t('enregistrement(s) exporté(s)', 'exported record(s)', $locale).'</div>'.
+            '<div class="notice">'.$this->t('Ce document contient tous les champs et tous les enregistrements visibles par l’utilisateur au moment de l’export. Les valeurs non renseignées sont signalées explicitement.', 'This document contains every field and every record visible to the user at export time. Missing values are explicitly identified.', $locale).'</div>'.
+            ('' === $records ? '<p class="empty">'.$this->t('Aucun enregistrement à exporter.', 'No record to export.', $locale).'</p>' : $records).
+            $this->footer($this->t('Export détaillé', 'Detailed export', $locale), $organization, $documentId).'</body></html>';
     }
 
     private function sharedCss(): string
