@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -127,7 +127,12 @@ export function IntegrationSettingsPage() {
   });
   const [form, setForm] = useState<Form>(initial);
   const [secret, setSecret] = useState<string | null>(null);
+  const [secretIntegrationId, setSecretIntegrationId] = useState<number | null>(
+    null,
+  );
   const [secretCopied, setSecretCopied] = useState(false);
+  const [operationPending, setOperationPending] = useState(false);
+  const operationLock = useRef(false);
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
   const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -175,6 +180,7 @@ export function IntegrationSettingsPage() {
     },
     onSuccess: async (data) => {
       setSecret(data.created?.secret ?? null);
+      setSecretIntegrationId(data.created?.id ?? null);
       setSecretCopied(false);
       setOidcResult(data.oidc ?? null);
       if (data.created) setForm(initial);
@@ -192,6 +198,7 @@ export function IntegrationSettingsPage() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (create.isPending || operationLock.current) return;
     setSecret(null);
     setOidcResult(null);
     setOperationError(null);
@@ -200,50 +207,56 @@ export function IntegrationSettingsPage() {
 
   async function remove(item: Integration) {
     if (!window.confirm(`Supprimer « ${item.name} » ?`)) return;
-    try {
+    await runOperation(async () => {
       await api.delete(`/v1/integrations/${item.id}`);
-      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
-    } catch (error) {
-      setOperationError(errorMessage(error));
-    }
+      if (secretIntegrationId === item.id) setSecret(null);
+    });
   }
 
   async function toggle(item: Integration) {
-    try {
+    await runOperation(async () => {
       await api.put(`/v1/integrations/${item.id}`, {
         name: item.name,
         configuration: item.configuration,
         enabled: !item.enabled,
       });
-      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
-    } catch (error) {
-      setOperationError(errorMessage(error));
-    }
+    });
   }
 
   async function rotate(item: Integration) {
     if (!window.confirm(`Renouveler « ${item.name} » pour 90 jours ?`)) return;
-    try {
+    await runOperation(async () => {
       const response = await api.post<Integration & { secret: string }>(
         `/v1/integrations/${item.id}/rotate`,
         { expiresInDays: 90 },
       );
       setSecret(response.data.secret);
+      setSecretIntegrationId(item.id);
       setSecretCopied(false);
-      setOperationError(null);
-      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
-    } catch (error) {
-      setOperationError(errorMessage(error));
-    }
+    });
   }
 
   async function revoke(item: Integration) {
     if (!window.confirm(`Révoquer immédiatement « ${item.name} » ?`)) return;
-    try {
+    await runOperation(async () => {
       await api.post(`/v1/integrations/${item.id}/revoke`);
+      if (secretIntegrationId === item.id) setSecret(null);
+    });
+  }
+
+  async function runOperation(operation: () => Promise<void>) {
+    if (operationLock.current || create.isPending) return;
+    operationLock.current = true;
+    setOperationPending(true);
+    setOperationError(null);
+    try {
+      await operation();
       await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
     } catch (error) {
       setOperationError(errorMessage(error));
+    } finally {
+      operationLock.current = false;
+      setOperationPending(false);
     }
   }
 
@@ -271,8 +284,15 @@ export function IntegrationSettingsPage() {
                 size="small"
                 variant="outlined"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(secret);
-                  setSecretCopied(true);
+                  try {
+                    await navigator.clipboard.writeText(secret);
+                    setSecretCopied(true);
+                  } catch {
+                    setSecretCopied(false);
+                    setOperationError(
+                      "La copie automatique est indisponible. Sélectionnez et copiez la clé affichée.",
+                    );
+                  }
                 }}
               >
                 {secretCopied ? "Clé copiée" : "Copier la clé"}
@@ -585,6 +605,7 @@ export function IntegrationSettingsPage() {
               variant="contained"
               disabled={
                 create.isPending ||
+                operationPending ||
                 (form.type === "API_KEY" && form.scopes.length === 0)
               }
             >
@@ -607,11 +628,12 @@ export function IntegrationSettingsPage() {
           <Card key={item.id} variant="outlined">
             <CardContent>
               <Stack
-                direction={{ xs: "column", sm: "row" }}
+                direction={{ xs: "column", md: "row" }}
                 spacing={1}
-                alignItems={{ sm: "center" }}
+                alignItems={{ md: "center" }}
+                sx={{ flexWrap: "wrap", overflowWrap: "anywhere" }}
               >
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <Typography fontWeight={700}>{item.name}</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {typeLabels[item.type] ?? item.type}
@@ -656,16 +678,28 @@ export function IntegrationSettingsPage() {
                   <>
                     <Button
                       disabled={
-                        !item.enabled &&
-                        (!item.credentialConfigured || item.credentialExpired)
+                        operationPending ||
+                        create.isPending ||
+                        (!item.enabled &&
+                          (!item.credentialConfigured ||
+                            item.credentialExpired))
                       }
                       onClick={() => toggle(item)}
                     >
                       {item.enabled ? "Désactiver" : "Activer"}
                     </Button>
-                    <Button onClick={() => rotate(item)}>Renouveler</Button>
+                    <Button
+                      disabled={operationPending || create.isPending}
+                      onClick={() => rotate(item)}
+                    >
+                      Renouveler
+                    </Button>
                     {item.credentialConfigured && (
-                      <Button color="error" onClick={() => revoke(item)}>
+                      <Button
+                        disabled={operationPending || create.isPending}
+                        color="error"
+                        onClick={() => revoke(item)}
+                      >
                         Révoquer
                       </Button>
                     )}
@@ -673,24 +707,27 @@ export function IntegrationSettingsPage() {
                 )}
                 {item.type === "DIRECTORY" && (
                   <Button
+                    disabled={operationPending || create.isPending}
                     onClick={async () => {
                       setDirectoryResult(null);
-                      try {
+                      await runOperation(async () => {
                         const response = await api.post<{
                           matchedEntries: number;
                         }>(`/v1/integrations/${item.id}/directory-test`);
                         setDirectoryResult(
                           `LDAPS validé — ${response.data.matchedEntries} entrée(s) trouvée(s).`,
                         );
-                      } catch (error) {
-                        setDirectoryResult(errorMessage(error));
-                      }
+                      });
                     }}
                   >
                     Tester LDAPS
                   </Button>
                 )}
-                <Button color="error" onClick={() => remove(item)}>
+                <Button
+                  disabled={operationPending || create.isPending}
+                  color="error"
+                  onClick={() => remove(item)}
+                >
                   Supprimer
                 </Button>
               </Stack>

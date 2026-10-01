@@ -112,9 +112,11 @@ final readonly class ServiceApiController
             $requestId = bin2hex(random_bytes(16));
         }
         $request->attributes->set('_service_request_id', $requestId);
-        $plain = trim((string) $request->headers->get('X-RiskPilot-Key', ''));
-        $prefix = substr($plain, 0, 12);
-        $limiter = $this->serviceApiLimiter->create(hash('sha256', $prefix.'|'.($request->getClientIp() ?? 'unknown')))->consume();
+        $plain = (string) $request->headers->get('X-RiskPilot-Key', '');
+        $validInput = '' !== $plain && 256 >= strlen($plain) && 1 === preg_match('/^[A-Za-z0-9_-]+$/D', $plain);
+        $item = $validInput ? $this->repository->findApiKey(hash('sha256', $plain)) : null;
+        $limiterId = $item instanceof PlatformIntegration ? 'key:'.$item->getId() : 'invalid:'.($request->getClientIp() ?? 'unknown');
+        $limiter = $this->serviceApiLimiter->create(hash('sha256', $limiterId))->consume();
         $request->attributes->set('_service_rate_limit', $limiter->getLimit());
         $request->attributes->set('_service_rate_remaining', $limiter->getRemainingTokens());
         if (!$limiter->isAccepted()) {
@@ -125,7 +127,6 @@ final readonly class ServiceApiController
             return $response;
         }
 
-        $item = '' === $plain ? null : $this->repository->findApiKey($prefix);
         if (!$item instanceof PlatformIntegration || !$item->verifies($plain)) {
             return $this->error($request, 'INVALID_SERVICE_KEY', 'Clé de service invalide.', 401);
         }
@@ -157,10 +158,14 @@ final readonly class ServiceApiController
         $updatedSince = null;
         if ('' !== $raw) {
             try {
-                if (64 < strlen($raw) || 1 !== preg_match('/(?:Z|[+-]\d{2}:\d{2})$/', $raw)) {
+                if (1 !== preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/D', $raw)) {
                     throw new \Exception();
                 }
                 $updatedSince = new \DateTimeImmutable($raw);
+                $errors = \DateTimeImmutable::getLastErrors();
+                if (false !== $errors && (0 < $errors['warning_count'] || 0 < $errors['error_count'])) {
+                    throw new \Exception();
+                }
             } catch (\Exception) {
                 return $this->error($request, 'INVALID_FILTER', 'updatedSince doit être une date ISO 8601 avec fuseau horaire.', 422);
             }

@@ -66,4 +66,15 @@ final class PlatformIntegrationConnectorTest extends TestCase
         self::assertFalse($key->isCredentialConfigured());
         self::assertFalse($key->verifies('rp_api_key_rotated'));
     }
+
+    public function testExpirationCannotBeRemovedThroughAnOrdinaryUpdate(): void
+    {
+        $key = new PlatformIntegration(new Organization('Primary'), 'API_KEY', 'GENERIC', 'SIEM', [
+            'scopes' => ['risks:read'],
+            'expiresAt' => (new \DateTimeImmutable('+30 days'))->format(DATE_ATOM),
+        ]);
+        $key->setCredential('rp_api_key_original');
+        $this->expectException(\InvalidArgumentException::class);
+        $key->update('SIEM', ['scopes' => ['risks:read']], true);
+    }
 }

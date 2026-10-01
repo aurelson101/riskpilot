@@ -49,8 +49,14 @@ final class ActionPlanRepository extends ServiceEntityRepository
     private function serviceQuery(Organization $organization, ?string $status, ?\DateTimeImmutable $updatedSince): \Doctrine\ORM\QueryBuilder
     {
         $query = $this->createQueryBuilder('a')->andWhere('a.organization = :organization')->setParameter('organization', $organization);
-        if (null !== $status) {
+        if ('OVERDUE' === $status) {
+            $query->andWhere('a.status NOT IN (:closedStatuses)')->setParameter('closedStatuses', ['COMPLETED', 'CANCELLED'])
+                ->andWhere('a.dueDate < :today')->setParameter('today', new \DateTimeImmutable('today'));
+        } elseif (null !== $status) {
             $query->andWhere('a.status = :status')->setParameter('status', $status);
+            if (!in_array($status, ['COMPLETED', 'CANCELLED'], true)) {
+                $query->andWhere('a.dueDate >= :today')->setParameter('today', new \DateTimeImmutable('today'));
+            }
         }
         if (null !== $updatedSince) {
             $query->andWhere('a.updatedAt >= :updatedSince')->setParameter('updatedSince', $updatedSince);

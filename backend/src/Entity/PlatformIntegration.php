@@ -205,6 +205,9 @@ class PlatformIntegration
     /** @param array<string, mixed> $configuration */
     public function update(string $name, array $configuration, bool $enabled): void
     {
+        if ('API_KEY' === $this->type && ($configuration['expiresAt'] ?? null) !== ($this->configuration['expiresAt'] ?? null)) {
+            throw new \InvalidArgumentException('Utilisez la rotation pour modifier la validité de la clé API.');
+        }
         if ('' === trim($name)) {
             throw new \InvalidArgumentException('Le nom est obligatoire.');
         }

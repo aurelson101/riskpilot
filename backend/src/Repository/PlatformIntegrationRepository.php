@@ -23,8 +23,8 @@ final class PlatformIntegrationRepository extends ServiceEntityRepository
         return $this->findBy(['organization' => $organization], ['type' => 'ASC', 'name' => 'ASC']);
     }
 
-    public function findApiKey(string $prefix): ?PlatformIntegration
+    public function findApiKey(string $secretHash): ?PlatformIntegration
     {
-        return $this->findOneBy(['type' => 'API_KEY', 'credentialPrefix' => $prefix, 'enabled' => true]);
+        return $this->findOneBy(['type' => 'API_KEY', 'secretHash' => $secretHash, 'enabled' => true]);
     }
 }

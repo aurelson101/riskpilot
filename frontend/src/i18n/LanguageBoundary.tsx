@@ -18,6 +18,8 @@ function replacePhrase(value: string, source: string, target: string) {
 }
 
 function translateValue(value: string, locale: Locale): string {
+  const nativeDictionary = locale === "en" ? enToFr : frToEn;
+  if (nativeDictionary.has(value)) return value;
   const dictionary = locale === "en" ? frToEn : enToFr;
   const exact = dictionary.get(value);
   if (exact) return exact;

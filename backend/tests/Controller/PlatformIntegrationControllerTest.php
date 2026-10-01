@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\ActionPlan;
 use App\Entity\Organization;
 use App\Entity\PlatformIntegration;
 use App\Entity\SecurityControl;
@@ -35,6 +36,17 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $secondControl = (new SecurityControl('Control from another tenant', 'Identity', $second))->setOwner($other);
         $manager->persist($firstControl);
         $manager->persist($secondControl);
+        $collisionSecrets = ['rp_api_key_a'.str_repeat('1', 48), 'rp_api_key_a'.str_repeat('2', 48)];
+        foreach ([$first, $second] as $index => $organization) {
+            $key = new PlatformIntegration($organization, 'API_KEY', 'GENERIC', 'Collision test', ['scopes' => ['controls:read']], true);
+            $key->setCredential($collisionSecrets[$index]);
+            $manager->persist($key);
+        }
+        foreach (['Past open' => ['OPEN', '-2 days'], 'Past completed' => ['COMPLETED', '-2 days'], 'Future open' => ['OPEN', '+2 days']] as $title => [$status, $due]) {
+            $action = new ActionPlan($title, $first, null, $admin, new \DateTimeImmutable($due));
+            $action->setStatus($status);
+            $manager->persist($action);
+        }
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
@@ -55,8 +67,17 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
         self::assertSame('INSUFFICIENT_SCOPE', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
 
+        foreach ($collisionSecrets as $index => $key) {
+            $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $key);
+            $client->request('GET', '/api/v1/service/controls');
+            self::assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertSame(0 === $index ? 'MFA administration' : 'Control from another tenant', $result['items'][0]['name']);
+            self::assertSame((int) $client->getResponse()->headers->get('X-RateLimit-Limit') - 1, (int) $client->getResponse()->headers->get('X-RateLimit-Remaining'));
+        }
+
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
-        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'API_KEY', 'provider' => 'GENERIC', 'name' => 'Control reader', 'configuration' => ['scopes' => ['controls:read']], 'enabled' => true]);
+        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'API_KEY', 'provider' => 'GENERIC', 'name' => 'Control reader', 'configuration' => ['scopes' => ['controls:read', 'actions:read']], 'enabled' => true]);
         self::assertResponseStatusCodeSame(201);
         $reader = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $reader['secret']);
@@ -75,6 +96,22 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         self::assertSame(1, $controls['pagination']['total']);
         self::assertNull($controls['pagination']['nextOffset']);
         self::assertSame('IMPLEMENTED', $controls['filters']['status']);
+
+        foreach (['OVERDUE' => 'Past open', 'OPEN' => 'Future open', 'COMPLETED' => 'Past completed'] as $status => $title) {
+            $client->request('GET', '/api/v1/service/actions?status='.$status.'&updatedSince=2020-01-01T00:00:00Z');
+            self::assertResponseIsSuccessful();
+            $result = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertCount(1, $result['items']);
+            self::assertSame($title, $result['items'][0]['title']);
+            self::assertSame($status, $result['items'][0]['status']);
+            self::assertSame(1, $result['pagination']['total']);
+        }
+        foreach (['tomorrowZ', '2026-02-30T00:00:00Z', '2026-01-01T25:00:00Z', '2026-01-01T00:00:00'] as $date) {
+            $client->request('GET', '/api/v1/service/actions?updatedSince='.rawurlencode($date));
+            self::assertResponseStatusCodeSame(422);
+        }
+        $client->jsonRequest('PUT', '/api/v1/integrations/'.$reader['id'], ['configuration' => ['scopes' => ['controls:read'], 'expiresAt' => '2099-01-01T00:00:00+00:00']]);
+        self::assertResponseStatusCodeSame(422);
 
         $client->request('GET', '/api/v1/service/controls?updatedSince=2026-01-01T00:00:00Z');
         self::assertResponseStatusCodeSame(422);
@@ -117,6 +154,21 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $client->request('GET', '/api/v1/service/actions');
         self::assertResponseStatusCodeSame(401);
         self::assertSame('INVALID_SERVICE_KEY', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
+        foreach ([str_repeat('a', 257), 'bad key', "rp_api_key_bad\tkey"] as $badKey) {
+            $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $badKey);
+            $client->request('GET', '/api/v1/service/status');
+            self::assertResponseStatusCodeSame(401);
+        }
+        $invalidLimit = (int) $client->getResponse()->headers->get('X-RateLimit-Limit');
+        for ($attempt = 0; $attempt < $invalidLimit; ++$attempt) {
+            $client->setServerParameter('HTTP_X_RISKPILOT_KEY', 'invalid-key-'.$attempt);
+            $client->request('GET', '/api/v1/service/status');
+        }
+        self::assertResponseStatusCodeSame(429);
+        self::assertNotNull($client->getResponse()->headers->get('Retry-After'));
+        $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $created['secret']);
+        $client->request('GET', '/api/v1/service/status');
+        self::assertResponseIsSuccessful();
 
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'CONNECTOR', 'provider' => 'JIRA', 'name' => 'Jira actions', 'configuration' => ['baseUrl' => 'https://jira.example.test', 'direction' => 'BIDIRECTIONAL', 'conflictStrategy' => 'MANUAL', 'fieldOwnership' => ['status' => 'JIRA']], 'enabled' => true]);
