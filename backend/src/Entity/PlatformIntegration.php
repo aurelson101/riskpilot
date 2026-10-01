@@ -145,9 +145,15 @@ class PlatformIntegration
         return hash_hmac('sha256', $timestamp.'.'.$payload, $this->secretHash);
     }
 
-    public function markUsed(): void
+    public function markUsed(): bool
     {
-        $this->lastUsedAt = new \DateTimeImmutable();
+        $now = new \DateTimeImmutable();
+        if (null !== $this->lastUsedAt && $this->lastUsedAt > $now->modify('-5 minutes')) {
+            return false;
+        }
+        $this->lastUsedAt = $now;
+
+        return true;
     }
 
     /** @param array<string, mixed> $configuration */

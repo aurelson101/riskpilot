@@ -766,6 +766,10 @@ const pairs: Array<[fr: string, en: string]> = [
   ],
   ["Accès API RiskPilot", "RiskPilot API access"],
   [
+    "Les droits sélectionnés limitent aussi les endpoints : /api/v1/service/risks, /controls et /actions. La clé doit être envoyée dans l’en-tête X-RiskPilot-Key et n’est affichée qu’une seule fois.",
+    "The selected permissions also restrict the endpoints: /api/v1/service/risks, /controls, and /actions. Send the key in the X-RiskPilot-Key header; it is displayed only once.",
+  ],
+  [
     "Diagnostic annuaire Microsoft AD (LDAPS)",
     "Microsoft AD directory diagnostic (LDAPS)",
   ],

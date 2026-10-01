@@ -11,6 +11,16 @@ use PHPUnit\Framework\TestCase;
 
 final class PlatformIntegrationDirectoryTest extends TestCase
 {
+    public function testLastUseTrackingAvoidsWritingOnEveryApiRead(): void
+    {
+        $integration = new PlatformIntegration(new Organization('Tenant'), 'API_KEY', 'GENERIC', 'Reader', ['scopes' => ['risks:read']], true);
+
+        self::assertTrue($integration->markUsed());
+        $firstUse = $integration->getLastUsedAt();
+        self::assertFalse($integration->markUsed());
+        self::assertSame($firstUse, $integration->getLastUsedAt());
+    }
+
     /** @param array<string, mixed> $override */
     #[DataProvider('invalidConfigurationProvider')]
     public function testItRejectsUnsafeDirectoryConfiguration(array $override): void

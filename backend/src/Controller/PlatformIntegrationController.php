@@ -68,7 +68,12 @@ use Symfony\Component\Routing\Attribute\Route;
             $this->entityManager->persist($item);
             $this->entityManager->flush();
 
-            return new JsonResponse([...$this->response($item), 'secret' => $plainSecret], 201);
+            $response = new JsonResponse([...$this->response($item), 'secret' => $plainSecret], 201);
+            if (null !== $plainSecret) {
+                $response->headers->set('Cache-Control', 'private, no-store');
+            }
+
+            return $response;
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
         }

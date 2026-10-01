@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Organization;
+use App\Entity\SecurityControl;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -29,6 +30,10 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         foreach ([$first, $second, $admin, $other] as $entity) {
             $manager->persist($entity);
         }
+        $firstControl = (new SecurityControl('MFA administration', 'Identity', $first))->setOwner($admin)->setImplementationStatus('IMPLEMENTED')->setEffectiveness(90);
+        $secondControl = (new SecurityControl('Control from another tenant', 'Identity', $second))->setOwner($other);
+        $manager->persist($firstControl);
+        $manager->persist($secondControl);
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
@@ -41,6 +46,32 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $service = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame($first->getId(), $service['organizationId']);
+
+        $client->request('GET', '/api/v1/service/controls');
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('INSUFFICIENT_SCOPE', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
+
+        $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
+        $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'API_KEY', 'provider' => 'GENERIC', 'name' => 'Control reader', 'configuration' => ['scopes' => ['controls:read']], 'enabled' => true]);
+        self::assertResponseStatusCodeSame(201);
+        $reader = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $reader['secret']);
+        $client->request('GET', '/api/v1/service/controls?limit=500&offset=-5');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
+        $controls = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(1, $controls['items']);
+        self::assertSame('MFA administration', $controls['items'][0]['name']);
+        self::assertSame(100, $controls['pagination']['limit']);
+        self::assertSame(0, $controls['pagination']['offset']);
+        self::assertSame(1, $controls['pagination']['total']);
+        self::assertNull($controls['pagination']['nextOffset']);
+
+        $client->setServerParameter('HTTP_X_RISKPILOT_KEY', 'invalid-key');
+        $client->request('GET', '/api/v1/service/actions');
+        self::assertResponseStatusCodeSame(401);
+        self::assertSame('INVALID_SERVICE_KEY', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
+
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'CONNECTOR', 'provider' => 'JIRA', 'name' => 'Jira actions', 'configuration' => ['baseUrl' => 'https://jira.example.test', 'direction' => 'BIDIRECTIONAL', 'conflictStrategy' => 'MANUAL', 'fieldOwnership' => ['status' => 'JIRA']], 'enabled' => true]);
         self::assertResponseStatusCodeSame(201);

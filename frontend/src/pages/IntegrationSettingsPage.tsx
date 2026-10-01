@@ -85,7 +85,6 @@ const scopes = [
   ["risks:read", "Lire les risques"],
   ["controls:read", "Lire les mesures de sécurité"],
   ["actions:read", "Lire les plans d’action"],
-  ["events:write", "Écrire des événements"],
 ] as const;
 const emailProviders: Record<string, string> = {
   SMTP2GO: "SMTP2GO",
@@ -319,6 +318,12 @@ export function IntegrationSettingsPage() {
             )}
             {form.type === "API_KEY" ? (
               <>
+                <Alert severity="info">
+                  Les droits sélectionnés limitent aussi les endpoints :
+                  /api/v1/service/risks, /controls et /actions. La clé doit être
+                  envoyée dans l’en-tête X-RiskPilot-Key et n’est affichée
+                  qu’une seule fois.
+                </Alert>
                 <Typography fontWeight={700}>Droits accordés</Typography>
                 <FormGroup>
                   {scopes.map(([value, label]) => (
