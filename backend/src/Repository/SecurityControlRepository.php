@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Organization;
 use App\Entity\SecurityControl;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -40,5 +41,26 @@ final class SecurityControlRepository extends ServiceEntityRepository
         }
 
         return $this->createQueryBuilder('c')->andWhere('c.id IN (:ids)')->andWhere('c.organization = :organization')->setParameter('ids', $ids)->setParameter('organization', $actor->getOrganization())->getQuery()->getResult();
+    }
+
+    /** @return list<SecurityControl> */
+    public function findForService(Organization $organization, int $limit, int $offset, ?string $status): array
+    {
+        return $this->serviceQuery($organization, $status)->orderBy('c.id', 'ASC')->setMaxResults($limit)->setFirstResult($offset)->getQuery()->getResult();
+    }
+
+    public function countForService(Organization $organization, ?string $status): int
+    {
+        return (int) $this->serviceQuery($organization, $status)->select('COUNT(c.id)')->getQuery()->getSingleScalarResult();
+    }
+
+    private function serviceQuery(Organization $organization, ?string $status): \Doctrine\ORM\QueryBuilder
+    {
+        $query = $this->createQueryBuilder('c')->andWhere('c.organization = :organization')->setParameter('organization', $organization);
+        if (null !== $status) {
+            $query->andWhere('c.implementationStatus = :status')->setParameter('status', $status);
+        }
+
+        return $query;
     }
 }

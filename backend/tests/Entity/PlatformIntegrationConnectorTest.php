@@ -44,4 +44,26 @@ final class PlatformIntegrationConnectorTest extends TestCase
             'fieldOwnership' => ['status' => 'RISKPILOT'],
         ]);
     }
+
+    public function testApiKeyLifecycleIsExplicitAndSafe(): void
+    {
+        $key = new PlatformIntegration(new Organization('Primary'), 'API_KEY', 'GENERIC', 'SIEM', [
+            'scopes' => ['risks:read'],
+            'expiresAt' => '2025-01-01T00:00:00+00:00',
+        ]);
+        $key->setCredential('rp_api_key_original');
+
+        self::assertTrue($key->isCredentialConfigured());
+        self::assertTrue($key->isCredentialExpired(new \DateTimeImmutable('2025-01-02T00:00:00+00:00')));
+
+        $key->rotateCredential('rp_api_key_rotated', new \DateTimeImmutable('+30 days'));
+        self::assertTrue($key->isEnabled());
+        self::assertTrue($key->verifies('rp_api_key_rotated'));
+        self::assertFalse($key->isCredentialExpired());
+
+        $key->revokeCredential();
+        self::assertFalse($key->isEnabled());
+        self::assertFalse($key->isCredentialConfigured());
+        self::assertFalse($key->verifies('rp_api_key_rotated'));
+    }
 }

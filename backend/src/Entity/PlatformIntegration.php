@@ -121,6 +121,31 @@ class PlatformIntegration
         return $this->lastUsedAt;
     }
 
+    public function isCredentialConfigured(): bool
+    {
+        return 'DIRECTORY' === $this->type ? null !== $this->encryptedCredential : null !== $this->secretHash;
+    }
+
+    public function getCredentialExpiresAt(): ?\DateTimeImmutable
+    {
+        $value = $this->configuration['expiresAt'] ?? null;
+        if ('API_KEY' !== $this->type || !is_string($value) || '' === $value) {
+            return null;
+        }
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    public function isCredentialExpired(?\DateTimeImmutable $now = null): bool
+    {
+        $expiresAt = $this->getCredentialExpiresAt();
+
+        return null !== $expiresAt && $expiresAt <= ($now ?? new \DateTimeImmutable());
+    }
+
     public function setCredential(string $plainSecret): void
     {
         if (!in_array($this->type, ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
@@ -134,6 +159,27 @@ class PlatformIntegration
     public function verifies(string $plainSecret): bool
     {
         return null !== $this->secretHash && hash_equals($this->secretHash, hash('sha256', $plainSecret));
+    }
+
+    public function rotateCredential(string $plainSecret, \DateTimeImmutable $expiresAt): void
+    {
+        if ('API_KEY' !== $this->type || $expiresAt <= new \DateTimeImmutable()) {
+            throw new \InvalidArgumentException('Rotation de clé API invalide.');
+        }
+        $this->configuration['expiresAt'] = $expiresAt->format(DATE_ATOM);
+        $this->setCredential($plainSecret);
+        $this->enabled = true;
+    }
+
+    public function revokeCredential(): void
+    {
+        if ('API_KEY' !== $this->type) {
+            throw new \LogicException('Seule une clé API peut être révoquée.');
+        }
+        $this->credentialPrefix = null;
+        $this->secretHash = null;
+        $this->enabled = false;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function sign(string $payload, int $timestamp): string
@@ -165,6 +211,9 @@ class PlatformIntegration
         if ($enabled && in_array($this->type, ['OIDC', 'SAML'], true)) {
             throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
         }
+        if ($enabled && 'API_KEY' === $this->type && (!$this->isCredentialConfigured() || $this->isCredentialExpired())) {
+            throw new \InvalidArgumentException('La clé API est révoquée ou expirée : effectuez une rotation avant de l’activer.');
+        }
         $this->validateConfiguration($this->type, $configuration);
         $this->name = trim($name);
         $this->configuration = $configuration;
@@ -182,6 +231,13 @@ class PlatformIntegration
             $scopes = array_values(array_unique(array_map('strval', (array) ($configuration['scopes'] ?? []))));
             if ([] === $scopes || [] !== array_diff($scopes, self::SCOPES)) {
                 throw new \InvalidArgumentException('Les portées de la clé API sont invalides.');
+            }
+            if (isset($configuration['expiresAt'])) {
+                try {
+                    new \DateTimeImmutable((string) $configuration['expiresAt']);
+                } catch (\Exception) {
+                    throw new \InvalidArgumentException('La date d’expiration de la clé API est invalide.');
+                }
             }
         }
         if ('WEBHOOK' === $type) {

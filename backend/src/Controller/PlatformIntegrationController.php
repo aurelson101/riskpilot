@@ -52,7 +52,12 @@ use Symfony\Component\Routing\Attribute\Route;
             return $this->invalid('Cette intégration n’est pas encore raccordée à un parcours complet et ne peut pas être activée.');
         }
         try {
-            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), (array) ($data['configuration'] ?? []), (bool) ($data['enabled'] ?? false));
+            $configuration = (array) ($data['configuration'] ?? []);
+            if ('API_KEY' === $type) {
+                $days = $this->validityDays($data['expiresInDays'] ?? 90);
+                $configuration['expiresAt'] = (new \DateTimeImmutable())->modify('+'.$days.' days')->format(DATE_ATOM);
+            }
+            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), $configuration, (bool) ($data['enabled'] ?? false));
             $plainSecret = null;
             if (in_array($item->getType(), ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
@@ -77,6 +82,43 @@ use Symfony\Component\Routing\Attribute\Route;
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
         }
+    }
+
+    #[Route('/{id}/rotate', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function rotate(int $id, Request $request): JsonResponse
+    {
+        $actor = $this->admin();
+        $item = $this->repository->find($id);
+        if (!$item instanceof PlatformIntegration || $item->getOrganization() !== $actor->getOrganization() || 'API_KEY' !== $item->getType()) {
+            return $this->notFound();
+        }
+        try {
+            $days = $this->validityDays($request->toArray()['expiresInDays'] ?? 90);
+            $secret = 'rp_api_key_'.bin2hex(random_bytes(24));
+            $item->rotateCredential($secret, (new \DateTimeImmutable())->modify('+'.$days.' days'));
+            $this->entityManager->flush();
+        } catch (\InvalidArgumentException $e) {
+            return $this->invalid($e->getMessage());
+        }
+
+        $response = new JsonResponse([...$this->response($item), 'secret' => $secret]);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
+
+    #[Route('/{id}/revoke', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function revoke(int $id): JsonResponse
+    {
+        $actor = $this->admin();
+        $item = $this->repository->find($id);
+        if (!$item instanceof PlatformIntegration || $item->getOrganization() !== $actor->getOrganization() || 'API_KEY' !== $item->getType()) {
+            return $this->notFound();
+        }
+        $item->revokeCredential();
+        $this->entityManager->flush();
+
+        return new JsonResponse($this->response($item));
     }
 
     #[Route('/{id}/directory-test', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -159,7 +201,7 @@ use Symfony\Component\Routing\Attribute\Route;
     /** @return array<string, mixed> */
     private function response(PlatformIntegration $item): array
     {
-        return ['id' => $item->getId(), 'type' => $item->getType(), 'provider' => $item->getProvider(), 'name' => $item->getName(), 'configuration' => $item->getConfiguration(), 'credentialPrefix' => $item->getCredentialPrefix(), 'credentialConfigured' => null !== $item->getEncryptedCredential(), 'enabled' => $item->isEnabled(), 'lastUsedAt' => $item->getLastUsedAt()?->format(DATE_ATOM), 'updatedAt' => $item->getUpdatedAt()->format(DATE_ATOM)];
+        return ['id' => $item->getId(), 'type' => $item->getType(), 'provider' => $item->getProvider(), 'name' => $item->getName(), 'configuration' => $item->getConfiguration(), 'credentialPrefix' => $item->getCredentialPrefix(), 'credentialConfigured' => $item->isCredentialConfigured(), 'credentialExpiresAt' => $item->getCredentialExpiresAt()?->format(DATE_ATOM), 'credentialExpired' => $item->isCredentialExpired(), 'enabled' => $item->isEnabled(), 'lastUsedAt' => $item->getLastUsedAt()?->format(DATE_ATOM), 'updatedAt' => $item->getUpdatedAt()->format(DATE_ATOM)];
     }
 
     private function admin(): User
@@ -180,5 +222,15 @@ use Symfony\Component\Routing\Attribute\Route;
     private function notFound(): JsonResponse
     {
         return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Intégration introuvable.'], 404);
+    }
+
+    private function validityDays(mixed $value): int
+    {
+        $days = filter_var($value, FILTER_VALIDATE_INT);
+        if (!in_array($days, [30, 90, 365], true)) {
+            throw new \InvalidArgumentException('La durée doit être de 30, 90 ou 365 jours.');
+        }
+
+        return $days;
     }
 }

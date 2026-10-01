@@ -26,7 +26,10 @@ type Integration = {
   name: string;
   configuration: Record<string, unknown>;
   credentialPrefix: string | null;
-  credentialConfigured?: boolean;
+  credentialConfigured: boolean;
+  credentialExpiresAt: string | null;
+  credentialExpired: boolean;
+  lastUsedAt: string | null;
   enabled: boolean;
 };
 type IntegrationType = "API_KEY" | "DIRECTORY" | "OIDC_DIAGNOSTIC";
@@ -48,6 +51,7 @@ type Form = {
   type: IntegrationType;
   name: string;
   scopes: string[];
+  expiresInDays: "30" | "90" | "365";
   host: string;
   port: string;
   baseDn: string;
@@ -67,6 +71,7 @@ const initial: Form = {
   type: "API_KEY",
   name: "",
   scopes: ["risks:read"],
+  expiresInDays: "90",
   host: "ldaps://",
   port: "636",
   baseDn: "",
@@ -122,6 +127,7 @@ export function IntegrationSettingsPage() {
   });
   const [form, setForm] = useState<Form>(initial);
   const [secret, setSecret] = useState<string | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
   const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -158,6 +164,7 @@ export function IntegrationSettingsPage() {
             provider: directory ? "ACTIVE_DIRECTORY" : "GENERIC",
             name: form.name,
             configuration,
+            ...(directory ? {} : { expiresInDays: Number(form.expiresInDays) }),
             ...(directory ? { credential: form.credential } : {}),
             enabled: directory ? false : form.enabled,
           },
@@ -168,6 +175,7 @@ export function IntegrationSettingsPage() {
     },
     onSuccess: async (data) => {
       setSecret(data.created?.secret ?? null);
+      setSecretCopied(false);
       setOidcResult(data.oidc ?? null);
       if (data.created) setForm(initial);
       setOperationError(null);
@@ -213,6 +221,32 @@ export function IntegrationSettingsPage() {
     }
   }
 
+  async function rotate(item: Integration) {
+    if (!window.confirm(`Renouveler « ${item.name} » pour 90 jours ?`)) return;
+    try {
+      const response = await api.post<Integration & { secret: string }>(
+        `/v1/integrations/${item.id}/rotate`,
+        { expiresInDays: 90 },
+      );
+      setSecret(response.data.secret);
+      setSecretCopied(false);
+      setOperationError(null);
+      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
+  }
+
+  async function revoke(item: Integration) {
+    if (!window.confirm(`Révoquer immédiatement « ${item.name} » ?`)) return;
+    try {
+      await api.post(`/v1/integrations/${item.id}/revoke`);
+      await cache.invalidateQueries({ queryKey: ["platform-integrations"] });
+    } catch (error) {
+      setOperationError(errorMessage(error));
+    }
+  }
+
   return (
     <Stack spacing={3} maxWidth={1000}>
       <div>
@@ -227,8 +261,27 @@ export function IntegrationSettingsPage() {
       {operationError && <Alert severity="error">{operationError}</Alert>}
       {secret && (
         <Alert severity="warning">
-          Copiez cette clé maintenant, elle ne sera plus affichée :{" "}
-          <strong>{secret}</strong>
+          <Stack spacing={1}>
+            <span>
+              Copiez cette clé maintenant, elle ne sera plus affichée :{" "}
+              <strong style={{ overflowWrap: "anywhere" }}>{secret}</strong>
+            </span>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(secret);
+                  setSecretCopied(true);
+                }}
+              >
+                {secretCopied ? "Clé copiée" : "Copier la clé"}
+              </Button>
+              <Button size="small" onClick={() => setSecret(null)}>
+                J’ai conservé la clé
+              </Button>
+            </Stack>
+          </Stack>
         </Alert>
       )}
 
@@ -348,6 +401,22 @@ export function IntegrationSettingsPage() {
                     />
                   ))}
                 </FormGroup>
+                <TextField
+                  select
+                  label="Durée de validité"
+                  value={form.expiresInDays}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      expiresInDays: event.target
+                        .value as Form["expiresInDays"],
+                    })
+                  }
+                >
+                  <MenuItem value="30">30 jours</MenuItem>
+                  <MenuItem value="90">90 jours (recommandé)</MenuItem>
+                  <MenuItem value="365">365 jours</MenuItem>
+                </TextField>
                 <FormControlLabel
                   control={
                     <Switch
@@ -550,15 +619,57 @@ export function IntegrationSettingsPage() {
                       ? ` · ${item.credentialPrefix}…`
                       : ""}
                   </Typography>
+                  {item.type === "API_KEY" && (
+                    <Typography variant="body2" color="text.secondary">
+                      Expiration :{" "}
+                      {item.credentialExpiresAt
+                        ? new Date(item.credentialExpiresAt).toLocaleString(
+                            "fr-FR",
+                          )
+                        : "non définie (ancienne clé)"}
+                      {" · "}Dernière utilisation :{" "}
+                      {item.lastUsedAt
+                        ? new Date(item.lastUsedAt).toLocaleString("fr-FR")
+                        : "jamais"}
+                    </Typography>
+                  )}
                 </div>
                 <Chip
-                  color={item.enabled ? "success" : "default"}
-                  label={item.enabled ? "Actif" : "Inactif"}
+                  color={
+                    item.credentialExpired
+                      ? "error"
+                      : item.enabled
+                        ? "success"
+                        : "default"
+                  }
+                  label={
+                    item.credentialExpired
+                      ? "Expirée"
+                      : !item.credentialConfigured
+                        ? "Révoquée"
+                        : item.enabled
+                          ? "Active"
+                          : "Inactive"
+                  }
                 />
                 {item.type === "API_KEY" && (
-                  <Button onClick={() => toggle(item)}>
-                    {item.enabled ? "Désactiver" : "Activer"}
-                  </Button>
+                  <>
+                    <Button
+                      disabled={
+                        !item.enabled &&
+                        (!item.credentialConfigured || item.credentialExpired)
+                      }
+                      onClick={() => toggle(item)}
+                    >
+                      {item.enabled ? "Désactiver" : "Activer"}
+                    </Button>
+                    <Button onClick={() => rotate(item)}>Renouveler</Button>
+                    {item.credentialConfigured && (
+                      <Button color="error" onClick={() => revoke(item)}>
+                        Révoquer
+                      </Button>
+                    )}
+                  </>
                 )}
                 {item.type === "DIRECTORY" && (
                   <Button
