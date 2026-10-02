@@ -52,6 +52,10 @@ services:
         arguments:
             $appUrl: '%app.url%'
 
+    App\Application\EmailTemplateRenderer:
+        arguments:
+            $appUrl: '%app.url%'
+
     App\Controller\IsmsDocumentController:
         arguments:
             $appUrl: '%app.url%'

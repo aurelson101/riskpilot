@@ -2,6 +2,37 @@
 
 Cette roadmap unique remplace toutes les roadmaps précédentes. Les fondations des quatre étapes ont été livrées le 2026-07-26. Les compléments avancés restant à industrialiser sont conservés dans les critères détaillés ci-dessous.
 
+## Priorités réévaluées au 2026-10-02
+
+La [comparaison EGERIE / CISO Assistant](grc-product-comparison.md) complète cette
+roadmap à partir de sources publiques et du code actuel, sans annoncer de parité
+produit. Les critères ci-dessous sont des travaux à réaliser, pas des livraisons.
+
+1. **P0 — Fiabilité des emails (partiel)** : cinq tentatives maximum, annulation
+   des destinataires inéligibles et code d'erreur générique implémentés ; restent
+   la reprise des réservations bloquées, la supervision et l'examen des erreurs historiques.
+2. **P0 — Emails FR/EN (partiel)** : reset/test bilingues et liens internes ajoutés ;
+   restent la traduction des notifications métier, l'alternative texte/HTML et
+   les validations de réception par fournisseur. Le test suit la langue de l'administrateur.
+3. **P1 — Bibliothèques interopérables** : import contrôlé Excel/YAML, identifiants
+   stables, versions, traductions, licences, simulation et rapport d'erreurs ;
+   conserver les packs gouvernés et les imports existants.
+4. **P1 — Identité complète** : parcours SSO OIDC avec fournisseur open source
+   de préproduction, puis SAML/SCIM selon besoin ; ne pas activer les diagnostics
+   actuels comme s'ils réalisaient une connexion ou un provisioning.
+5. **P1 — Collecte collaborative** : tester les questionnaires et relances de bout
+   en bout ; liens limités, expiration, preuves et validation indépendante.
+6. **P1 — Cartographie multinorme** : enrichir les liens existants avec direction,
+   type, provenance et revue ; ne pas déduire automatiquement une conformité.
+7. **P1 — Calendriers** : matrice de réception/actualisation/révocation Thunderbird,
+   Outlook web/classique et Google ; synchronisation bidirectionnelle hors socle actuel.
+8. **P2 — Quantification** : expliquer et tester les hypothèses du simulateur
+   existant, les distributions et les comparaisons avant/après traitement.
+9. **P2 — Pilotage simple** : parcours guidé périmètre → analyse → preuve → action
+   → décision, avec les vues 360° existantes sans ajouter de menus doublons.
+10. **P2 — IA gouvernée** : mesurer la qualité FR/EN et la couverture des assistants,
+    garder consentement, contrôle tenant/RBAC et confirmation humaine avant écriture.
+
 ## Statut au 2026-07-26
 
 - **Étape 1 — livrée** : famille explicite, migration de reprise, filtre API et trois vues anglaises spécialisées.
@@ -75,7 +106,10 @@ Livrables et critères d’acceptation :
 
 ## Étape 4 — API de saisie des valeurs d’indicateurs
 
-Le type `INDICATOR` existe déjà dans la gouvernance exécutive, avec une valeur courante, une cible, des seuils et une période. Il manque un modèle de séries temporelles et une API dédiée pour enregistrer des mesures successives sans écraser l’historique.
+Le type `INDICATOR` existe dans la gouvernance exécutive, avec une valeur courante,
+une cible, des seuils et une période. Le socle `Indicator`/`IndicatorValue` et son
+API ont été livrés à l'étape 4 ; les critères ci-dessous décrivent la cible complète,
+notamment les alertes et tendances restant à industrialiser.
 
 Créer une API versionnée pour :
 

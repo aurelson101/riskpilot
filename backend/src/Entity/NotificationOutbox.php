@@ -13,7 +13,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['status', 'available_at'], name: 'idx_notification_outbox_dispatch')]
 class NotificationOutbox
 {
-    public const STATUSES = ['PENDING', 'DISPATCHED', 'SENT', 'FAILED'];
+    public const STATUSES = ['PENDING', 'DISPATCHED', 'SENT', 'FAILED', 'DEAD_LETTER', 'CANCELLED'];
+    public const MAX_ATTEMPTS = 5;
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private User $recipient;
@@ -43,7 +44,33 @@ class NotificationOutbox
     public function getAttempts(): int { return $this->attempts; }
     public function getLastError(): ?string { return $this->lastError; }
     public function getAvailableAt(): \DateTimeImmutable { return $this->availableAt; }
-    public function markDispatched(): void { if ('PENDING' !== $this->status && 'FAILED' !== $this->status) return; $this->status = 'DISPATCHED'; ++$this->attempts; }
-    public function markSent(): void { $this->status = 'SENT'; $this->lastError = null; $this->sentAt = new \DateTimeImmutable(); }
-    public function markFailed(string $error): void { $this->status = 'FAILED'; $this->lastError = mb_substr($error, 0, 255); $this->availableAt = new \DateTimeImmutable('+'.min(60, 2 ** min(5, $this->attempts)).' minutes'); }
+    public function isRecipientEligible(): bool
+    {
+        return User::STATUS_ACTIVE === $this->recipient->getStatus()
+            && ($this->recipient->getOrganization() === $this->organization
+                || (null !== $this->organization->getId() && $this->recipient->getOrganization()->getId() === $this->organization->getId()));
+    }
+    public function markDispatched(): void
+    {
+        if (!in_array($this->status, ['PENDING', 'FAILED'], true)) return;
+        if ($this->attempts >= self::MAX_ATTEMPTS) { $this->status = 'DEAD_LETTER'; return; }
+        $this->status = 'DISPATCHED'; ++$this->attempts;
+    }
+    public function markSent(): void
+    {
+        if ('DISPATCHED' !== $this->status) return;
+        $this->status = 'SENT'; $this->lastError = null; $this->sentAt = new \DateTimeImmutable();
+    }
+    public function markFailed(): void
+    {
+        if ('DISPATCHED' !== $this->status) return;
+        $this->status = $this->attempts >= self::MAX_ATTEMPTS ? 'DEAD_LETTER' : 'FAILED';
+        $this->lastError = 'MAIL_SEND_FAILED';
+        $this->availableAt = new \DateTimeImmutable('+'.(2 ** min(5, $this->attempts)).' minutes');
+    }
+    public function markCancelled(): void
+    {
+        if (!in_array($this->status, ['PENDING', 'FAILED', 'DISPATCHED'], true)) return;
+        $this->status = 'CANCELLED'; $this->lastError = 'RECIPIENT_NO_LONGER_ELIGIBLE';
+    }
 }

@@ -47,5 +47,14 @@ final class NotificationOutboxTest extends KernelTestCase
         self::assertInstanceOf(NotificationOutbox::class, $claimed);
         self::assertSame('DISPATCHED', $claimed->getStatus());
         self::assertSame(1, $claimed->getAttempts());
+
+        // A legacy failure already at the cap must be terminalized, never reserved again.
+        $manager->getConnection()->executeStatement(
+            'UPDATE notification_outbox SET status = :status, attempts = :attempts WHERE id = :id',
+            ['status' => 'FAILED', 'attempts' => NotificationOutbox::MAX_ATTEMPTS, 'id' => $claimed->getId()],
+        );
+        self::assertSame([], $repository->claimDispatchableIds());
+        $manager->clear();
+        self::assertSame('DEAD_LETTER', $manager->getRepository(NotificationOutbox::class)->find($ids[0])->getStatus());
     }
 }

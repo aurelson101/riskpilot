@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Application\OauthMailProvider;
 use App\Application\OrganizationMailer;
+use App\Application\EmailTemplateRenderer;
 use App\Entity\EmailSettings;
 use App\Entity\User;
 use App\Repository\EmailSettingsRepository;
@@ -32,6 +33,7 @@ final readonly class EmailSettingsController
         private OrganizationMailer $mailer,
         private OauthMailProvider $oauth,
         private string $appUrl,
+        private EmailTemplateRenderer $emailTemplates,
     ) {
     }
 
@@ -163,12 +165,19 @@ final readonly class EmailSettingsController
             return $this->error('Le test SMTP sans chiffrement est désactivé. Sélectionnez STARTTLS ou TLS implicite.');
         }
         try {
-            $this->mailer->sendWithSettings($settings, $recipient, 'Test de messagerie RiskPilot', 'Votre configuration de messagerie RiskPilot fonctionne correctement.');
+            $email = $this->emailTemplates->connectionTest($user->getLocale());
+            $this->mailer->sendWithSettings($settings, $recipient, $email['subject'], $email['message']);
         } catch (\Throwable) {
-            return new JsonResponse(['code' => 'SMTP_CONNECTION_FAILED', 'message' => 'Échec de connexion ou d’authentification SMTP. Vérifiez les identifiants et les règles du fournisseur.'], JsonResponse::HTTP_BAD_GATEWAY);
+            $oauth = in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true);
+            return new JsonResponse([
+                'code' => $oauth ? 'OAUTH_MAIL_SEND_FAILED' : 'SMTP_CONNECTION_FAILED',
+                'message' => 'en' === $user->getLocale()
+                    ? 'The email provider could not send the test message. Check your settings and permissions.'
+                    : 'Le fournisseur de messagerie n’a pas pu envoyer le test. Vérifiez la configuration et les autorisations.',
+            ], JsonResponse::HTTP_BAD_GATEWAY);
         }
 
-        return new JsonResponse(['message' => 'Email de test envoyé.']);
+        return new JsonResponse(['message' => 'en' === $user->getLocale() ? 'Test email submitted to the provider. Check its receipt.' : 'Email de test transmis au fournisseur. Vérifiez sa réception.']);
     }
 
     /** @return array<string, mixed> */

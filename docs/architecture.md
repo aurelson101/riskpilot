@@ -182,7 +182,38 @@ Les fichiers `.doc` et `.docx` sont validés, limités à 10 Mo, renommés aléa
 
 ### Messagerie et notifications
 
-`NotificationService` persiste la notification puis publie `SendNotificationEmail`. Le worker appelle `OrganizationMailer`, qui sélectionne la configuration du tenant : SMTP, Gmail API ou Microsoft Graph. `SecretCipher` chiffre les mots de passe, secrets et jetons OAuth avec une clé dérivée de `APP_SECRET`.
+`NotificationService` persiste une `Notification` et une `NotificationOutbox`
+avec une clé d'idempotence propre à l'organisation. Le scheduler exécute
+`app:notifications:dispatch-outbox` : le repository réserve les lignes
+`PENDING`/`FAILED` éligibles avec `FOR UPDATE SKIP LOCKED`, les marque
+`DISPATCHED`, puis la commande publie `DispatchNotificationOutbox` dans Messenger.
+Le handler appelle `OrganizationMailer`, qui sélectionne la configuration du
+tenant : SMTP, Gmail API ou Microsoft Graph. Un succès passe à `SENT`, un échec
+à `FAILED` avec un délai progressif. `SendNotificationEmail` possède encore un
+handler distinct ; ce n'est plus le chemin publié par `NotificationService`.
+
+La réservation borne désormais les tentatives à cinq et classe aussi les anciens
+messages `PENDING`/`FAILED` ayant atteint ce plafond en `DEAD_LETTER`. Le worker
+revérifie avant envoi que le destinataire est actif et appartient à l'organisation
+d'origine ; sinon le message devient `CANCELLED`. Ces états terminaux ne sont pas
+réclamés par le scheduler. Ils tiennent dans le champ `VARCHAR(20)` existant :
+aucune migration de schéma n'est nécessaire pour ce patch.
+
+Limite persistante : pas de reprise automatique repérée après interruption entre
+réservation et publication. La concurrence SQL réelle doit être validée sur une
+base de préproduction, distincte des tests unitaires avec connexion simulée.
+Le handler ajoute désormais le champ `link` au corps de l'email uniquement si
+le chemin est interne et l'URL de l'application valide, avec un libellé FR/EN.
+`EmailTemplateRenderer` centralise le reset FR/EN (langue du destinataire), le
+test de messagerie FR/EN (langue de l'administrateur) et les liens internes.
+Les sujets et corps des notifications métier restent français, en texte simple.
+Les nouveaux échecs stockent uniquement `MAIL_SEND_FAILED` ; les anciennes erreurs
+ne sont pas automatiquement purgées. Voir les
+[priorités et modèles](grc-models-configuration.md).
+
+`SecretCipher` chiffre les mots de passe, secrets et jetons OAuth avec une clé
+dérivée de `APP_SECRET`. Modifier cette valeur sans procédure de migration
+peut rendre les secrets existants indéchiffrables.
 
 ## Architecture frontend
 

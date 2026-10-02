@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\OrganizationMailer;
+use App\Application\EmailTemplateRenderer;
 use App\Entity\AuthSession;
 use App\Entity\PasswordResetToken;
 use App\Entity\User;
@@ -38,6 +39,7 @@ final readonly class AuthController
         private OrganizationMailer $mailer,
         private LoggerInterface $logger,
         private string $appUrl,
+        private EmailTemplateRenderer $emailTemplates,
     ) {
     }
 
@@ -129,11 +131,12 @@ final readonly class AuthController
             $this->entityManager->persist(new PasswordResetToken($user, hash('sha256', $rawToken)));
             $this->entityManager->flush();
             try {
+                $email = $this->emailTemplates->passwordReset($user->getLocale(), $rawToken);
                 $this->mailer->send(
                     (int) $user->getOrganization()->getId(),
                     $user->getEmail(),
-                    'Réinitialisation de votre mot de passe RiskPilot',
-                    "Une réinitialisation de votre mot de passe a été demandée.\n\n".rtrim($this->appUrl, '/').'/reset-password?token='.rawurlencode($rawToken)."\n\nCe lien expire dans 30 minutes. Ignorez ce message si vous n’êtes pas à l’origine de la demande.",
+                    $email['subject'],
+                    $email['message'],
                 );
             } catch (\Throwable $error) {
                 $this->logger->error('Impossible d’envoyer l’email de récupération.', ['exception' => $error, 'userId' => $user->getId()]);

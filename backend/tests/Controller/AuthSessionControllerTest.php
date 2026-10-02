@@ -12,6 +12,8 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 
 final class AuthSessionControllerTest extends WebTestCase
 {
@@ -62,6 +64,36 @@ final class AuthSessionControllerTest extends WebTestCase
         $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$rotatedAccessToken);
         $this->client->request('GET', '/api/me');
         self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testForgotPasswordSendsAnEnglishEmailForAnEnglishProfile(): void
+    {
+        $this->assertResetEmailLanguage('en', 'Reset your RiskPilot password', 'single-use');
+    }
+
+    public function testForgotPasswordSendsAFrenchEmailForAFrenchProfile(): void
+    {
+        $this->assertResetEmailLanguage('fr', 'Réinitialisation de votre mot de passe RiskPilot', 'usage unique');
+    }
+
+    private function assertResetEmailLanguage(string $locale, string $subject, string $body): void
+    {
+        $this->user->setLocale($locale);
+        $this->entityManager->flush();
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects(self::once())->method('send')->willReturnCallback(
+            static function (Email $email) use ($subject, $body): void {
+                self::assertSame($subject, $email->getSubject());
+                self::assertSame('session@example.test', $email->getTo()[0]->getAddress());
+                self::assertStringContainsString($body, $email->getTextBody());
+                self::assertStringContainsString('/reset-password?token=', $email->getTextBody());
+                self::assertStringContainsString('30 minutes', $email->getTextBody());
+            },
+        );
+        self::getContainer()->set('mailer.mailer', $mailer);
+        $this->json('POST', '/api/auth/forgot-password', ['email' => 'session@example.test']);
+        self::assertResponseIsSuccessful();
+        self::assertSame(1, $this->entityManager->getRepository(PasswordResetToken::class)->count([]));
     }
 
     public function testPasswordResetIsSingleUseAndRevokesSessions(): void

@@ -48,6 +48,15 @@ docker compose exec backend php bin/console app:user:create-admin \
 
 La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de priorité avant une exploitation critique.
 
+### État et références produit — 2 octobre 2026
+
+La [comparaison EGERIE / CISO Assistant](docs/grc-product-comparison.md)
+décrit les parcours de référence, les briques présentes dans le code et les
+écarts prioritaires. Elle ne vaut pas validation fonctionnelle de la démo ni
+équivalence avec ces produits. Les [modèles et configurations](docs/grc-models-configuration.md)
+séparent les paramètres utilisables aujourd'hui des modèles proposés pour de
+futurs imports. Aucun modèle EGERIE propriétaire n'est redistribué.
+
 ## Authentification et administration
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes et les tentatives sont limitées. `GET /api/me` retourne le profil courant. Chaque utilisateur peut activer un MFA TOTP compatible Google Authenticator et Microsoft Authenticator depuis **Paramètres → Mon profil et MFA**, avec QR code et codes de secours à usage unique. Les administrateurs gèrent les utilisateurs de leur organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
@@ -66,7 +75,15 @@ Les mots de passe SMTP, secrets clients et jetons OAuth sont chiffrés avec libs
 
 `APP_URL` doit correspondre exactement à l’URL publique, par exemple `https://grc.example.com`. Cette valeur est utilisée pour les callbacks OAuth ; elle doit donc utiliser HTTPS en production et correspondre aux URI enregistrées dans Google Cloud et Microsoft Entra.
 
-Depuis la vue Calendrier des plans d’action, chaque utilisateur peut créer un lien d’abonnement iCalendar privé compatible Apple Calendar/iOS, Google Calendar/Android et Outlook. Le flux contient uniquement ses actions affectées ; le lien est affiché une seule fois et peut être régénéré ou révoqué à tout moment.
+Depuis la vue Calendrier des plans d’action, chaque utilisateur peut créer un lien d’abonnement iCalendar privé en lecture seule. Le flux contient uniquement ses actions affectées ; le lien est affiché une seule fois et peut être régénéré ou révoqué à tout moment. Il ne s'agit ni de CalDAV ni d'une synchronisation bidirectionnelle Graph/Google Calendar. La réception et l'actualisation dans Thunderbird, Outlook web/classique, Apple Calendar et Google Calendar doivent être validées client par client ; aucune compatibilité à 100 % n'est annoncée.
+
+Les emails de réinitialisation utilisent la langue FR/EN du destinataire ; les
+emails de test utilisent celle de l'administrateur qui lance le test. Les
+notifications métier conservent leurs textes français mais incluent désormais
+leur lien interne avec un libellé FR/EN. Les envois restent en texte simple.
+La traduction complète des notifications, le HTML et la reprise après incident
+restent à compléter ; voir la
+[vérification des emails](docs/releases/2026-10-02-grc-search-session.md#vérification-des-emails-fren--2-octobre-2026).
 
 L’authentification utilise des JWT courts liés à une session serveur et un refresh token rotatif conservé en cookie HttpOnly. Le profil permet de consulter et révoquer les appareils connectés. Le parcours « Mot de passe oublié » envoie un lien à usage unique valable 30 minutes et invalide toutes les sessions après réinitialisation. Après plusieurs échecs, le compte est temporairement verrouillé de manière progressive. Le MFA reste facultatif conformément au périmètre produit.
 
@@ -96,7 +113,7 @@ docker compose exec backend php bin/console app:actions:notify-deadlines
 
 Les API principales sont `GET|POST /api/actions`, `GET|PUT /api/actions/{id}`, `GET|POST /api/actions/{id}/comments`, `GET /api/notifications` et `PUT /api/notifications/{id}/read`.
 
-Le scheduler publie la boîte d’envoi avec `php bin/console app:notifications:dispatch-outbox`. Les erreurs sont conservées sans donnée d’authentification et replanifiées avec un délai progressif.
+Le scheduler publie la boîte d’envoi avec `php bin/console app:notifications:dispatch-outbox`. Les échecs sont replanifiés avec un délai progressif, jusqu'à cinq tentatives ; ensuite le message passe en `DEAD_LETTER`. Le worker annule les envois aux utilisateurs inactifs/verrouillés ou ayant quitté l'organisation d'origine. Les nouveaux échecs stockent uniquement `MAIL_SEND_FAILED`, sans le texte de l'exception fournisseur. La reprise des lignes bloquées en `DISPATCHED` et la supervision restent à compléter ; l'envoi ne constitue pas une preuve de réception. Ces protections ne purgent pas les anciennes erreurs déjà enregistrées.
 
 ## Référentiels et conformité
 

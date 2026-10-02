@@ -27,9 +27,13 @@ final class NotificationOutboxRepository extends ServiceEntityRepository
         $connection = $this->getEntityManager()->getConnection();
         $connection->beginTransaction();
         try {
+            $connection->executeStatement(
+                'UPDATE notification_outbox SET status = :terminal WHERE status IN (:pending, :failed) AND attempts >= :maximum',
+                ['terminal' => 'DEAD_LETTER', 'pending' => 'PENDING', 'failed' => 'FAILED', 'maximum' => NotificationOutbox::MAX_ATTEMPTS],
+            );
             $ids = array_map('intval', $connection->fetchFirstColumn(
-                'SELECT id FROM notification_outbox WHERE status IN (:pending, :failed) AND available_at <= :now ORDER BY created_at ASC LIMIT '.$limit.' FOR UPDATE SKIP LOCKED',
-                ['pending' => 'PENDING', 'failed' => 'FAILED', 'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s')],
+                'SELECT id FROM notification_outbox WHERE status IN (:pending, :failed) AND attempts < :maximum AND available_at <= :now ORDER BY created_at ASC LIMIT '.$limit.' FOR UPDATE SKIP LOCKED',
+                ['pending' => 'PENDING', 'failed' => 'FAILED', 'maximum' => NotificationOutbox::MAX_ATTEMPTS, 'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s')],
             ));
             if ([] !== $ids) {
                 $connection->executeStatement('UPDATE notification_outbox SET status = :status, attempts = attempts + 1 WHERE id IN (:ids)', ['status' => 'DISPATCHED', 'ids' => $ids], ['ids' => \Doctrine\DBAL\ArrayParameterType::INTEGER]);

@@ -89,3 +89,102 @@ restreints et partagés, les caractères spéciaux, les pages invalides, les ré
 401 simultanées, la déconnexion pendant un renouvellement et les téléchargements.
 Les petits écrans et le parcours de recherche doivent être contrôlés en navigateur
 avant d'annoncer la livraison terminée.
+
+## Vérification des emails FR/EN — 2 octobre 2026
+
+Statut : vérification du code uniquement. Les suggestions ci-dessous ne sont pas
+implémentées et ne font pas partie des améliorations livrées listées plus haut.
+
+### Constats et bugs à traiter
+
+- Les notifications métier, la réinitialisation du mot de passe et l'email de
+  test utilisent des textes français ; la langue du destinataire n'est pas
+  utilisée pour leur rédaction. Le parcours anglais n'est donc pas complet.
+- SMTP, Gmail et Microsoft Graph envoient du texte simple, sans mise en page HTML.
+  Le champ `link` enregistré dans la file de notifications n'est pas transmis
+  par `DispatchNotificationOutboxHandler` : le lien métier manque dans l'email.
+- Les lignes sont marquées `DISPATCHED` avant publication dans Messenger.
+  La sélection suivante ne reprend que `PENDING` et `FAILED` : une interruption
+  entre ces étapes peut laisser un email bloqué, sans mécanisme de reprise repéré.
+- `markFailed()` prévoit un délai de reprise mais aucun nombre maximal de
+  tentatives : un échec permanent peut être retenté indéfiniment.
+- Le handler ne revérifie ni l'activité du destinataire ni son appartenance
+  actuelle à l'organisation avant l'envoi. Une notification en attente pourrait
+  transmettre des informations après désactivation ou changement d'organisation.
+- Sans configuration active, le mailer de secours utilise
+  `notifications@riskpilot.local` ; son adéquation à un envoi externe reste à vérifier.
+- Le renouvellement OAuth conserve bien le jeton de renouvellement précédent
+  lorsque le fournisseur n'en renvoie pas de nouveau (`EmailSettings::connectOauth`).
+
+Ces constats viennent de la lecture ciblée des services, contrôleurs, entités et
+handlers concernés ; les scénarios d'incident n'ont pas été reproduits.
+Aucun email réel n'a été envoyé. Les tests PHP ne sont pas exécutables dans
+l'environnement local de cette passe : ni PHP ni Docker ne sont disponibles.
+
+### Dix suggestions d'amélioration — proposées, non implémentées
+
+1. Centraliser les sujets et contenus FR/EN par type de notification, y compris
+   réinitialisation du mot de passe et test de messagerie.
+2. Enregistrer la langue du destinataire dans le message asynchrone, avec un
+   repli explicite en français pour une langue absente ou non prise en charge.
+3. Ajouter un habillage HTML commun avec une alternative texte : titre clair,
+   identité RiskPilot, contenu lisible et signature cohérente.
+4. Inclure les liens métier et boutons d'action ; construire les URL depuis
+   l'adresse approuvée de l'application et échapper les contenus dynamiques HTML.
+5. Proposer une prévisualisation FR/EN des emails avant tout envoi de test.
+6. Tester chaque type d'email dans les deux langues : accents, noms longs,
+   dates localisées, liens et absence de données d'une autre organisation.
+7. Prévoir une reprise des messages `DISPATCHED` bloqués et des publications
+   échouées, avec délai de réservation et protection contre les doublons.
+8. Borner les tentatives, isoler les échecs définitifs et avertir l'administrateur ;
+   prendre en compte les limites temporaires des fournisseurs lorsque disponibles.
+9. Revérifier au moment de l'envoi que le destinataire est actif et appartient
+   toujours à l'organisation d'origine ; annuler les notifications devenues invalides.
+10. Valider l'expéditeur de secours et réaliser des tests de réception autorisés
+    via SMTP, Gmail et Graph, avec comptes FR/EN et consultation des erreurs utiles
+    sans exposer les secrets.
+
+### Suite de la vérification : premier patch email
+
+Les constats ci-dessus décrivent l'état avant ce patch. Les modifications locales
+suivantes ont été réalisées, sans déploiement ni envoi réel :
+
+- `EmailTemplateRenderer` : reset FR/EN selon le destinataire, test FR/EN selon
+  l'administrateur, repli en français et corps texte cohérents.
+- Les notifications envoyées incluent leur lien interne avec un libellé FR/EN ;
+  les URL externes, les caractères de contrôle et les bases URL invalides sont refusés.
+- Les erreurs d'envoi du test distinguent SMTP et OAuth ; un succès indique une
+  transmission au fournisseur, sans prétendre prouver la réception.
+- Tests ciblés dans un conteneur temporaire sans réseau, sans volumes de la démo :
+  5 tests, 30 assertions ; syntaxe des contrôleurs et du handler valide.
+
+Restent : traduction des notifications métier, HTML, reprise des réservations
+bloquées, plafond de tentatives, contrôle du destinataire au moment de l'envoi
+et validations de réception SMTP/Gmail/Graph.
+
+### Deuxième patch : sécurité et limite de reprise des emails
+
+- Cinq tentatives maximum ; classement en `DEAD_LETTER` des échecs au plafond,
+  y compris des anciens messages éligibles déjà au-delà de cette limite.
+- Vérification du statut et du tenant du destinataire avant appel au mailer ;
+  annulation définitive en `CANCELLED` si le destinataire n'est plus éligible.
+- Enregistrement du seul code `MAIL_SEND_FAILED` pour les nouveaux échecs,
+  sans copie du texte de l'exception. Les erreurs historiques ne sont pas purgées.
+- États terminaux protégés contre une relance via les méthodes de l'entité.
+- 9 tests ciblés, 54 assertions : transitions, plafond, délai, destinataires,
+  handler et transaction/réservation SQL simulée. Syntaxe PHP des trois fichiers
+  applicatifs modifiés valide. Exécution isolée sans réseau ni volumes de la démo.
+
+Aucune migration de schéma, aucun déploiement ni envoi réel. Restent la validation
+de concurrence PostgreSQL en préproduction, la récupération des réservations
+bloquées, la supervision, le HTML et la traduction des notifications métier.
+
+### Recette avant publication
+
+5 tests d'intégration, 38 assertions supplémentaires ont passé sur un PostgreSQL
+17 temporaire, dans un réseau Docker interne sans accès aux volumes de la démo :
+connexion/renouvellement/révocation, récupération du mot de passe FR/EN avec mailer
+simulé, reset à usage unique et réservation/plafond des messages dans la base réelle.
+La base et son réseau temporaires ont été supprimés après les tests.
+Cette recette ne vérifie ni la réception réelle SMTP/Graph/Gmail ni les courses
+entre plusieurs workers. Les limites produit précédemment indiquées restent valables.
