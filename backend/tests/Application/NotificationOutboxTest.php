@@ -56,5 +56,26 @@ final class NotificationOutboxTest extends KernelTestCase
         self::assertSame([], $repository->claimDispatchableIds());
         $manager->clear();
         self::assertSame('DEAD_LETTER', $manager->getRepository(NotificationOutbox::class)->find($ids[0])->getStatus());
+
+        $organization = $manager->getRepository(Organization::class)->find($organization->getId());
+        $english = (new User('english@example.test', 'English', 'Recipient', $organization, [User::ROLE_VIEWER]))->setLocale('en');
+        $manager->persist($english);
+        $manager->flush();
+        $due = new \DateTimeImmutable('2030-01-02');
+        $notifications->notifyLocalized($english, 'ACTION_ASSIGNED', ['First action', $due], '/actions');
+        $manager->flush();
+        $notifications->notifyLocalized($english, 'ACTION_ASSIGNED', ['Second action', $due], '/actions');
+        $manager->flush();
+        $english->setLocale('fr');
+        $notifications->notifyLocalized($english, 'ACTION_ASSIGNED', ['First action', $due], '/actions');
+        $manager->flush();
+        self::assertSame(3, $manager->getRepository(Notification::class)->count([]));
+        $notification = $manager->getRepository(Notification::class)->findOneBy(['recipient' => $english]);
+        self::assertSame('New action assigned', $notification->getTitle());
+        self::assertStringContainsString('2030-01-02', $notification->getMessage());
+        $english->setStatus(User::STATUS_INACTIVE);
+        $manager->flush();
+        self::assertSame([], $repository->claimDispatchableIds());
+        self::assertSame(2, $manager->getRepository(NotificationOutbox::class)->count(['status' => 'CANCELLED']));
     }
 }

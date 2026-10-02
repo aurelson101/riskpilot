@@ -21,8 +21,14 @@ final class DispatchNotificationOutboxCommand extends Command
         // The repository claims rows atomically with FOR UPDATE SKIP LOCKED so
         // parallel scheduler instances cannot publish the same message.
         $ids = $this->outbox->claimDispatchableIds();
-        foreach ($ids as $id) {
-            $this->bus->dispatch(new DispatchNotificationOutbox($id));
+        foreach ($ids as $index => $id) {
+            try {
+                $this->bus->dispatch(new DispatchNotificationOutbox($id));
+            } catch (\Throwable) {
+                $this->outbox->releaseUnpublishedIds(array_slice($ids, $index));
+                $output->writeln(sprintf('%d message(s) published; remaining messages delayed after OUTBOX_PUBLISH_FAILED.', $index));
+                return Command::FAILURE;
+            }
         }
 
         $output->writeln(sprintf('%d outbox message(s) dispatched.', count($ids)));

@@ -49,6 +49,36 @@ final readonly class EmailTemplateRenderer
         return $message."\n\n".('en' === $locale ? 'View in RiskPilot: ' : 'Consulter dans RiskPilot : ').$url;
     }
 
+    /** @param list<string|int|float|\DateTimeInterface> $parameters
+     *  @return array{subject: string, message: string}
+     */
+    public function businessNotification(string $type, string $locale, array $parameters): array
+    {
+        $templates = [
+            'ACTION_ASSIGNED' => ['Nouvelle action affectée', 'New action assigned', 'L’action « %s » vous est affectée avec une échéance au %s.', 'Action “%s” is assigned to you, due on %s.'],
+            'ACTION_OWNER_CHANGED' => ['Action réaffectée', 'Action reassigned', 'L’action « %s » vous est affectée avec une échéance au %s.', 'Action “%s” has been reassigned to you, due on %s.'],
+            'ACTION_OVERDUE' => ['Action en retard', 'Overdue action', 'L’action « %s » est attendue pour le %s.', 'Action “%s” was due on %s.'],
+            'ACTION_DUE_SOON' => ['Échéance proche', 'Action due soon', 'L’action « %s » est attendue pour le %s.', 'Action “%s” is due on %s.'],
+            'RISK_ACCEPTANCE_EXPIRED' => ['Acceptation de risque expirée', 'Risk acceptance expired', 'Le risque « %s » doit être réévalué.', 'Risk “%s” must be reassessed.'],
+            'RISK_REVIEW_REMINDER' => ['Revue de risque à finaliser', 'Risk review reminder', '« %s » doit être revu avant le %s dans la campagne « %s ».', '“%s” must be reviewed by %s in campaign “%s”.'],
+            'OPERATIONAL_REMINDER' => ['Échéance à traiter', 'Operational deadline reminder', '« %s » arrive à échéance le %s.', '“%s” is due on %s.'],
+            'CRITICAL_RISK_CREATED' => ['Risque critique créé', 'Critical risk created', 'Le scénario « %s » a un score brut de %d.', 'Scenario “%s” has a gross risk score of %d.'],
+            'RISK_REVIEW_REQUIRED' => ['Risque à valider', 'Risk validation required', 'Le scénario « %s » est en attente de validation.', 'Scenario “%s” is awaiting validation.'],
+            'COMPLIANCE_ASSESSMENT_COMPLETED' => ['Évaluation de conformité terminée', 'Compliance assessment completed', 'L’évaluation %s %s est terminée avec un score de %.2f%%.', 'Assessment %s %s is complete with a score of %.2f%%.'],
+            'RISK_ACCEPTANCE_REQUIRED' => ['Acceptation de risque à décider', 'Risk acceptance decision required', 'Le risque « %s » nécessite une décision formelle.', 'Risk “%s” requires a formal decision.'],
+            'RISK_ACCEPTANCE_DECIDED' => ['Décision d’acceptation de risque', 'Risk acceptance decision', 'La demande pour « %s » est %s.', 'The request for “%s” has been %s.'],
+            'RISK_REVIEW_CAMPAIGN' => ['Campagne de revue affectée', 'Risk review campaign assigned', 'La campagne « %s » contient %d risque(s) à revoir.', 'Campaign “%s” contains %d risk(s) to review.'],
+        ];
+        $template = $templates[$type] ?? throw new \InvalidArgumentException('Unknown business notification type.');
+        $english = 'en' === $locale;
+        if ('RISK_ACCEPTANCE_DECIDED' === $type) {
+            $parameters[1] = 'APPROVED' === ($parameters[1] ?? null) ? ($english ? 'approved' : 'approuvée') : ($english ? 'rejected' : 'refusée');
+        }
+        $parameters = array_map(static fn ($value) => $value instanceof \DateTimeInterface ? $value->format($english ? 'Y-m-d' : 'd/m/Y') : $value, $parameters);
+
+        return ['subject' => $template[$english ? 1 : 0], 'message' => vsprintf($template[$english ? 3 : 2], $parameters)];
+    }
+
     public function html(string $subject, string $message): string
     {
         $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

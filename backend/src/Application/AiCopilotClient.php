@@ -81,22 +81,33 @@ PROMPT;
         } catch (\JsonException $error) {
             throw new \RuntimeException('AI provider returned an invalid pilot response.', 0, $error);
         }
-        if (!is_array($result) || '' === trim((string) ($result['answer'] ?? '')) || !is_array($result['actions'] ?? null)) {
+        if (!is_array($result) || !is_string($result['answer'] ?? null) || '' === trim($result['answer']) || !is_array($result['actions'] ?? null) || !array_is_list($result['actions'])) {
             throw new \RuntimeException('AI provider returned an incomplete pilot response.');
         }
 
-        $actions = array_map(static function (mixed $action): ?array {
-            if (!is_array($action)) {
+        $actions = array_map(static function (mixed $action) use ($capabilities): ?array {
+            if (!is_array($action) || !is_string($action['type'] ?? null) || !is_string($action['label'] ?? null)
+                || preg_match('/[\x00-\x1F\x7F]/', $action['label']) || (isset($action['path']) && !is_string($action['path']))) {
                 return null;
             }
-            $normalized = ['type' => (string) ($action['type'] ?? ''), 'label' => mb_substr(trim((string) ($action['label'] ?? '')), 0, 120)];
-            if (isset($action['path'])) {
-                $normalized['path'] = (string) $action['path'];
+            $allowed = array_filter($capabilities, static fn (array $capability): bool => $capability['type'] === $action['type']
+                && ('NAVIGATE' !== $action['type'] || ($capability['path'] ?? null) === ($action['path'] ?? null)));
+            if ([] === $allowed) {
+                return null;
+            }
+            $normalized = ['type' => $action['type'], 'label' => mb_substr(trim($action['label']), 0, 120)];
+            if ('NAVIGATE' === $action['type']) {
+                $normalized['path'] = $action['path'];
             }
 
             return $normalized;
         }, $result['actions']);
         $actions = array_values(array_filter($actions, static fn (?array $action): bool => null !== $action && '' !== $action['type'] && '' !== $action['label']));
+        $unique = [];
+        foreach ($actions as $action) {
+            $unique[$action['type'].'|'.($action['path'] ?? '')] ??= $action;
+        }
+        $actions = array_values($unique);
 
         return [
             'answer' => mb_substr(trim((string) $result['answer']), 0, 12000),
@@ -129,6 +140,22 @@ PROMPT;
         }
         if (!is_array($draft)) {
             throw new \RuntimeException('AI provider returned an invalid risk draft.');
+        }
+
+        foreach (['title', 'description', 'rationale'] as $field) {
+            if (!is_string($draft[$field] ?? null)) {
+                throw new \RuntimeException('AI risk draft text must be a string.');
+            }
+        }
+        foreach (['scopeId', 'assetId', 'threatId', 'likelihood', 'impact'] as $field) {
+            if (!is_int($draft[$field] ?? null) || $draft[$field] < 1) {
+                throw new \RuntimeException('AI risk draft identifiers and scores must be positive integers.');
+            }
+        }
+        foreach (['scopeId' => 'scopes', 'assetId' => 'assets', 'threatId' => 'threats'] as $field => $collection) {
+            if (!in_array($draft[$field], array_column($catalog[$collection], 'id'), true)) {
+                throw new \RuntimeException('AI risk draft references an unavailable catalog item.');
+            }
         }
 
         $title = trim((string) ($draft['title'] ?? ''));
@@ -176,6 +203,19 @@ PROMPT;
         }
         if (!is_array($draft)) {
             throw new \RuntimeException('AI provider returned an invalid compliance action draft.');
+        }
+        foreach (['title', 'description', 'rationale', 'priority', 'actionType'] as $field) {
+            if (!is_string($draft[$field] ?? null)) {
+                throw new \RuntimeException('AI compliance draft text must be a string.');
+            }
+        }
+        foreach (['complianceResultId', 'dueInDays'] as $field) {
+            if (!is_int($draft[$field] ?? null) || $draft[$field] < 1) {
+                throw new \RuntimeException('AI compliance draft identifiers and deadlines must be positive integers.');
+            }
+        }
+        if (!in_array($draft['complianceResultId'], array_column($catalog, 'id'), true)) {
+            throw new \RuntimeException('AI compliance draft references an unavailable catalog item.');
         }
 
         $result = [

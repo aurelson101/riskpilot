@@ -26,7 +26,7 @@ final class ExpireRiskAcceptancesCommand extends Command
         foreach ($expired as $acceptance) {
             $acceptance->expire();
             $risk = $acceptance->getRisk();
-            $this->notifications->notify($risk->getRiskOwner(), 'RISK_ACCEPTANCE_EXPIRED', 'Acceptation de risque expirée', sprintf('Le risque « %s » doit être réévalué.', $risk->getTitle()), '/risks');
+            $this->notifications->notifyLocalized($risk->getRiskOwner(), 'RISK_ACCEPTANCE_EXPIRED', [$risk->getTitle()], '/risks');
         }
         $this->entityManager->flush();
         $output->writeln(sprintf('%d acceptation(s) expirée(s).', count($expired)));

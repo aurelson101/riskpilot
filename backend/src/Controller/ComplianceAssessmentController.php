@@ -134,7 +134,7 @@ final readonly class ComplianceAssessmentController
         }
         $item->recalculateScore();
         if ('COMPLETED' === $input->status && 'COMPLETED' !== $previousStatus) {
-            $this->notifications->notify($assessor, 'COMPLIANCE_ASSESSMENT_COMPLETED', 'Évaluation de conformité terminée', sprintf('L’évaluation %s %s est terminée avec un score de %.2f%%.', $framework->getName(), $framework->getVersion(), $item->getGlobalScore()), '/compliance');
+            $this->notifications->notifyLocalized($assessor, 'COMPLIANCE_ASSESSMENT_COMPLETED', [$framework->getName(), $framework->getVersion(), $item->getGlobalScore()], '/compliance');
         }
         $this->entityManager->flush();
 

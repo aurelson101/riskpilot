@@ -12,6 +12,14 @@ final class ComplianceResultInput
     #[Assert\Range(min: 0, max: 5)] public int $maturityLevel = 0;
     #[Assert\Choice(choices: ComplianceResult::STATUSES)] public string $complianceStatus = 'NOT_ASSESSED';
     #[Assert\Length(max: 10000)] public ?string $comment = null;
-    /** @var list<string> */ #[Assert\All([new Assert\Url(requireTld: false)])] public array $evidence = [];
+    /** @var list<string> */ #[Assert\Count(max: 100), Assert\All([new Assert\Url(requireTld: false), new Assert\Length(max: 2048)])] public array $evidence = [];
     #[Assert\Positive] public ?int $remediationActionId = null;
+
+    #[Assert\Callback]
+    public function validateLists(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
+    {
+        if (!array_is_list($this->evidence)) {
+            $context->buildViolation('Une liste est attendue.')->atPath('evidence')->addViolation();
+        }
+    }
 }

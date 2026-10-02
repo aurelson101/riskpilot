@@ -83,12 +83,15 @@ les configurations d'intégration et la validation des plans d'action.
 
 Les emails de réinitialisation utilisent la langue FR/EN du destinataire ; les
 emails de test utilisent celle de l'administrateur qui lance le test. Les
-notifications métier conservent leurs textes français mais incluent désormais
-leur lien interne avec un libellé FR/EN. Un habillage HTML commun est ajouté,
+nouveaux messages des 13 types de notifications métier utilisent la langue du
+destinataire, avec dates et lien interne FR/EN. Les notifications historiques
+restent inchangées. Un habillage HTML commun est ajouté,
 avec alternative texte pour SMTP/Gmail ; Graph reçoit le corps HTML. Les contenus
 dynamiques sont échappés et seuls les liens de l'application deviennent cliquables.
-La traduction complète des notifications et la reprise après incident
-restent à compléter ; voir la
+Les échecs de publication de l'outbox libèrent désormais le lot non publié avec
+un délai de reprise. Les anciens messages `DISPATCHED` bloqués nécessitent encore
+un diagnostic ; voir le [second lot de 50 améliorations](docs/releases/2026-10-02-50-notifications-ai-improvements.md)
+et la
 [vérification des emails](docs/releases/2026-10-02-grc-search-session.md#vérification-des-emails-fren--2-octobre-2026).
 
 L’authentification utilise des JWT courts liés à une session serveur et un refresh token rotatif conservé en cookie HttpOnly. Le profil permet de consulter et révoquer les appareils connectés. Le parcours « Mot de passe oublié » envoie un lien à usage unique valable 30 minutes et invalide toutes les sessions après réinitialisation. Après plusieurs échecs, le compte est temporairement verrouillé de manière progressive. Le MFA reste facultatif conformément au périmètre produit.

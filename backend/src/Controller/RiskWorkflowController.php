@@ -53,7 +53,7 @@ final readonly class RiskWorkflowController
         $admins = $this->users->findBy(['organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
         foreach ($admins as $admin) {
             if (array_intersect([User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN], $admin->getRoles())) {
-                $this->notifications->notify($admin, 'RISK_ACCEPTANCE_REQUIRED', 'Acceptation de risque à décider', sprintf('Le risque « %s » nécessite une décision formelle.', $risk->getTitle()), '/risks');
+                $this->notifications->notifyLocalized($admin, 'RISK_ACCEPTANCE_REQUIRED', [$risk->getTitle()], '/risks');
             }
         }
         $this->entityManager->flush();
@@ -72,7 +72,7 @@ final readonly class RiskWorkflowController
                 return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Demande introuvable.'], 404);
             }
             $acceptance->decide((string) ($input['status'] ?? ''), $actor, isset($input['comment']) ? (string) $input['comment'] : null);
-            $this->notifications->notify($acceptance->getRequestedBy(), 'RISK_ACCEPTANCE_DECIDED', 'Décision d’acceptation de risque', sprintf('La demande pour « %s » est %s.', $acceptance->getRisk()->getTitle(), 'APPROVED' === $acceptance->getStoredStatus() ? 'approuvée' : 'refusée'), '/risks');
+            $this->notifications->notifyLocalized($acceptance->getRequestedBy(), 'RISK_ACCEPTANCE_DECIDED', [$acceptance->getRisk()->getTitle(), $acceptance->getStoredStatus()], '/risks');
             $this->entityManager->flush();
         } catch (\LogicException $error) {
             return new JsonResponse(['code' => 'INVALID_TRANSITION', 'message' => $error->getMessage()], 409);
@@ -112,7 +112,7 @@ final readonly class RiskWorkflowController
         }
         $this->entityManager->persist($campaign);
         if ('ACTIVE' === $campaign->getStatus()) {
-            $this->notifications->notify($reviewer, 'RISK_REVIEW_CAMPAIGN', 'Campagne de revue affectée', sprintf('La campagne « %s » contient %d risque(s) à revoir.', $campaign->getTitle(), count($risks)), '/risks');
+            $this->notifications->notifyLocalized($reviewer, 'RISK_REVIEW_CAMPAIGN', [$campaign->getTitle(), count($risks)], '/risks');
         }
         $this->entityManager->flush();
 

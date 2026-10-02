@@ -25,7 +25,7 @@ final class RemindRiskReviewsCommand extends Command
         $reviews = $this->reviews->findDueForReminder();
         foreach ($reviews as $review) {
             $campaign = $review->getCampaign();
-            $this->notifications->notify($review->getReviewer(), 'RISK_REVIEW_REMINDER', 'Revue de risque à finaliser', sprintf('« %s » doit être revu avant le %s dans la campagne « %s ».', $review->getRisk()->getTitle(), $campaign->getDueAt()->format('d/m/Y'), $campaign->getTitle()), '/risks');
+            $this->notifications->notifyLocalized($review->getReviewer(), 'RISK_REVIEW_REMINDER', [$review->getRisk()->getTitle(), $campaign->getDueAt(), $campaign->getTitle()], '/risks');
             $review->markReminded();
         }
         $this->entityManager->flush();

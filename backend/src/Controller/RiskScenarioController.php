@@ -116,10 +116,10 @@ final readonly class RiskScenarioController
             ->setTreatmentDecision($input->treatmentDecision)->setStatus($input->status)->setReviewDate(null === $input->reviewDate ? null : new \DateTimeImmutable($input->reviewDate));
         $this->entityManager->persist($risk);
         if ($created && $risk->getGrossRiskScore() > $actor->getOrganization()->getRiskThresholds()['highMax']) {
-            $this->notifications->notify($owner, 'CRITICAL_RISK_CREATED', 'Risque critique créé', sprintf('Le scénario « %s » a un score brut de %d.', $risk->getTitle(), $risk->getGrossRiskScore()), '/risks');
+            $this->notifications->notifyLocalized($owner, 'CRITICAL_RISK_CREATED', [$risk->getTitle(), $risk->getGrossRiskScore()], '/risks');
         }
         if ($created && 'IN_REVIEW' === $risk->getStatus()) {
-            $this->notifications->notify($owner, 'RISK_REVIEW_REQUIRED', 'Risque à valider', sprintf('Le scénario « %s » est en attente de validation.', $risk->getTitle()), '/risks');
+            $this->notifications->notifyLocalized($owner, 'RISK_REVIEW_REQUIRED', [$risk->getTitle()], '/risks');
         }
         $this->entityManager->flush();
 

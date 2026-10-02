@@ -19,6 +19,14 @@ final class AssetInput
     #[Assert\Range(min: 1, max: 5)] public int $availability = 1;
     #[Assert\Positive] public ?int $ownerId = null;
     #[Assert\NotNull] #[Assert\Positive] public ?int $scopeId = null;
-    /** @var list<int> */ #[Assert\All([new Assert\Positive()])] public array $relatedAssetIds = [];
+    /** @var list<int> */ #[Assert\Count(max: 500), Assert\All([new Assert\Type('integer'), new Assert\Positive()])] public array $relatedAssetIds = [];
     #[Assert\Choice(choices: Asset::STATUSES)] public string $status = 'ACTIVE';
+
+    #[Assert\Callback]
+    public function validateLists(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
+    {
+        if (!array_is_list($this->relatedAssetIds)) {
+            $context->buildViolation('Une liste est attendue.')->atPath('relatedAssetIds')->addViolation();
+        }
+    }
 }

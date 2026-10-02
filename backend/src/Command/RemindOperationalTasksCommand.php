@@ -28,7 +28,7 @@ final class RemindOperationalTasksCommand extends Command
             if (null === $owner) {
                 continue;
             }
-            $this->notifications->notify($owner, 'OPERATIONAL_REMINDER', 'Échéance à traiter', sprintf('« %s » arrive à échéance le %s.', $record->getTitle(), $record->getDueAt()?->format('d/m/Y')), '/operations');
+            $this->notifications->notifyLocalized($owner, 'OPERATIONAL_REMINDER', [$record->getTitle(), $record->getDueAt() ?? ''], '/operations');
             $record->markReminded();
             ++$count;
         }

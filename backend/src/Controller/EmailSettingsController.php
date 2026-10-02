@@ -51,6 +51,33 @@ final readonly class EmailSettingsController
     {
         $user = $this->admin();
         $input = $request->toArray();
+        foreach (['provider', 'host', 'encryption', 'username', 'senderEmail', 'senderName', 'password', 'oauthClientId', 'oauthClientSecret', 'oauthTenant', 'replyTo'] as $field) {
+            if (array_key_exists($field, $input) && !is_string($input[$field]) && !('replyTo' === $field && null === $input[$field])) {
+                return $this->error('Les champs de messagerie doivent être des textes.');
+            }
+        }
+        if (array_key_exists('enabled', $input) && !is_bool($input['enabled'])) {
+            return $this->error('L’activation doit être un booléen.');
+        }
+        if (array_key_exists('port', $input) && !is_int($input['port'])) {
+            return $this->error('Le port SMTP doit être un entier.');
+        }
+        foreach (['password', 'oauthClientSecret'] as $field) {
+            $value = $input[$field] ?? '';
+            if (strlen($value) > 4096 || str_contains($value, "\0")) {
+                return $this->error('Le secret de messagerie est invalide ou trop long.');
+            }
+        }
+        foreach (['senderEmail', 'replyTo'] as $field) {
+            if (mb_strlen($input[$field] ?? '') > 180) {
+                return $this->error('Une adresse email dépasse 180 caractères.');
+            }
+        }
+        foreach (['username', 'senderName', 'oauthClientId'] as $field) {
+            if (preg_match('/[\x00-\x1F\x7F]/', $input[$field] ?? '')) {
+                return $this->error('Les identifiants et noms ne doivent pas contenir de caractères de contrôle.');
+            }
+        }
         $provider = strtoupper((string) ($input['provider'] ?? ''));
         if (!in_array($provider, EmailSettings::PROVIDERS, true)) {
             return $this->error('Le fournisseur sélectionné est invalide.');
@@ -93,6 +120,9 @@ final readonly class EmailSettingsController
     {
         $user = $this->admin();
         $provider = strtoupper($provider);
+        if (!in_array($provider, ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
+            return $this->error('Le fournisseur OAuth de messagerie est invalide.');
+        }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization(), 'provider' => $provider]);
         if (!$settings instanceof EmailSettings || null === $settings->getEncryptedOauthClientSecret()) {
             return $this->error('Enregistrez les identifiants OAuth avant la connexion.');
@@ -108,28 +138,34 @@ final readonly class EmailSettingsController
     #[Route('/oauth/{provider}/callback', methods: ['GET'])]
     public function callback(string $provider, Request $request): RedirectResponse
     {
-        $state = (string) $request->query->get('state', '');
-        $settings = $this->repository->findOneBy(['oauthStateHash' => hash('sha256', $state), 'provider' => strtoupper($provider)]);
         $frontend = rtrim($this->appUrl, '/').'/administration/email-settings';
+        $redirect = static fn (string $status): RedirectResponse => new RedirectResponse($frontend.'?oauth='.$status, 302, ['Cache-Control' => 'private, no-store', 'Referrer-Policy' => 'no-referrer']);
+        $query = $request->query->all();
+        $state = $query['state'] ?? '';
+        if (!in_array(strtoupper($provider), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true) || !is_string($state) || !preg_match('/^[a-f0-9]{64}$/D', $state)
+            || (isset($query['code']) && (!is_string($query['code']) || strlen($query['code']) > 8192))) {
+            return $redirect('error');
+        }
+        $settings = $this->repository->findOneBy(['oauthStateHash' => hash('sha256', $state), 'provider' => strtoupper($provider)]);
         if (!$settings instanceof EmailSettings || !$settings->consumeOauthState($state) || $request->query->has('error')) {
             if ($settings instanceof EmailSettings) {
                 $this->entityManager->flush();
             }
 
-            return new RedirectResponse($frontend.'?oauth=error');
+            return $redirect('error');
         }
         try {
             $redirectUri = rtrim($this->appUrl, '/').$request->getPathInfo();
             $tokens = $this->oauth->exchangeCode($settings, $redirectUri, (string) $request->query->get('code', ''), $state);
             $email = $this->oauth->connectedEmail($settings, $tokens['access_token']);
-            $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.max(60, $tokens['expires_in']).' seconds'), $email);
+            $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.$tokens['expires_in'].' seconds'), $email);
             $this->entityManager->flush();
 
-            return new RedirectResponse($frontend.'?oauth=success');
+            return $redirect('success');
         } catch (\Throwable) {
             $this->entityManager->flush();
 
-            return new RedirectResponse($frontend.'?oauth=error');
+            return $redirect('error');
         }
     }
 

@@ -178,7 +178,7 @@ final readonly class ActionPlanController
         $item->setTitle($input->title)->setDescription($input->description)->setRelatedRisk($risk)->setRelatedControl($control)->setOwner($owner)->setPriority($input->priority)->setStatus($input->status)->setStartDate($startDate)->setDueDate($dueDate)->setCompletionDate(null === $input->completionDate ? null : new \DateTimeImmutable($input->completionDate))->setProgress($input->progress)->setEstimatedCost(null === $input->estimatedCost ? null : number_format($input->estimatedCost, 2, '.', ''))->setEstimatedEffortDays(null === $input->estimatedEffortDays ? null : number_format($input->estimatedEffortDays, 2, '.', ''))->setActualCost(null === $input->actualCost ? null : number_format($input->actualCost, 2, '.', ''))->setExpectedRiskReduction($input->expectedRiskReduction)->setEvidence($input->evidence)->configureGrc($input->ticketNumber, $input->ticketUrl, $input->origin, $input->actionType, $frameworkIds, $requirementIds, $input->customFields, $auditFindings, $complianceResults);
         $this->entityManager->persist($item);
         if ($created || $previousOwner !== $owner) {
-            $this->notifications->notify($owner, $created ? 'ACTION_ASSIGNED' : 'ACTION_OWNER_CHANGED', $created ? 'Nouvelle action affectée' : 'Action réaffectée', sprintf('L’action « %s » vous est affectée avec une échéance au %s.', $item->getTitle(), $dueDate->format('d/m/Y')), '/actions');
+            $this->notifications->notifyLocalized($owner, $created ? 'ACTION_ASSIGNED' : 'ACTION_OWNER_CHANGED', [$item->getTitle(), $dueDate], '/actions');
         }
         $this->entityManager->flush();
 

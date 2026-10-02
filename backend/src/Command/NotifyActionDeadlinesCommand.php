@@ -29,7 +29,7 @@ final class NotifyActionDeadlinesCommand extends Command
         $actions = $this->entityManager->getRepository(ActionPlan::class)->createQueryBuilder('a')->andWhere('a.status NOT IN (:closed)')->andWhere('a.dueDate <= :soon')->setParameter('closed', ['COMPLETED', 'CANCELLED'])->setParameter('soon', $soon)->getQuery()->getResult();
         foreach ($actions as $action) {
             $overdue = $action->getDueDate() < $today;
-            $this->notifications->notify($action->getOwner(), $overdue ? 'ACTION_OVERDUE' : 'ACTION_DUE_SOON', $overdue ? 'Action en retard' : 'Échéance proche', sprintf('L’action « %s » est attendue pour le %s.', $action->getTitle(), $action->getDueDate()->format('d/m/Y')), '/actions');
+            $this->notifications->notifyLocalized($action->getOwner(), $overdue ? 'ACTION_OVERDUE' : 'ACTION_DUE_SOON', [$action->getTitle(), $action->getDueDate()], '/actions');
             ++$count;
         }
         $this->entityManager->flush();

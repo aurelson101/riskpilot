@@ -24,14 +24,19 @@ final class NotificationOutboxRepositoryTest extends TestCase
             static function (string $sql, array $parameters): array {
                 self::assertStringContainsString('attempts < :maximum', $sql);
                 self::assertStringContainsString('FOR UPDATE SKIP LOCKED', $sql);
+                self::assertStringContainsString('created_at ASC, id ASC', $sql);
                 self::assertSame(5, $parameters['maximum']);
                 return ['42'];
             },
         );
         $calls = 0;
-        $connection->expects(self::exactly(2))->method('executeStatement')->willReturnCallback(
+        $connection->expects(self::exactly(3))->method('executeStatement')->willReturnCallback(
             static function (string $sql, array $parameters) use (&$calls): int {
                 if (0 === $calls++) {
+                    self::assertStringContainsString('NOT EXISTS', $sql);
+                    self::assertSame('CANCELLED', $parameters['cancelled']);
+                    self::assertSame('ACTIVE', $parameters['active']);
+                } elseif (2 === $calls) {
                     self::assertStringContainsString('attempts >= :maximum', $sql);
                     self::assertSame('DEAD_LETTER', $parameters['terminal']);
                     self::assertSame(5, $parameters['maximum']);
