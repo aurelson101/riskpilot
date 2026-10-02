@@ -206,7 +206,11 @@ Le handler ajoute désormais le champ `link` au corps de l'email uniquement si
 le chemin est interne et l'URL de l'application valide, avec un libellé FR/EN.
 `EmailTemplateRenderer` centralise le reset FR/EN (langue du destinataire), le
 test de messagerie FR/EN (langue de l'administrateur) et les liens internes.
-Les sujets et corps des notifications métier restent français, en texte simple.
+Les sujets et corps des notifications métier restent français. Le renderer ajoute
+un habillage HTML avec styles intégrés, largeur fluide et contenu échappé.
+`OrganizationMailer` fournit texte et HTML à SMTP/Gmail ; Graph reçoit un corps
+JSON de type `HTML`. Les liens cliquables sont limités à l'URL de l'application.
+Les appels directs à `OauthMailProvider::send` sans HTML restent en texte simple.
 Les nouveaux échecs stockent uniquement `MAIL_SEND_FAILED` ; les anciennes erreurs
 ne sont pas automatiquement purgées. Voir les
 [priorités et modèles](grc-models-configuration.md).

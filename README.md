@@ -80,8 +80,10 @@ Depuis la vue Calendrier des plans d’action, chaque utilisateur peut créer un
 Les emails de réinitialisation utilisent la langue FR/EN du destinataire ; les
 emails de test utilisent celle de l'administrateur qui lance le test. Les
 notifications métier conservent leurs textes français mais incluent désormais
-leur lien interne avec un libellé FR/EN. Les envois restent en texte simple.
-La traduction complète des notifications, le HTML et la reprise après incident
+leur lien interne avec un libellé FR/EN. Un habillage HTML commun est ajouté,
+avec alternative texte pour SMTP/Gmail ; Graph reçoit le corps HTML. Les contenus
+dynamiques sont échappés et seuls les liens de l'application deviennent cliquables.
+La traduction complète des notifications et la reprise après incident
 restent à compléter ; voir la
 [vérification des emails](docs/releases/2026-10-02-grc-search-session.md#vérification-des-emails-fren--2-octobre-2026).
 

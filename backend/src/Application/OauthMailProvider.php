@@ -51,11 +51,14 @@ final readonly class OauthMailProvider
         return $email;
     }
 
-    public function send(EmailSettings $settings, string $recipient, string $subject, string $message): void
+    public function send(EmailSettings $settings, string $recipient, string $subject, string $message, ?string $html = null): void
     {
         $accessToken = $this->validAccessToken($settings);
         if ('GOOGLE_WORKSPACE' === $settings->getProvider()) {
             $email = (new Email())->from(new Address($settings->getSenderEmail(), $settings->getSenderName()))->to($recipient)->subject($subject)->text($message);
+            if (null !== $html) {
+                $email->html($html);
+            }
             if (null !== $settings->getReplyTo()) {
                 $email->replyTo($settings->getReplyTo());
             }
@@ -66,7 +69,7 @@ final readonly class OauthMailProvider
         }
         $payload = ['message' => [
             'subject' => $subject,
-            'body' => ['contentType' => 'Text', 'content' => $message],
+            'body' => ['contentType' => null === $html ? 'Text' : 'HTML', 'content' => $html ?? $message],
             'from' => ['emailAddress' => ['address' => $settings->getSenderEmail(), 'name' => $settings->getSenderName()]],
             'toRecipients' => [['emailAddress' => ['address' => $recipient]]],
         ], 'saveToSentItems' => true];

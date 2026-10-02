@@ -12,8 +12,9 @@ produit. Les critères ci-dessous sont des travaux à réaliser, pas des livrais
    des destinataires inéligibles et code d'erreur générique implémentés ; restent
    la reprise des réservations bloquées, la supervision et l'examen des erreurs historiques.
 2. **P0 — Emails FR/EN (partiel)** : reset/test bilingues et liens internes ajoutés ;
-   restent la traduction des notifications métier, l'alternative texte/HTML et
-   les validations de réception par fournisseur. Le test suit la langue de l'administrateur.
+   habillage HTML ajouté (texte+HTML SMTP/Gmail, HTML Graph) ; restent la traduction
+   des notifications métier et les validations de réception/rendu par fournisseur.
+   Le test suit la langue de l'administrateur.
 3. **P1 — Bibliothèques interopérables** : import contrôlé Excel/YAML, identifiants
    stables, versions, traductions, licences, simulation et rapport d'erreurs ;
    conserver les packs gouvernés et les imports existants.

@@ -54,4 +54,32 @@ final class EmailTemplateRendererTest extends TestCase
         $this->expectException(\RuntimeException::class);
         (new EmailTemplateRenderer('javascript:alert(1)'))->passwordReset('en', 'token');
     }
+
+    public function testHtmlEscapesContentAndLinksOnlyToTheConfiguredApplication(): void
+    {
+        $html = (new EmailTemplateRenderer('https://riskpilot.example'))->html(
+            '<script>alert("subject")</script>',
+            "<img src=x onerror=alert(1)>\nhttps://riskpilot.example/actions?one=1&two=2\nhttps://evil.example/actions\nhttps://riskpilot.example.evil.example/actions\nhttps://riskpilot.example/actions%0AInjected",
+        );
+        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringNotContainsString('<img ', $html);
+        self::assertStringContainsString('&lt;img', $html);
+        self::assertStringContainsString('href="https://riskpilot.example/actions?one=1&amp;two=2"', $html);
+        self::assertSame(1, substr_count($html, '<a '));
+        self::assertStringContainsString('<br>', $html);
+        self::assertStringContainsString('width=device-width', $html);
+        self::assertStringContainsString('max-width:600px', $html);
+    }
+
+    public function testHtmlPreservesFrenchAndEnglishResetContent(): void
+    {
+        $templates = new EmailTemplateRenderer('https://riskpilot.example');
+        foreach (['fr', 'en'] as $locale) {
+            $email = $templates->passwordReset($locale, 'test-token');
+            $html = $templates->html($email['subject'], $email['message']);
+            self::assertStringContainsString(htmlspecialchars($email['subject'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), $html);
+            self::assertStringContainsString('href="https://riskpilot.example/reset-password?token=test-token"', $html);
+            self::assertStringContainsString('30 minutes', $html);
+        }
+    }
 }

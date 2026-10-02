@@ -154,6 +154,10 @@ Les emails de reset et de test FR/EN sont déjà centralisés dans
 `EmailTemplateRenderer` ; le reset suit la langue du destinataire, le test celle
 de l'administrateur. Le modèle ci-dessous concerne les notifications métier dont
 le texte reste français ; seul le libellé du lien ajouté est déjà bilingue.
+L'habillage HTML échappé est commun à tous les envois via `OrganizationMailer` :
+SMTP/Gmail conservent une alternative texte, Graph reçoit le HTML. La largeur
+fluide et les styles intégrés sont testés structurellement, pas encore dans les
+clients Thunderbird/Outlook/Gmail réels.
 
 | Élément | Français | English |
 | --- | --- | --- |

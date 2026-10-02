@@ -15,7 +15,7 @@ use Symfony\Component\Mime\Email;
 
 final readonly class OrganizationMailer
 {
-    public function __construct(private EmailSettingsRepository $settings, private SecretCipher $cipher, private MailerInterface $fallbackMailer, private OauthMailProvider $oauthMailer)
+    public function __construct(private EmailSettingsRepository $settings, private SecretCipher $cipher, private MailerInterface $fallbackMailer, private OauthMailProvider $oauthMailer, private EmailTemplateRenderer $emailTemplates)
     {
     }
 
@@ -23,7 +23,7 @@ final readonly class OrganizationMailer
     {
         $settings = $this->settings->findOneBy(['organization' => $organizationId, 'enabled' => true]);
         if (!$settings instanceof EmailSettings) {
-            $this->fallbackMailer->send((new Email())->from('notifications@riskpilot.local')->to($recipient)->subject($subject)->text($message));
+            $this->fallbackMailer->send((new Email())->from('notifications@riskpilot.local')->to($recipient)->subject($subject)->text($message)->html($this->emailTemplates->html($subject, $message)));
 
             return;
         }
@@ -33,7 +33,7 @@ final readonly class OrganizationMailer
     public function sendWithSettings(EmailSettings $settings, string $recipient, string $subject, string $message): void
     {
         if (in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
-            $this->oauthMailer->send($settings, $recipient, $subject, $message);
+            $this->oauthMailer->send($settings, $recipient, $subject, $message, $this->emailTemplates->html($subject, $message));
 
             return;
         }
@@ -44,7 +44,7 @@ final readonly class OrganizationMailer
         $scheme = 'ssl' === $settings->getEncryption() ? 'smtps' : 'smtp';
         $query = 'tls' === $settings->getEncryption() ? '?require_tls=true' : '';
         $dsn = sprintf('%s://%s:%s@%s:%d%s', $scheme, rawurlencode($settings->getUsername()), rawurlencode($this->cipher->decrypt($password)), $settings->getHost(), $settings->getPort(), $query);
-        $email = (new Email())->from(new Address($settings->getSenderEmail(), $settings->getSenderName()))->to($recipient)->subject($subject)->text($message);
+        $email = (new Email())->from(new Address($settings->getSenderEmail(), $settings->getSenderName()))->to($recipient)->subject($subject)->text($message)->html($this->emailTemplates->html($subject, $message));
         if (null !== $settings->getReplyTo()) {
             $email->replyTo($settings->getReplyTo());
         }

@@ -188,3 +188,16 @@ simulé, reset à usage unique et réservation/plafond des messages dans la base
 La base et son réseau temporaires ont été supprimés après les tests.
 Cette recette ne vérifie ni la réception réelle SMTP/Graph/Gmail ni les courses
 entre plusieurs workers. Les limites produit précédemment indiquées restent valables.
+
+### Troisième patch : habillage HTML des emails
+
+- Habillage commun avec largeur fluide, styles intégrés et texte dynamique échappé.
+- Seuls les liens validés de l'application deviennent cliquables ; pas de ressources
+  externes ni de pixels de suivi ajoutés par le modèle.
+- SMTP et Gmail reçoivent texte+HTML ; Graph reçoit un corps HTML. Les appels
+  directs au provider OAuth sans HTML restent compatibles avec le texte simple.
+- 12 tests ciblés, 77 assertions : échappement, liens, contenus FR/EN et requêtes
+  OAuth simulées ; injection Symfony et syntaxe PHP valides dans un conteneur isolé.
+
+Aucun email réel envoyé pendant cette recette. Le rendu des clients mail et la
+réception restent à valider ; les notifications métier ne sont pas encore traduites.

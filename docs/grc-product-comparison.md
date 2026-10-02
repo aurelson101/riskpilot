@@ -31,7 +31,7 @@ restent stables lors des mises à jour. Sources :
 | Traitement et décision | Actions, Kanban/calendrier, portefeuille et rapports décisionnels | Unifier le parcours guidé et tester les vues 360° plutôt que multiplier les menus. |
 | Quantification | `DecisionWorkspaceController::quantify`, pertes annuelles et percentiles | Méthode locale à expliquer/valider ; ne pas annoncer une équivalence avec un moteur éditeur ou une estimation financière garantie. |
 | Identité | JWT/MFA/session, clés de service, bind/recherche LDAPS et découverte OIDC | SSO OIDC/SAML et SCIM non raccordés ; Keycloak/Authentik non validés par le diagnostic actuel Google/Entra. |
-| Messagerie | SMTP, Gmail et Graph délégués, OAuth/PKCE, reset/test FR/EN, liens internes, tentatives bornées et contrôle du destinataire | Traduction des notifications et HTML à compléter ; réservations bloquées et supervision à traiter. |
+| Messagerie | SMTP, Gmail et Graph délégués, OAuth/PKCE, reset/test FR/EN, HTML, liens internes, tentatives bornées et contrôle du destinataire | Traduction des notifications et rendu dans les clients mail à valider ; réservations bloquées et supervision à traiter. |
 | Agenda | Abonnement privé `.ics`, rotation/révocation, actions affectées | Pas de CalDAV ni d'API calendrier Graph/Google ; tests Thunderbird/Outlook à réaliser. |
 | IA | Copilote FR/EN, contexte consenti, brouillons gouvernés et RBAC | Évaluer couverture, qualité et réponses hors contexte ; aucun accès fournisseur direct et illimité aux API. |
 

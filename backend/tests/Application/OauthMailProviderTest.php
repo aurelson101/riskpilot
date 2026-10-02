@@ -87,6 +87,7 @@ final class OauthMailProviderTest extends TestCase
         self::assertSame('RiskPilot GRC', $payload['message']['from']['emailAddress']['name']);
         self::assertSame('reply@example.test', $payload['message']['replyTo'][0]['emailAddress']['address']);
         self::assertTrue($payload['saveToSentItems']);
+        self::assertSame('Text', $payload['message']['body']['contentType']);
     }
 
     public function testGoogleUsesGmailSendForTheConnectedAccount(): void
@@ -109,5 +110,34 @@ final class OauthMailProviderTest extends TestCase
         self::assertSame('Authorization: Bearer access-token', $captured['options']['normalized_headers']['authorization'][0]);
         $payload = json_decode($captured['options']['body'], true, flags: JSON_THROW_ON_ERROR);
         self::assertNotEmpty($payload['raw']);
+    }
+
+    public function testHtmlIsSentThroughGraphAndAsMultipartAlternativeThroughGmail(): void
+    {
+        foreach (['MICROSOFT_365', 'GOOGLE_WORKSPACE'] as $providerName) {
+            $captured = [];
+            $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+                $captured = $options;
+                return new MockResponse('{}', ['http_code' => 200]);
+            });
+            $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+            $settings = new EmailSettings(new Organization('Tenant'));
+            $settings->configureOauth($providerName, 'client-id', $cipher->encrypt('client-secret'), 'organizations', 'RiskPilot', null);
+            $settings->connectOauth($cipher->encrypt('access-token'), $cipher->encrypt('refresh-token'), new \DateTimeImmutable('+1 hour'), 'sender@example.test');
+            (new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), $http))->send($settings, 'recipient@example.test', 'Test', 'Plain body', '<p>HTML body</p>');
+            $payload = json_decode($captured['body'], true, flags: JSON_THROW_ON_ERROR);
+            if ('MICROSOFT_365' === $providerName) {
+                self::assertSame('HTML', $payload['message']['body']['contentType']);
+                self::assertSame('<p>HTML body</p>', $payload['message']['body']['content']);
+            } else {
+                $mime = base64_decode(strtr($payload['raw'], '-_', '+/'), true);
+                self::assertIsString($mime);
+                self::assertStringContainsString('multipart/alternative', $mime);
+                self::assertStringContainsString('text/plain', $mime);
+                self::assertStringContainsString('text/html', $mime);
+                self::assertStringContainsString('Plain body', $mime);
+                self::assertStringContainsString('HTML body', $mime);
+            }
+        }
     }
 }

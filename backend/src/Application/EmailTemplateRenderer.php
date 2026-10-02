@@ -49,6 +49,33 @@ final readonly class EmailTemplateRenderer
         return $message."\n\n".('en' === $locale ? 'View in RiskPilot: ' : 'Consulter dans RiskPilot : ').$url;
     }
 
+    public function html(string $subject, string $message): string
+    {
+        $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $parts = preg_split('~(https?://[^\s<>"\']+)~u', $message, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $body = '';
+        $base = rtrim($this->appUrl, '/');
+        foreach (false === $parts ? [$message] : $parts as $part) {
+            $text = $escape($part);
+            $path = str_starts_with($part, $base.'/') ? substr($part, strlen($base)) : '';
+            $body .= '' !== $path && $this->internalUrl($path) === $part
+                ? '<a href="'.$text.'" style="color:#155eef;text-decoration:underline;overflow-wrap:anywhere;word-break:break-word;">'.$text.'</a>'
+                : $text;
+        }
+
+        return '<!doctype html><html><head><meta charset="utf-8">'
+            .'<meta name="viewport" content="width=device-width, initial-scale=1">'
+            .'<title>'.$escape($subject).'</title></head>'
+            .'<body style="margin:0;padding:16px;background:#f3f5f8;font-family:Arial,sans-serif;color:#182230;">'
+            .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">'
+            .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #d0d5dd;border-radius:8px;">'
+            .'<tr><td style="padding:20px 24px;background:#155eef;color:#ffffff;font-size:20px;font-weight:bold;">RiskPilot</td></tr>'
+            .'<tr><td style="padding:24px;">'
+            .'<h1 style="margin:0 0 20px;font-size:22px;line-height:1.4;overflow-wrap:anywhere;">'.$escape($subject).'</h1>'
+            .'<div style="font-size:16px;line-height:1.6;overflow-wrap:anywhere;word-break:break-word;">'.nl2br($body, false).'</div>'
+            .'</td></tr></table></td></tr></table></body></html>';
+    }
+
     private function internalUrl(string $path): ?string
     {
         $base = rtrim($this->appUrl, '/');
