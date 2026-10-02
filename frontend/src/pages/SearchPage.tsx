@@ -164,6 +164,8 @@ export function SearchPage() {
         <TextField
           select
           label="Type de dossier"
+          SelectProps={{ displayEmpty: true }}
+          InputLabelProps={{ shrink: true }}
           value={selectedType}
           onChange={(event) => update({ type: event.target.value })}
           sx={{ minWidth: 180 }}

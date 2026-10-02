@@ -53,6 +53,7 @@ describe("GRC search", () => {
     const get = vi.spyOn(api, "get");
     show();
     expect(get).not.toHaveBeenCalled();
+    expect(screen.getByText("Tous les dossiers")).toBeVisible();
     expect(screen.getByText(/Saisissez un mot-clé/)).toBeVisible();
     fireEvent.change(screen.getByLabelText("Rechercher"), {
       target: { value: "cloud" },
