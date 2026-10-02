@@ -10,6 +10,8 @@ export interface AuthContextValue {
     mfaCode?: string,
   ) => Promise<boolean>;
   logout: () => void;
+  profileUnavailable?: boolean;
+  retryProfile?: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

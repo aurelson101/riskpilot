@@ -5,8 +5,21 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import { AuthProvider } from "./auth/AuthContext.tsx";
 import "./index.css";
+import axios from "axios";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) =>
+        failureCount < 2 &&
+        !axios.isCancel(error) &&
+        (!axios.isAxiosError(error) ||
+          !error.response ||
+          error.response.status >= 500),
+    },
+    mutations: { retry: false },
+  },
+});
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

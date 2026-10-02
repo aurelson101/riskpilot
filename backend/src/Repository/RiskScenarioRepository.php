@@ -30,6 +30,16 @@ final class RiskScenarioRepository extends ServiceEntityRepository
     }
 
     /** @return list<RiskScenario> */
+    public function findForExport(User $actor): array
+    {
+        return $this->createQueryBuilder('r')->addSelect('scope', 'asset', 'threat', 'owner', 'vulnerabilities')
+            ->join('r.scope', 'scope')->join('r.asset', 'asset')->join('r.threat', 'threat')->join('r.riskOwner', 'owner')
+            ->leftJoin('r.vulnerabilities', 'vulnerabilities')
+            ->where('r.organization = :organization')->setParameter('organization', $actor->getOrganization())
+            ->orderBy('r.currentRiskScore', 'DESC')->addOrderBy('r.title', 'ASC')->addOrderBy('r.id', 'ASC')->getQuery()->getResult();
+    }
+
+    /** @return list<RiskScenario> */
     public function findForService(Organization $organization, int $limit, int $offset, ?string $status, ?\DateTimeImmutable $updatedSince): array
     {
         return $this->serviceQuery($organization, $status, $updatedSince)->orderBy('r.updatedAt', 'ASC')->addOrderBy('r.id', 'ASC')->setMaxResults($limit)->setFirstResult($offset)->getQuery()->getResult();

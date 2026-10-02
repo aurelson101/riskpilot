@@ -46,13 +46,20 @@ export function DashboardPage() {
   const [exportError, setExportError] = useState(false);
   const query = useQuery({
     queryKey: ["dashboard"],
-    queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
+    queryFn: async ({ signal }) =>
+      (await api.get<Dashboard>("/dashboard", { signal })).data,
+    staleTime: 30_000,
   });
   if (query.isLoading)
     return <CircularProgress aria-label="Chargement de la page" />;
   if (query.isError || !query.data)
     return (
-      <Alert severity="error">Impossible de charger le tableau de bord.</Alert>
+      <Alert
+        severity="error"
+        action={<Button onClick={() => void query.refetch()}>Réessayer</Button>}
+      >
+        Impossible de charger le tableau de bord.
+      </Alert>
     );
   const data = query.data;
   const cards = [
@@ -269,14 +276,25 @@ export function DashboardPage() {
                     justifyContent="space-between"
                     alignItems="center"
                   >
-                    <Typography>{risk.title}</Typography>
+                    <Button
+                      component={Link}
+                      to="/risks"
+                      sx={{
+                        textAlign: "left",
+                        justifyContent: "flex-start",
+                        minWidth: 0,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {risk.title}
+                    </Button>
                     <Chip
                       size="small"
                       label={risk.score}
                       color={
-                        risk.score >= 17
+                        risk.level === "CRITICAL"
                           ? "error"
-                          : risk.score >= 10
+                          : risk.level === "HIGH"
                             ? "warning"
                             : "default"
                       }
@@ -313,7 +331,18 @@ export function DashboardPage() {
                     justifyContent="space-between"
                   >
                     <Stack>
-                      <Typography fontWeight={650}>{action.title}</Typography>
+                      <Button
+                        component={Link}
+                        to="/actions"
+                        sx={{
+                          textAlign: "left",
+                          justifyContent: "flex-start",
+                          minWidth: 0,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {action.title}
+                      </Button>
                       <Typography variant="caption">
                         {new Date(
                           `${action.dueDate}T00:00:00`,

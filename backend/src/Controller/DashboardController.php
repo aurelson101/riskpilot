@@ -8,7 +8,6 @@ use App\Application\CurrentUser;
 use App\Application\PdfReportRenderer;
 use App\Domain\Risk\RiskCalculation;
 use App\Entity\ActionPlan;
-use App\Entity\ComplianceAssessment;
 use App\Entity\ExecutiveGovernanceRecord;
 use App\Entity\RiskScenario;
 use App\Repository\ActionPlanRepository;
@@ -55,17 +54,26 @@ final readonly class DashboardController
         $thresholds = $actor->getOrganization()->getRiskThresholds();
         $riskLevels = ['LOW' => 0, 'MODERATE' => 0, 'HIGH' => 0, 'CRITICAL' => 0];
         $actionStatuses = [];
+        $today = new \DateTimeImmutable('today');
+        $dueLimit = $today->modify('+30 days');
+        $dueActions = [];
         foreach ($risks as $risk) {
             ++$riskLevels[$this->calculation->level($risk->getCurrentRiskScore(), $thresholds)->value];
         }
         foreach ($actions as $action) {
-            $actionStatuses[$action->getStatus()] = ($actionStatuses[$action->getStatus()] ?? 0) + 1;
+            $status = $action->getStatus();
+            $actionStatuses[$status] = ($actionStatuses[$status] ?? 0) + 1;
+            if (!in_array($status, ['COMPLETED', 'CANCELLED'], true) && $action->getDueDate() >= $today && $action->getDueDate() <= $dueLimit) {
+                $dueActions[] = $action;
+            }
         }
-        $dueLimit = new \DateTimeImmutable('+30 days');
-        $dueActions = array_values(array_filter($actions, fn (ActionPlan $action): bool => !in_array($action->getStatus(), ['COMPLETED', 'CANCELLED'], true) && $action->getDueDate() <= $dueLimit));
-        $scores = array_map(fn (ComplianceAssessment $item): float => $item->getGlobalScore(), array_filter($assessments, fn (ComplianceAssessment $item): bool => 'COMPLETED' === $item->getStatus()));
+        $scores = [];
         $complianceByFramework = [];
         foreach ($assessments as $assessment) {
+            if ('COMPLETED' !== $assessment->getStatus()) {
+                continue;
+            }
+            $scores[] = $assessment->getGlobalScore();
             $key = $assessment->getFramework()->getName().' '.$assessment->getFramework()->getVersion();
             $complianceByFramework[$key] = max($complianceByFramework[$key] ?? 0, $assessment->getGlobalScore());
         }
@@ -73,7 +81,7 @@ final readonly class DashboardController
         return [
             'summary' => ['totalRisks' => count($risks), 'criticalRisks' => $riskLevels['CRITICAL'], 'highRisks' => $riskLevels['HIGH'], 'overdueActions' => $actionStatuses['OVERDUE'] ?? 0, 'dueActions' => count($dueActions), 'globalCompliance' => [] === $scores ? 0 : round(array_sum($scores) / count($scores), 1)],
             'riskLevels' => $riskLevels, 'actionStatuses' => $actionStatuses, 'complianceByFramework' => $complianceByFramework,
-            'topRisks' => array_map(fn (RiskScenario $risk): array => ['id' => $risk->getId(), 'title' => $risk->getTitle(), 'score' => $risk->getCurrentRiskScore(), 'status' => $risk->getStatus()], array_slice($risks, 0, 10)),
+            'topRisks' => array_map(fn (RiskScenario $risk): array => ['id' => $risk->getId(), 'title' => $risk->getTitle(), 'score' => $risk->getCurrentRiskScore(), 'level' => $this->calculation->level($risk->getCurrentRiskScore(), $thresholds)->value, 'status' => $risk->getStatus()], array_slice(array_values(array_filter($risks, static fn (RiskScenario $risk): bool => !in_array($risk->getStatus(), ['CLOSED', 'ARCHIVED'], true))), 0, 10)),
             'dueActions' => array_map(fn (ActionPlan $action): array => ['id' => $action->getId(), 'title' => $action->getTitle(), 'dueDate' => $action->getDueDate()->format('Y-m-d'), 'status' => $action->getStatus(), 'priority' => $action->getPriority()], array_slice($dueActions, 0, 10)),
         ];
     }

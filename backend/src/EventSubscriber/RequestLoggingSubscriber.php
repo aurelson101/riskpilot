@@ -31,10 +31,18 @@ final readonly class RequestLoggingSubscriber
         }
         $request = $event->getRequest();
         $response = $event->getResponse();
-        $requestId = (string) ($response->headers->get('X-Request-ID') ?: $request->headers->get('X-Request-ID') ?: bin2hex(random_bytes(16)));
-        $response->headers->set('X-Request-ID', mb_substr($requestId, 0, 36));
+        $requestId = (string) ($response->headers->get('X-Request-ID') ?: $request->headers->get('X-Request-ID') ?: '');
+        if (!preg_match('/\A[a-zA-Z0-9_-]{8,64}\z/D', $requestId)) {
+            $requestId = bin2hex(random_bytes(16));
+        }
+        $response->headers->set('X-Request-ID', $requestId);
+        if (str_starts_with($request->getPathInfo(), '/api/') && $request->headers->has('Authorization')) {
+            $response->headers->set('Cache-Control', 'private, no-store');
+            $response->setVary('Authorization', false);
+        }
         $startedAt = $request->attributes->get('_request_started_at');
         $durationMs = is_int($startedAt) ? round((hrtime(true) - $startedAt) / 1_000_000, 2) : null;
-        $this->logger->info('http_request', ['request_id' => $requestId, 'method' => $request->getMethod(), 'path' => $request->getPathInfo(), 'status' => $response->getStatusCode(), 'duration_ms' => $durationMs, 'client_ip' => $request->getClientIp()]);
+        $path = preg_replace('/[\x00-\x1f\x7f]/', '', $request->getPathInfo()) ?? '';
+        $this->logger->info('http_request', ['request_id' => $requestId, 'method' => $request->getMethod(), 'path' => mb_substr($path, 0, 512), 'status' => $response->getStatusCode(), 'duration_ms' => $durationMs, 'client_ip' => $request->getClientIp()]);
     }
 }

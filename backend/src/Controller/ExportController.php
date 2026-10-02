@@ -49,7 +49,7 @@ final readonly class ExportController
             'Impact résiduel', 'Score résiduel', 'Décision de traitement', 'Code traitement',
             'Statut', 'Code statut', 'Date de révision',
         ]];
-        foreach ($this->risks->findVisibleTo($this->currentUser->get()) as $risk) {
+        foreach ($this->risks->findForExport($this->currentUser->get()) as $risk) {
             $rows[] = [
                 $risk->getId(), $risk->getTitle(), $risk->getDescription(), $risk->getScope()->getName(),
                 $risk->getAsset()->getName(), $risk->getThreat()->getName(),
@@ -75,7 +75,7 @@ final readonly class ExportController
             'Date de fin', 'Coût estimé', 'Coût réel', 'Réduction de risque attendue', 'Ticket', 'URL ticket',
             'Origine', 'Type', 'Référentiels', 'Exigences', 'Non-conformités', 'Champs personnalisés', 'Preuves',
         ]];
-        foreach ($this->actions->findVisibleTo($this->currentUser->get()) as $action) {
+        foreach ($this->actions->findForExport($this->currentUser->get()) as $action) {
             $rows[] = [
                 $action->getId(), $action->getTitle(), $action->getDescription(), $action->getRelatedRisk()?->getTitle(),
                 $action->getRelatedControl()?->getName(), $action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName(),

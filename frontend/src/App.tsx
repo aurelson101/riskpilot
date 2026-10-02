@@ -261,7 +261,7 @@ function RoleRoute({
 const adminRoles = ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"] as const;
 
 function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, profileUnavailable, retryProfile } = useAuth();
   const navigate = useNavigate();
   const [copilotOpen, setCopilotOpen] = useState(false);
   const location = useLocation();
@@ -329,7 +329,17 @@ function Layout() {
   if (!user) {
     return (
       <Stack minHeight="100vh" alignItems="center" justifyContent="center">
-        <CircularProgress aria-label="Chargement du profil" />
+        {profileUnavailable ? (
+          <Alert
+            severity="error"
+            action={<Button onClick={retryProfile}>Réessayer</Button>}
+          >
+            Le profil est temporairement indisponible. Votre session est
+            conservée.
+          </Alert>
+        ) : (
+          <CircularProgress aria-label="Chargement du profil" />
+        )}
       </Stack>
     );
   }

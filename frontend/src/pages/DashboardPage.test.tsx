@@ -38,7 +38,9 @@ describe("DashboardPage exports", () => {
       },
     });
     get.mockResolvedValueOnce({
-      data: new Blob(["xlsx"]),
+      data: new Blob(["xlsx"], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
       headers: {
         "content-disposition": 'attachment; filename="actions-2026-08-23.xlsx"',
       },
@@ -63,9 +65,12 @@ describe("DashboardPage exports", () => {
       await screen.findByRole("button", { name: "Actions Excel" }),
     );
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith("/exports/actions.xlsx", {
-        responseType: "blob",
-      }),
+      expect(get).toHaveBeenCalledWith(
+        "/exports/actions.xlsx",
+        expect.objectContaining({
+          responseType: "blob",
+        }),
+      ),
     );
     expect(click).toHaveBeenCalledOnce();
     expect(

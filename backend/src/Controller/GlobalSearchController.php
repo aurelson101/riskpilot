@@ -5,61 +5,40 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
-use App\Repository\ActionPlanRepository;
-use App\Repository\IsmsDocumentRepository;
-use App\Repository\RiskScenarioRepository;
-use App\Repository\SecurityControlRepository;
-use App\Repository\ThirdPartyRepository;
+use App\Application\GlobalSearch;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class GlobalSearchController
 {
-    public function __construct(
-        private CurrentUser $currentUser,
-        private RiskScenarioRepository $risks,
-        private ActionPlanRepository $actions,
-        private SecurityControlRepository $controls,
-        private IsmsDocumentRepository $documents,
-        private ThirdPartyRepository $thirdParties,
-    ) {
+    public function __construct(private CurrentUser $currentUser, private GlobalSearch $search, private RateLimiterFactoryInterface $globalSearchLimiter)
+    {
     }
 
     #[Route('/api/search', methods: ['GET'])]
     public function __invoke(Request $request): JsonResponse
     {
-        $query = mb_strtolower(trim((string) $request->query->get('q', '')));
-        if (mb_strlen($query) < 2) {
-            return new JsonResponse(['code' => 'QUERY_TOO_SHORT'], 422);
+        $query = trim((string) $request->query->get('q', ''));
+        $page = filter_var($request->query->get('page', '1'), FILTER_VALIDATE_INT);
+        $limit = filter_var($request->query->get('limit', '20'), FILTER_VALIDATE_INT);
+        $type = $request->query->get('type');
+        $sort = $request->query->get('sort', 'relevance');
+        $headers = ['Cache-Control' => 'private, no-store'];
+        if (mb_strlen($query) < 2 || mb_strlen($query) > 160) {
+            return new JsonResponse(['code' => 'INVALID_QUERY', 'message' => 'La recherche doit contenir entre 2 et 160 caractères.'], 422, $headers);
         }
-        $actor = $this->currentUser->get();
-        $items = [];
-        $append = static function (array &$items, string $type, int $id, string $title, string $subtitle, string $link) use ($query): void {
-            if (str_contains(mb_strtolower($title.' '.$subtitle), $query)) {
-                $items[] = compact('type', 'id', 'title', 'subtitle', 'link');
-            }
-        };
-        foreach ($this->risks->findVisibleTo($actor) as $item) {
-            $append($items, 'RISK', (int) $item->getId(), $item->getTitle(), (string) $item->getDescription(), '/risks');
+        if (false === $page || $page < 1 || $page > 1000 || false === $limit || $limit < 1 || $limit > 50 || (null !== $type && !isset(GlobalSearch::SOURCES[$type])) || !in_array($sort, ['relevance', 'title'], true)) {
+            return new JsonResponse(['code' => 'INVALID_FILTER'], 422, $headers);
         }
-        foreach ($this->actions->findVisibleTo($actor) as $item) {
-            $append($items, 'ACTION', (int) $item->getId(), $item->getTitle(), (string) $item->getDescription(), '/actions');
-        }
-        foreach ($this->controls->findVisibleTo($actor) as $item) {
-            $append($items, 'CONTROL', (int) $item->getId(), $item->getName(), (string) $item->getDescription(), '/compliance');
-        }
-        foreach ($this->documents->findVisibleTo($actor) as $item) {
-            $append($items, 'DOCUMENT', (int) $item->getId(), $item->getTitle(), $item->getCategory(), '/isms-documents');
-        }
-        foreach ($this->thirdParties->findVisibleTo($actor) as $item) {
-            $append($items, 'THIRD_PARTY', (int) $item->getId(), $item->getName(), (string) $item->getServices(), '/third-parties');
-        }
-        usort($items, static fn (array $a, array $b): int => [$a['type'], $a['title']] <=> [$b['type'], $b['title']]);
-        $page = max(1, $request->query->getInt('page', 1));
-        $limit = min(50, max(1, $request->query->getInt('limit', 20)));
-        $total = count($items);
 
-        return new JsonResponse(['items' => array_slice($items, ($page - 1) * $limit, $limit), 'page' => $page, 'limit' => $limit, 'total' => $total, 'pages' => max(1, (int) ceil($total / $limit))]);
+        $actor = $this->currentUser->get();
+        $allowance = $this->globalSearchLimiter->create($actor->getOrganization()->getId().':'.$actor->getId())->consume();
+        if (!$allowance->isAccepted()) {
+            return new JsonResponse(['code' => 'RATE_LIMITED'], 429, [...$headers, 'Retry-After' => (string) max(1, $allowance->getRetryAfter()->getTimestamp() - time())]);
+        }
+
+        return new JsonResponse($this->search->search($actor, $query, $page, $limit, $type, $sort), 200, $headers);
     }
 }

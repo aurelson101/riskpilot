@@ -310,7 +310,13 @@ export interface Dashboard {
   riskLevels: Record<RiskLevel, number>;
   actionStatuses: Record<string, number>;
   complianceByFramework: Record<string, number>;
-  topRisks: Array<{ id: number; title: string; score: number; status: string }>;
+  topRisks: Array<{
+    id: number;
+    title: string;
+    score: number;
+    status: string;
+    level?: RiskLevel;
+  }>;
   dueActions: Array<{
     id: number;
     title: string;

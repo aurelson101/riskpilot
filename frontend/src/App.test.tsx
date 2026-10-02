@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
+import { AxiosError, AxiosHeaders } from "axios";
 import { AuthProvider } from "./auth/AuthContext";
 import { api, TOKEN_STORAGE_KEY } from "./api/client";
 
@@ -59,7 +60,15 @@ describe("App", () => {
   it("revient à la connexion quand le JWT stocké est expiré", async () => {
     localStorage.setItem("riskpilot.interfaceLocale", "fr");
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "expired-token");
-    vi.spyOn(api, "get").mockRejectedValueOnce(new Error("Unauthorized"));
+    vi.spyOn(api, "get").mockRejectedValueOnce(
+      new AxiosError("Unauthorized", "ERR_BAD_REQUEST", undefined, undefined, {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: {},
+      }),
+    );
     vi.spyOn(api, "post").mockRejectedValueOnce(new Error("Unauthorized"));
     render(
       <QueryClientProvider client={new QueryClient()}>

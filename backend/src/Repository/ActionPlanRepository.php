@@ -30,6 +30,15 @@ final class ActionPlanRepository extends ServiceEntityRepository
     }
 
     /** @return list<ActionPlan> */
+    public function findForExport(User $actor): array
+    {
+        return $this->createQueryBuilder('a')->addSelect('owner', 'risk', 'control')
+            ->join('a.owner', 'owner')->leftJoin('a.relatedRisk', 'risk')->leftJoin('a.relatedControl', 'control')
+            ->where('a.organization = :organization')->setParameter('organization', $actor->getOrganization())
+            ->orderBy('a.dueDate', 'ASC')->addOrderBy('a.priority', 'DESC')->addOrderBy('a.id', 'ASC')->getQuery()->getResult();
+    }
+
+    /** @return list<ActionPlan> */
     public function findForRisk(int $riskId, User $actor): array
     {
         return $this->findBy(['relatedRisk' => $riskId, 'organization' => $actor->getOrganization()]);
