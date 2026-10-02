@@ -22,6 +22,7 @@ use App\Repository\SecurityControlTestRepository;
 use App\Repository\StatementOfApplicabilityRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -225,6 +226,13 @@ final readonly class ComplianceGovernanceController
             return $this->forbidden();
         }
         $data = $request->toArray();
+        if (!is_int($data['sourceRequirementId'] ?? null) || $data['sourceRequirementId'] < 1
+            || !is_int($data['targetRequirementId'] ?? null) || $data['targetRequirementId'] < 1
+            || (array_key_exists('coveragePercent', $data) && !is_int($data['coveragePercent']))
+            || (array_key_exists('inheritEvidence', $data) && !is_bool($data['inheritEvidence']))
+            || (isset($data['rationale']) && (!is_string($data['rationale']) || mb_strlen($data['rationale']) > 2000))) {
+            return $this->invalid('Renseignez des identifiants positifs, un pourcentage entier, un booléen et une justification de 2000 caractères maximum.');
+        }
         $source = $this->requirements->find((int) ($data['sourceRequirementId'] ?? 0));
         $target = $this->requirements->find((int) ($data['targetRequirementId'] ?? 0));
         if (null === $source || null === $target) {
@@ -232,8 +240,19 @@ final readonly class ComplianceGovernanceController
         }
         try {
             $mapping = new RequirementMapping($this->currentUser->get()->getOrganization(), $source, $target, (int) ($data['coveragePercent'] ?? 100), (bool) ($data['inheritEvidence'] ?? true), $this->currentUser->get(), isset($data['rationale']) ? (string) $data['rationale'] : null);
+            $existing = $this->mappings->findOneBy(['organization' => $mapping->getOrganization(), 'sourceRequirement' => $source, 'targetRequirement' => $target]);
+            if ($existing instanceof RequirementMapping) {
+                if ($existing->getCoveragePercent() === $mapping->getCoveragePercent()
+                    && $existing->doesInheritEvidence() === $mapping->doesInheritEvidence()
+                    && $existing->getRationale() === $mapping->getRationale()) {
+                    return new JsonResponse($this->mappingResponse($existing));
+                }
+                return new JsonResponse(['code' => 'MAPPING_CONFLICT', 'message' => 'Cette correspondance existe avec une configuration différente.'], 409);
+            }
             $this->entityManager->persist($mapping);
             $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            return new JsonResponse(['code' => 'MAPPING_CONFLICT', 'message' => 'Cette correspondance vient d’être créée. Actualisez la liste.'], 409);
         } catch (\InvalidArgumentException $exception) {
             return $this->invalid($exception->getMessage());
         }
@@ -264,7 +283,7 @@ final readonly class ComplianceGovernanceController
         }
         $items = [];
         foreach ($this->mappings->findBy(['organization' => $actor->getOrganization(), 'targetRequirement' => $result->getRequirement(), 'inheritEvidence' => true]) as $mapping) {
-            foreach ($this->results->findBy(['requirement' => $mapping->getSourceRequirement()]) as $source) {
+            foreach ($this->results->findEvidenceSources($result->getAssessment(), $mapping->getSourceRequirement()) as $source) {
                 if ($source->getAssessment()->getOrganization() === $actor->getOrganization() && [] !== $source->getEvidence()) {
                     $items[] = ['mappingId' => $mapping->getId(), 'coveragePercent' => $mapping->getCoveragePercent(), 'sourceRequirement' => $source->getRequirement()->getReference(), 'sourceFramework' => $source->getRequirement()->getFramework()->getName(), 'assessmentId' => $source->getAssessment()->getId(), 'evidence' => $source->getEvidence()];
                 }
@@ -302,7 +321,7 @@ final readonly class ComplianceGovernanceController
     /** @return array<string, mixed> */
     private function mappingResponse(RequirementMapping $mapping): array
     {
-        return ['id' => $mapping->getId(), 'source' => ['id' => $mapping->getSourceRequirement()->getId(), 'reference' => $mapping->getSourceRequirement()->getReference(), 'framework' => $mapping->getSourceRequirement()->getFramework()->getName()], 'target' => ['id' => $mapping->getTargetRequirement()->getId(), 'reference' => $mapping->getTargetRequirement()->getReference(), 'framework' => $mapping->getTargetRequirement()->getFramework()->getName()], 'coveragePercent' => $mapping->getCoveragePercent(), 'inheritEvidence' => $mapping->doesInheritEvidence(), 'rationale' => $mapping->getRationale()];
+        return ['id' => $mapping->getId(), 'source' => ['id' => $mapping->getSourceRequirement()->getId(), 'reference' => $mapping->getSourceRequirement()->getReference(), 'framework' => $mapping->getSourceRequirement()->getFramework()->getName()], 'target' => ['id' => $mapping->getTargetRequirement()->getId(), 'reference' => $mapping->getTargetRequirement()->getReference(), 'framework' => $mapping->getTargetRequirement()->getFramework()->getName()], 'coveragePercent' => $mapping->getCoveragePercent(), 'inheritEvidence' => $mapping->doesInheritEvidence(), 'rationale' => $mapping->getRationale(), 'direction' => 'SOURCE_TO_TARGET', 'createdBy' => ['id' => $mapping->getCreatedBy()->getId(), 'name' => $this->userName($mapping->getCreatedBy())], 'createdAt' => $mapping->getCreatedAt()->format(DATE_ATOM)];
     }
 
     /**

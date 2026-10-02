@@ -1,5 +1,26 @@
 # API
 
+## Correspondances multinormes
+
+`GET /api/requirement-mappings` reste isolé par organisation et expose désormais
+`direction=SOURCE_TO_TARGET`, `createdBy` (id/nom) et `createdAt`, en complément
+des exigences source/cible, de la couverture et de la justification.
+
+`POST /api/requirement-mappings` exige les droits de gestion existants : IDs
+entiers positifs, `coveragePercent` entier entre 1 et 100, `inheritEvidence`
+booléen JSON et justification textuelle de 2000 caractères maximum (ou null).
+Les valeurs par défaut restent couverture 100 et héritage activé.
+Une paire/configuration identique retourne l'objet existant en HTTP 200 ; une
+nouvelle paire retourne 201. Une paire existante avec une configuration différente
+retourne 409 (`MAPPING_CONFLICT`), sans écrasement. Une création concurrente qui
+heurte l'unicité retourne aussi 409 plutôt qu'une erreur serveur.
+
+`GET /api/compliance-results/{id}/inherited-evidence` sélectionne les sources en
+SQL dans l'organisation et le périmètre exacts de l'évaluation cible, hors
+évaluations archivées. Il ne copie aucune preuve, ne change aucun score et ne
+réalise pas de partage implicite avec les autres périmètres. Le résultat cible
+d'un autre tenant reste inaccessible (404).
+
 L’API REST est servie sous `/api` et sa documentation OpenAPI sous `/docs`. Les réponses d’erreur métier utiliseront un code stable, un message lisible et un objet `errors` pour les violations de validation.
 
 Le point `GET /api/health` permet de vérifier le service sans authentification. Les ressources métier sont protégées par JWT et isolées par organisation.

@@ -201,3 +201,22 @@ entre plusieurs workers. Les limites produit précédemment indiquées restent v
 
 Aucun email réel envoyé pendant cette recette. Le rendu des clients mail et la
 réception restent à valider ; les notifications métier ne sont pas encore traduites.
+
+### Correspondances multinormes : réutilisation gouvernée
+
+Inspiré des principes publics de liens réutilisables d'[EGERIE](https://www.egerie.com/plateforme)
+et des [mappings documentés par CISO Assistant](https://github.com/intuitem/ciso-assistant-community/blob/main/product-docs/configuration/libraries/custom-libraries.md),
+sans copie de catalogue ni de code tiers :
+
+- Création idempotente des correspondances identiques ; conflit explicite sans
+  écrasement pour une configuration différente ou une création concurrente.
+- Types JSON stricts, IDs positifs et justification bornée à 2000 caractères.
+- Direction, auteur et date exposés dans l'API existante.
+- Sources de preuves sélectionnées en SQL dans le tenant et le périmètre exacts,
+  hors évaluations archivées ; relations chargées ensemble pour limiter les lectures différées.
+- Aucune copie de preuve ni modification automatique du résultat cible.
+
+5 tests d'intégration, 40 assertions, sur PostgreSQL 17 isolé : cycle SoA existant,
+validation, doublons, conflits, traçabilité et isolation des preuves.
+Syntaxe PHP et diff valides. Base et réseau temporaires supprimés après recette.
+Les types de relations et leur approbation indépendante restent à compléter.

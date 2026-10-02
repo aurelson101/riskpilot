@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\ComplianceAssessment;
 use App\Entity\ComplianceResult;
+use App\Entity\Requirement;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -22,6 +23,26 @@ final class ComplianceResultRepository extends ServiceEntityRepository
     public function findForAssessment(ComplianceAssessment $assessment): array
     {
         return $this->findBy(['assessment' => $assessment], ['id' => 'ASC']);
+    }
+
+    /** @return list<ComplianceResult> */
+    public function findEvidenceSources(ComplianceAssessment $target, Requirement $requirement): array
+    {
+        return $this->createQueryBuilder('result')
+            ->addSelect('assessment', 'requirement', 'framework')
+            ->innerJoin('result.assessment', 'assessment')
+            ->innerJoin('result.requirement', 'requirement')
+            ->innerJoin('requirement.framework', 'framework')
+            ->andWhere('result.requirement = :requirement')
+            ->andWhere('assessment.organization = :organization')
+            ->andWhere('assessment.scope = :scope')
+            ->andWhere('assessment.status != :archived')
+            ->setParameter('requirement', $requirement)
+            ->setParameter('organization', $target->getOrganization())
+            ->setParameter('scope', $target->getScope())
+            ->setParameter('archived', 'ARCHIVED')
+            ->orderBy('result.id', 'ASC')
+            ->getQuery()->getResult();
     }
 
     /** @return list<ComplianceResult> */

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Framework;
+use App\Entity\ComplianceAssessment;
+use App\Entity\ComplianceResult;
+use App\Entity\RequirementMapping;
 use App\Entity\Organization;
 use App\Entity\Requirement;
 use App\Entity\Scope;
@@ -90,6 +93,84 @@ final class ComplianceGovernanceControllerTest extends WebTestCase
         $this->authenticate($this->manager);
         $this->client->jsonRequest('POST', '/api/requirement-mappings', ['sourceRequirementId' => $this->requirement->getId(), 'targetRequirementId' => $this->requirement->getId(), 'coveragePercent' => 100]);
         self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testMappingsAreIdempotentTraceableAndTenantScoped(): void
+    {
+        $this->authenticate($this->manager);
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $target = $manager->getRepository(Requirement::class)->findOneBy(['reference' => 'A.5.2']);
+        $input = ['sourceRequirementId' => $this->requirement->getId(), 'targetRequirementId' => $target->getId(), 'coveragePercent' => 80, 'inheritEvidence' => false, 'rationale' => 'Politique et responsabilités partagées'];
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
+        self::assertResponseStatusCodeSame(201);
+        $created = $this->payload();
+        self::assertSame('SOURCE_TO_TARGET', $created['direction']);
+        self::assertSame($this->manager->getId(), $created['createdBy']['id']);
+        self::assertNotEmpty($created['createdAt']);
+        self::assertFalse($created['inheritEvidence']);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame($created['id'], $this->payload()['id']);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', [...$input, 'coveragePercent' => 50]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('MAPPING_CONFLICT', $this->payload()['code']);
+        self::assertSame(1, $manager->getRepository(RequirementMapping::class)->count([]));
+
+        $this->authenticate($this->foreignAdmin);
+        $this->client->request('GET', '/api/requirement-mappings');
+        self::assertResponseIsSuccessful();
+        self::assertSame([], $this->payload());
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
+        self::assertResponseStatusCodeSame(201);
+        self::assertNotSame($created['id'], $this->payload()['id']);
+    }
+
+    public function testMappingRejectsAmbiguousTypesAndOversizedRationale(): void
+    {
+        $this->authenticate($this->manager);
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $target = $manager->getRepository(Requirement::class)->findOneBy(['reference' => 'A.5.2']);
+        $input = ['sourceRequirementId' => $this->requirement->getId(), 'targetRequirementId' => $target->getId()];
+        foreach ([['coveragePercent' => 80.5], ['coveragePercent' => null], ['inheritEvidence' => 'false'], ['inheritEvidence' => null], ['sourceRequirementId' => -1], ['rationale' => []], ['rationale' => str_repeat('é', 2001)]] as $invalid) {
+            $this->client->jsonRequest('POST', '/api/requirement-mappings', [...$input, ...$invalid]);
+            self::assertResponseStatusCodeSame(422);
+        }
+        self::assertSame(0, $manager->getRepository(RequirementMapping::class)->count([]));
+    }
+
+    public function testInheritedEvidenceExcludesOtherScopesTenantsAndArchivedAssessments(): void
+    {
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $organization = $this->manager->getOrganization();
+        $targetRequirement = $manager->getRepository(Requirement::class)->findOneBy(['reference' => 'A.5.2']);
+        $otherScope = new Scope('Autre périmètre', 'ORGANIZATION', $organization);
+        $foreignScope = new Scope('Périmètre étranger', 'ORGANIZATION', $this->foreignAdmin->getOrganization());
+        $manager->persist($otherScope);
+        $manager->persist($foreignScope);
+        $targetAssessment = new ComplianceAssessment($organization, $this->framework, $this->scope, $this->manager, new \DateTimeImmutable());
+        $targetResult = new ComplianceResult($targetAssessment, $targetRequirement);
+        $manager->persist($targetAssessment);
+        $manager->persist($targetResult);
+        foreach ([[$this->manager, $this->scope, 'IN_PROGRESS', 'allowed'], [$this->manager, $otherScope, 'IN_PROGRESS', 'other-scope'], [$this->manager, $this->scope, 'ARCHIVED', 'archived'], [$this->foreignAdmin, $foreignScope, 'IN_PROGRESS', 'foreign']] as [$actor, $scope, $status, $evidence]) {
+            $assessment = new ComplianceAssessment($actor->getOrganization(), $this->framework, $scope, $actor, new \DateTimeImmutable());
+            $assessment->setStatus($status);
+            $result = new ComplianceResult($assessment, $this->requirement);
+            $result->setEvidence([$evidence]);
+            $manager->persist($assessment);
+            $manager->persist($result);
+        }
+        $manager->persist(new RequirementMapping($organization, $this->requirement, $targetRequirement, 80, true, $this->manager, 'Réutilisation à vérifier'));
+        $manager->flush();
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/compliance-results/'.$targetResult->getId().'/inherited-evidence');
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $this->payload());
+        self::assertSame(['allowed'], $this->payload()[0]['evidence']);
+        self::assertSame(80, $this->payload()[0]['coveragePercent']);
+        self::assertSame([], $targetResult->getEvidence());
+        $this->authenticate($this->foreignAdmin);
+        $this->client->request('GET', '/api/compliance-results/'.$targetResult->getId().'/inherited-evidence');
+        self::assertResponseStatusCodeSame(404);
     }
 
     private function authenticate(User $user): void
