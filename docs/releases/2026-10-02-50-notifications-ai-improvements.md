@@ -55,6 +55,8 @@ leurs contrôles de tenant, de rôle, de consentement et de confirmation humaine
 34. Autorisation OAuth limitée aux fournisseurs email pris en charge.
 35. Callback OAuth : paramètres bornés, état hexadécimal attendu, redirections
     non stockables et sans référent, durée de jeton respectée sans minimum artificiel.
+    Les deux proxies Nginx appliquent également `no-referrer` pour ne pas neutraliser
+    la protection du callback ; la politique est renforcée pour toute l'application.
 
 ## Collections GRC — 36 à 45
 
