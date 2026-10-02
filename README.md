@@ -77,6 +77,10 @@ Les mots de passe SMTP, secrets clients et jetons OAuth sont chiffrés avec libs
 
 Depuis la vue Calendrier des plans d’action, chaque utilisateur peut créer un lien d’abonnement iCalendar privé en lecture seule. Le flux contient uniquement ses actions affectées ; le lien est affiché une seule fois et peut être régénéré ou révoqué à tout moment. Il ne s'agit ni de CalDAV ni d'une synchronisation bidirectionnelle Graph/Google Calendar. La réception et l'actualisation dans Thunderbird, Outlook web/classique, Apple Calendar et Google Calendar doivent être validées client par client ; aucune compatibilité à 100 % n'est annoncée.
 
+Le lot de [50 améliorations ciblées](docs/releases/2026-10-02-50-hardening-improvements.md)
+renforce l'agenda FR/EN, la structure des exports Excel, les appels Gmail/Graph,
+les configurations d'intégration et la validation des plans d'action.
+
 Les emails de réinitialisation utilisent la langue FR/EN du destinataire ; les
 emails de test utilisent celle de l'administrateur qui lance le test. Les
 notifications métier conservent leurs textes français mais incluent désormais

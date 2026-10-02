@@ -14,6 +14,23 @@ final class XlsxExporter
         if ([] === $rows) {
             throw new \InvalidArgumentException('An XLSX export requires a header row.');
         }
+        $columns = count($rows[0]);
+        if (0 === $columns || $columns > 16384 || count($rows) > 1048574) {
+            throw new \InvalidArgumentException('Export exceeds worksheet dimensions.');
+        }
+        foreach ($rows as $row) {
+            if (!array_is_list($row) || count($row) !== $columns) {
+                throw new \InvalidArgumentException('Export rows must match the header columns.');
+            }
+            foreach ($row as $value) {
+                if ((!is_scalar($value) && null !== $value) || is_bool($value) || (is_float($value) && !is_finite($value)) || (is_string($value) && !mb_check_encoding($value, 'UTF-8'))) {
+                    throw new \InvalidArgumentException('Invalid export cell value.');
+                }
+                if (mb_strlen((string) $value) > 32767) {
+                    throw new \InvalidArgumentException('Export cell exceeds the Excel text limit.');
+                }
+            }
+        }
 
         $path = tempnam(sys_get_temp_dir(), 'riskpilot-xlsx-');
         if (false === $path) {
@@ -26,7 +43,6 @@ final class XlsxExporter
             throw new \RuntimeException('Unable to create XLSX archive.');
         }
 
-        $columns = count($rows[0]);
         $lastColumn = $this->columnName($columns);
         $zip->addFromString('[Content_Types].xml', $this->contentTypes());
         $zip->addFromString('_rels/.rels', $this->rootRelationships());
@@ -53,6 +69,7 @@ final class XlsxExporter
         $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
         $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
         $xml .= '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
+        $xml .= sprintf('<dimension ref="A1:%s%d"/>', $lastColumn, count($rows) + 2);
         $xml .= '<sheetViews><sheetView workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
         $xml .= '<cols>';
         foreach ($rows[0] as $index => $header) {
@@ -77,12 +94,13 @@ final class XlsxExporter
             $xml .= '</row>';
         }
         $xml .= '</sheetData>';
-        $xml .= sprintf('<mergeCells count="2"><mergeCell ref="A1:%s1"/><mergeCell ref="A2:%s2"/></mergeCells>', $lastColumn, $lastColumn);
         $xml .= sprintf('<autoFilter ref="A3:%s%d"/>', $lastColumn, count($rows) + 2);
-        $xml .= sprintf('<dimension ref="A1:%s%d"/>', $lastColumn, count($rows) + 2);
+        if ('A' !== $lastColumn) {
+            $xml .= sprintf('<mergeCells count="2"><mergeCell ref="A1:%s1"/><mergeCell ref="A2:%s2"/></mergeCells>', $lastColumn, $lastColumn);
+        }
         $xml .= '<printOptions horizontalCentered="1"/>';
         $xml .= '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
-        $xml .= '<headerFooter><oddHeader>&C&amp;B'.$this->xml($title).'&amp;B</oddHeader><oddFooter>&L'.$this->xml($organization).'&RPage &amp;P / &amp;N</oddFooter></headerFooter>';
+        $xml .= '<headerFooter><oddHeader>&amp;C&amp;B'.$this->xml(str_replace('&', '&&', $title)).'&amp;B</oddHeader><oddFooter>&amp;L'.$this->xml(str_replace('&', '&&', $organization)).'&amp;RPage &amp;P / &amp;N</oddFooter></headerFooter>';
         $xml .= '</worksheet>';
 
         return $xml;
@@ -90,7 +108,7 @@ final class XlsxExporter
 
     private function inlineCell(string $reference, string $value, int $style): string
     {
-        return sprintf('<c r="%s" s="%d" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>', $reference, $style, htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        return sprintf('<c r="%s" s="%d" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>', $reference, $style, $this->xml($value));
     }
 
     /** @param list<list<int|float|string|null>> $rows */
@@ -106,7 +124,9 @@ final class XlsxExporter
 
     private function xml(string $value): string
     {
-        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $value = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $value) ?? '';
+
+        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     private function safeText(int|float|string|null $value): string
@@ -140,7 +160,10 @@ final class XlsxExporter
 
     private function workbook(string $title): string
     {
-        return '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'.htmlspecialchars(mb_substr($title, 0, 31), ENT_XML1 | ENT_QUOTES, 'UTF-8').'" sheetId="1" r:id="rId1"/></sheets></workbook>';
+        $name = trim(preg_replace('~[\\\\/?*\[\]:\x00-\x1F]~u', ' ', $title) ?? '', " '");
+        $name = mb_substr('' === $name ? 'RiskPilot' : $name, 0, 31);
+
+        return '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'.$this->xml($name).'" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'.$this->xml("'".str_replace("'", "''", $name)."'!\$1:\$3").'</definedName></definedNames></workbook>';
     }
 
     private function workbookRelationships(): string
@@ -160,8 +183,8 @@ final class XlsxExporter
 
     private function coreProperties(string $title): string
     {
-        $created = (new \DateTimeImmutable())->format('Y-m-d\TH:i:s\Z');
+        $created = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
 
-        return '<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'.htmlspecialchars($title, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</dc:title><dc:creator>RiskPilot</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'.$created.'</dcterms:created></cp:coreProperties>';
+        return '<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'.$this->xml($title).'</dc:title><dc:creator>RiskPilot</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'.$created.'</dcterms:created></cp:coreProperties>';
     }
 }

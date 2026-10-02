@@ -35,9 +35,10 @@ class PlatformIntegration
     {
         $type = strtoupper(trim($type));
         $provider = strtoupper(trim($provider));
-        if (!in_array($type, self::TYPES, true) || !in_array($provider, self::PROVIDERS, true) || '' === trim($name)) {
+        if (!in_array($type, self::TYPES, true) || !in_array($provider, self::PROVIDERS, true)) {
             throw new \InvalidArgumentException('Type, fournisseur ou nom d’intégration invalide.');
         }
+        $this->validateName($name);
         if ($enabled && in_array($type, ['OIDC', 'SAML'], true)) {
             throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
         }
@@ -208,9 +209,7 @@ class PlatformIntegration
         if ('API_KEY' === $this->type && ($configuration['expiresAt'] ?? null) !== ($this->configuration['expiresAt'] ?? null)) {
             throw new \InvalidArgumentException('Utilisez la rotation pour modifier la validité de la clé API.');
         }
-        if ('' === trim($name)) {
-            throw new \InvalidArgumentException('Le nom est obligatoire.');
-        }
+        $this->validateName($name);
         if ($enabled && in_array($this->type, ['OIDC', 'SAML'], true)) {
             throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
         }
@@ -227,18 +226,35 @@ class PlatformIntegration
     /** @param array<string, mixed> $configuration */
     private function validateConfiguration(string $type, array $configuration): void
     {
+        $json = json_encode($configuration);
+        if (false === $json || strlen($json) > 65536) {
+            throw new \InvalidArgumentException('La configuration doit rester inférieure à 64 Kio et être sérialisable.');
+        }
+        $this->rejectPlainSecrets($configuration);
+        foreach (['issuer', 'url', 'baseUrl', 'direction', 'conflictStrategy', 'host', 'baseDn', 'bindDn', 'userFilter', 'testUsername', 'caCertificate'] as $key) {
+            if (array_key_exists($key, $configuration) && !is_string($configuration[$key])) {
+                throw new \InvalidArgumentException('Un champ de configuration textuel est invalide.');
+            }
+        }
         if (in_array($type, ['OIDC', 'SAML'], true) && '' === trim((string) ($configuration['issuer'] ?? ''))) {
             throw new \InvalidArgumentException('L’émetteur de l’identité est obligatoire.');
         }
+        if ('OIDC' === $type && !$this->validHttpsUrl($configuration['issuer'])) {
+            throw new \InvalidArgumentException('L’émetteur OIDC doit être une URL HTTPS valide.');
+        }
         if ('API_KEY' === $type) {
-            $scopes = array_values(array_unique(array_map('strval', (array) ($configuration['scopes'] ?? []))));
+            $scopes = $configuration['scopes'] ?? [];
+            if (!is_array($scopes) || !array_is_list($scopes) || count(array_filter($scopes, 'is_string')) !== count($scopes)) {
+                throw new \InvalidArgumentException('Les portées doivent être une liste de chaînes.');
+            }
             if ([] === $scopes || [] !== array_diff($scopes, self::SCOPES)) {
                 throw new \InvalidArgumentException('Les portées de la clé API sont invalides.');
             }
             if (isset($configuration['expiresAt'])) {
-                try {
-                    new \DateTimeImmutable((string) $configuration['expiresAt']);
-                } catch (\Exception) {
+                $value = $configuration['expiresAt'];
+                $date = is_string($value) ? \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $value) : false;
+                $errors = \DateTimeImmutable::getLastErrors();
+                if (false === $date || (false !== $errors && ($errors['warning_count'] || $errors['error_count']))) {
                     throw new \InvalidArgumentException('La date d’expiration de la clé API est invalide.');
                 }
             }
@@ -254,13 +270,21 @@ class PlatformIntegration
             $direction = strtoupper((string) ($configuration['direction'] ?? ''));
             $conflictStrategy = strtoupper((string) ($configuration['conflictStrategy'] ?? ''));
             $fieldOwnership = (array) ($configuration['fieldOwnership'] ?? []);
+            foreach ($fieldOwnership as $field => $owner) {
+                if (!is_string($field) || '' === trim($field) || !is_string($owner) || '' === trim($owner) || strlen($field) > 120 || strlen($owner) > 120) {
+                    throw new \InvalidArgumentException('La propriété des champs doit associer des noms à des sources explicites.');
+                }
+            }
             if (!$this->validHttpsUrl($url) || !in_array($direction, ['IMPORT', 'EXPORT', 'BIDIRECTIONAL'], true) || !in_array($conflictStrategy, ['SOURCE_WINS', 'RISKPILOT_WINS', 'MANUAL'], true) || [] === $fieldOwnership) {
                 throw new \InvalidArgumentException('Le connecteur exige une URL HTTPS, un sens, une stratégie de conflit et la propriété des champs.');
             }
         }
         if ('DIRECTORY' === $type) {
             $host = trim((string) ($configuration['host'] ?? ''));
-            $port = (int) ($configuration['port'] ?? 636);
+            $port = $configuration['port'] ?? 636;
+            if (!is_int($port)) {
+                throw new \InvalidArgumentException('Le port LDAPS doit être un entier.');
+            }
             $baseDn = trim((string) ($configuration['baseDn'] ?? ''));
             $bindDn = trim((string) ($configuration['bindDn'] ?? ''));
             $userFilter = trim((string) ($configuration['userFilter'] ?? ''));
@@ -290,7 +314,7 @@ class PlatformIntegration
             return false;
         }
         $parts = parse_url($url);
-        if (!is_array($parts) || 'https' !== strtolower((string) ($parts['scheme'] ?? '')) || isset($parts['user']) || isset($parts['pass'])) {
+        if (!is_array($parts) || 'https' !== strtolower((string) ($parts['scheme'] ?? '')) || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) {
             return false;
         }
         $host = (string) ($parts['host'] ?? '');
@@ -299,5 +323,26 @@ class PlatformIntegration
         }
 
         return str_contains($host, '.') && false !== filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME);
+    }
+
+    private function validateName(string $name): void
+    {
+        if ('' === trim($name) || mb_strlen(trim($name)) > 120 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+            throw new \InvalidArgumentException('Le nom doit contenir 1 à 120 caractères sans caractère de contrôle.');
+        }
+    }
+
+    /** @param array<mixed> $configuration */
+    private function rejectPlainSecrets(array $configuration): void
+    {
+        foreach ($configuration as $key => $value) {
+            $normalized = strtolower(str_replace(['_', '-'], '', (string) $key));
+            if (in_array($normalized, ['password', 'bindpassword', 'clientsecret', 'accesstoken', 'refreshtoken', 'apikey', 'privatekey', 'secret'], true)) {
+                throw new \InvalidArgumentException('Les secrets doivent utiliser les champs sécurisés dédiés, jamais la configuration.');
+            }
+            if (is_array($value)) {
+                $this->rejectPlainSecrets($value);
+            }
+        }
     }
 }

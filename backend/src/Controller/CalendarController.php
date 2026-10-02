@@ -65,42 +65,42 @@ final readonly class CalendarController
     {
         $user = $this->users->findActiveByCalendarToken($token);
         if (!$user instanceof User) {
-            return new Response('Calendrier introuvable.', Response::HTTP_NOT_FOUND);
+            return new Response('Calendrier introuvable.', Response::HTTP_NOT_FOUND, ['Cache-Control' => 'private, no-store']);
         }
 
-        $events = array_filter(
-            $this->actions->findVisibleTo($user),
-            static fn (ActionPlan $action): bool => $action->getOwner() === $user && 'CANCELLED' !== $action->getStoredStatus(),
-        );
+        $events = $this->actions->findForCalendar($user);
+        $english = 'en' === $user->getLocale();
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
             'PRODID:-//RiskPilot//Plans d action//FR',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:RiskPilot - Mes actions',
+            'X-WR-CALNAME:RiskPilot - '.($english ? 'My actions' : 'Mes actions'),
             'X-PUBLISHED-TTL:PT1H',
             'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
         ];
         foreach ($events as $action) {
             $due = $action->getDueDate();
             $description = sprintf(
-                "Priorité : %s\nStatut : %s\nRisque : %s%s",
-                $action->getPriority(),
-                $action->getStatus(),
-                $action->getRelatedRisk()?->getTitle() ?? 'Sans risque lié',
+                $english ? "Priority: %s\nStatus: %s\nRisk: %s%s" : "Priorité : %s\nStatut : %s\nRisque : %s%s",
+                $this->label($action->getPriority(), $english),
+                $this->label($action->getStatus(), $english),
+                $action->getRelatedRisk()?->getTitle() ?? ($english ? 'No linked risk' : 'Sans risque lié'),
                 null === $action->getDescription() ? '' : "\n\n".$action->getDescription(),
             );
             array_push($lines,
                 'BEGIN:VEVENT',
-                'UID:action-'.$action->getId().'@riskpilot',
+                'UID:action-'.$action->getId().'@'.substr(hash('sha256', rtrim($this->appUrl, '/')), 0, 24).'.riskpilot',
                 'DTSTAMP:'.$action->getUpdatedAt()->setTimezone(new \DateTimeZone('UTC'))->format('Ymd\THis\Z'),
+                'CREATED:'.$action->getCreatedAt()->setTimezone(new \DateTimeZone('UTC'))->format('Ymd\THis\Z'),
+                'LAST-MODIFIED:'.$action->getUpdatedAt()->setTimezone(new \DateTimeZone('UTC'))->format('Ymd\THis\Z'),
                 'DTSTART;VALUE=DATE:'.$due->format('Ymd'),
                 'DTEND;VALUE=DATE:'.$due->modify('+1 day')->format('Ymd'),
                 'SUMMARY:'.$this->escape($action->getTitle()),
                 'DESCRIPTION:'.$this->escape($description),
                 'URL:'.rtrim($this->appUrl, '/').'/actions',
-                'STATUS:'.('COMPLETED' === $action->getStoredStatus() ? 'COMPLETED' : 'CONFIRMED'),
+                'STATUS:CONFIRMED',
                 'PRIORITY:'.$this->icalPriority($action->getPriority()),
                 'END:VEVENT',
             );
@@ -117,7 +117,21 @@ final readonly class CalendarController
 
     private function escape(string $value): string
     {
+        $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value) ?? '';
         return str_replace(['\\', ';', ',', "\r\n", "\r", "\n"], ['\\\\', '\\;', '\\,', '\\n', '\\n', '\\n'], $value);
+    }
+
+    private function label(string $value, bool $english): string
+    {
+        $labels = [
+            'LOW' => ['Faible', 'Low'], 'MEDIUM' => ['Moyenne', 'Medium'],
+            'HIGH' => ['Haute', 'High'], 'CRITICAL' => ['Critique', 'Critical'],
+            'OPEN' => ['Ouverte', 'Open'], 'PLANNED' => ['Planifiée', 'Planned'],
+            'IN_PROGRESS' => ['En cours', 'In progress'], 'BLOCKED' => ['Bloquée', 'Blocked'],
+            'COMPLETED' => ['Terminée', 'Completed'], 'OVERDUE' => ['En retard', 'Overdue'],
+        ];
+
+        return $labels[$value][$english ? 1 : 0] ?? $value;
     }
 
     private function fold(string $line): string

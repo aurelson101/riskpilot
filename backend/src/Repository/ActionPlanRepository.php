@@ -24,6 +24,16 @@ final class ActionPlanRepository extends ServiceEntityRepository
         return $this->findBy(['organization' => $actor->getOrganization()], ['dueDate' => 'ASC', 'priority' => 'DESC']);
     }
 
+    /** @return list<ActionPlan> */
+    public function findForCalendar(User $actor): array
+    {
+        return $this->createQueryBuilder('a')->addSelect('risk')->leftJoin('a.relatedRisk', 'risk')
+            ->where('a.organization = :organization')->setParameter('organization', $actor->getOrganization())
+            ->andWhere('a.owner = :owner')->setParameter('owner', $actor)
+            ->andWhere('a.status != :cancelled')->setParameter('cancelled', 'CANCELLED')
+            ->orderBy('a.dueDate', 'ASC')->addOrderBy('a.id', 'ASC')->getQuery()->getResult();
+    }
+
     public function findOneVisibleTo(int $id, User $actor): ?ActionPlan
     {
         return $this->findOneBy(['id' => $id, 'organization' => $actor->getOrganization()]);

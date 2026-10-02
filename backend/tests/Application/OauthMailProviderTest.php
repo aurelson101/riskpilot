@@ -10,11 +10,105 @@ use App\Entity\Organization;
 use App\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OauthMailProviderTest extends TestCase
 {
+    #[DataProvider('invalidTokens')]
+    public function testInvalidTokenResponsesAreRejected(array $payload): void
+    {
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('GOOGLE_WORKSPACE', 'client-id', $cipher->encrypt('client-secret'), null, 'RiskPilot', null);
+        $provider = new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), new MockHttpClient(new MockResponse(json_encode($payload))));
+        $this->expectException(\RuntimeException::class);
+        $provider->exchangeCode($settings, 'https://riskpilot.example/callback', 'code', 'state');
+    }
+
+    public static function invalidTokens(): iterable
+    {
+        yield 'empty access token' => [['access_token' => ' ', 'expires_in' => 3600]];
+        yield 'zero lifetime' => [['access_token' => 'token', 'expires_in' => 0]];
+        yield 'negative lifetime' => [['access_token' => 'token', 'expires_in' => -1]];
+        yield 'string lifetime' => [['access_token' => 'token', 'expires_in' => '3600']];
+        yield 'unbounded lifetime' => [['access_token' => 'token', 'expires_in' => 86401]];
+        yield 'empty refresh token' => [['access_token' => 'token', 'refresh_token' => '', 'expires_in' => 3600]];
+        yield 'invalid refresh token' => [['access_token' => 'token', 'refresh_token' => ['secret'], 'expires_in' => 3600]];
+    }
+
+    public function testRefreshPreservesTheActualShortTokenLifetime(): void
+    {
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('MICROSOFT_365', 'client-id', $cipher->encrypt('client-secret'), 'organizations', 'RiskPilot', null);
+        $settings->connectOauth($cipher->encrypt('expired-token'), $cipher->encrypt('refresh-token'), new \DateTimeImmutable('-1 minute'), 'sender@example.test');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+        $http = new MockHttpClient([
+            new MockResponse('{"access_token":"new-token","expires_in":10}'),
+            new MockResponse('', ['http_code' => 202]),
+        ]);
+        (new OauthMailProvider($cipher, $em, $http))->send($settings, 'recipient@example.test', 'Review', 'Body');
+        self::assertSame('new-token', $cipher->decrypt($settings->getEncryptedAccessToken()));
+        self::assertLessThanOrEqual(time() + 10, $settings->getAccessTokenExpiresAt()->getTimestamp());
+        self::assertGreaterThan(time(), $settings->getAccessTokenExpiresAt()->getTimestamp());
+    }
+
+    public function testMicrosoftIdentityFallsBackToUpnAndRequestsAreBounded(): void
+    {
+        $http = new MockHttpClient(static function (string $method, string $url, array $options): MockResponse {
+            self::assertSame(15.0, $options['timeout']);
+            self::assertSame(30.0, $options['max_duration']);
+            self::assertSame(0, $options['max_redirects']);
+
+            return new MockResponse('{"mail":"","userPrincipalName":"owner@example.test"}');
+        });
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('MICROSOFT_365', 'client-id', $cipher->encrypt('client-secret'), 'organizations', 'RiskPilot', null);
+        self::assertSame('owner@example.test', (new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), $http))->connectedEmail($settings, 'token'));
+    }
+
+    public function testGoogleExplicitlyUnverifiedIdentityIsRejected(): void
+    {
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('GOOGLE_WORKSPACE', 'client-id', $cipher->encrypt('client-secret'), null, 'RiskPilot', null);
+        $provider = new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), new MockHttpClient(new MockResponse('{"email":"owner@example.test","email_verified":false}')));
+        $this->expectException(\RuntimeException::class);
+        $provider->connectedEmail($settings, 'token');
+    }
+
+    public function testNonOauthProviderCannotFallThroughToMicrosoft(): void
+    {
+        $provider = new OauthMailProvider(new SecretCipher('test-secret-at-least-32-characters-long'), $this->createMock(EntityManagerInterface::class), new MockHttpClient());
+        $this->expectException(\InvalidArgumentException::class);
+        $provider->authorizationUrl(new EmailSettings(new Organization('Tenant')), 'https://riskpilot.example/callback', 'state');
+    }
+
+    #[DataProvider('invalidMessages')]
+    public function testInvalidMessageIsRejectedWithoutHttpRequests(string $recipient, string $subject): void
+    {
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new EmailSettings(new Organization('Tenant'));
+        $settings->configureOauth('MICROSOFT_365', 'client-id', $cipher->encrypt('client-secret'), 'organizations', 'RiskPilot', null);
+        $http = new MockHttpClient(static function (): MockResponse {
+            self::fail('Invalid message must not make an HTTP request.');
+        });
+        $this->expectException(\InvalidArgumentException::class);
+        (new OauthMailProvider($cipher, $this->createMock(EntityManagerInterface::class), $http))->send($settings, $recipient, $subject, 'Body');
+    }
+
+    public static function invalidMessages(): iterable
+    {
+        yield 'recipient' => ['invalid', 'Subject'];
+        yield 'empty subject' => ['owner@example.test', ''];
+        yield 'subject injection' => ['owner@example.test', "Subject\r\nBcc: evil@example.test"];
+        yield 'long subject' => ['owner@example.test', str_repeat('a', 256)];
+    }
+
     public function testOauthAuthorizationUsesMinimalScopesStateAndPkce(): void
     {
         $cipher = new SecretCipher('test-secret-at-least-32-characters-long');

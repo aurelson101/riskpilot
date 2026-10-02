@@ -13,12 +13,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class OauthMailProvider
 {
+    private const HTTP_OPTIONS = ['timeout' => 15, 'max_duration' => 30, 'max_redirects' => 0];
+
     public function __construct(private SecretCipher $cipher, private EntityManagerInterface $entityManager, private HttpClientInterface $httpClient)
     {
     }
 
     public function authorizationUrl(EmailSettings $settings, string $redirectUri, string $state): string
     {
+        $this->assertProvider($settings);
         $clientId = $settings->getOauthClientId() ?? throw new \RuntimeException('Client OAuth manquant.');
         $codeChallenge = $this->codeChallenge($state);
         if ('GOOGLE_WORKSPACE' === $settings->getProvider()) {
@@ -41,9 +44,13 @@ final readonly class OauthMailProvider
 
     public function connectedEmail(EmailSettings $settings, string $accessToken): string
     {
+        $this->assertProvider($settings);
         $url = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? 'https://openidconnect.googleapis.com/v1/userinfo' : 'https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName';
-        $data = $this->httpClient->request('GET', $url, ['auth_bearer' => $accessToken])->toArray();
-        $email = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? $data['email'] ?? null : $data['mail'] ?? $data['userPrincipalName'] ?? null;
+        $data = $this->httpClient->request('GET', $url, [...self::HTTP_OPTIONS, 'auth_bearer' => $accessToken])->toArray();
+        if ('GOOGLE_WORKSPACE' === $settings->getProvider() && array_key_exists('email_verified', $data) && true !== $data['email_verified']) {
+            throw new \RuntimeException('Adresse du compte OAuth non vérifiée.');
+        }
+        $email = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? $data['email'] ?? null : (is_string($data['mail'] ?? null) && '' !== trim($data['mail']) ? $data['mail'] : $data['userPrincipalName'] ?? null);
         if (!is_string($email) || false === filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new \RuntimeException('Adresse du compte OAuth introuvable.');
         }
@@ -53,6 +60,13 @@ final readonly class OauthMailProvider
 
     public function send(EmailSettings $settings, string $recipient, string $subject, string $message, ?string $html = null): void
     {
+        $this->assertProvider($settings);
+        if (false === filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('Destinataire invalide.');
+        }
+        if ('' === trim($subject) || mb_strlen($subject) > 255 || preg_match('/[\x00-\x1F\x7F]/', $subject)) {
+            throw new \InvalidArgumentException('Objet du message invalide.');
+        }
         $accessToken = $this->validAccessToken($settings);
         if ('GOOGLE_WORKSPACE' === $settings->getProvider()) {
             $email = (new Email())->from(new Address($settings->getSenderEmail(), $settings->getSenderName()))->to($recipient)->subject($subject)->text($message);
@@ -63,7 +77,7 @@ final readonly class OauthMailProvider
                 $email->replyTo($settings->getReplyTo());
             }
             $raw = rtrim(strtr(base64_encode($email->toString()), '+/', '-_'), '=');
-            $this->httpClient->request('POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', ['auth_bearer' => $accessToken, 'json' => ['raw' => $raw]])->getContent();
+            $this->httpClient->request('POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', [...self::HTTP_OPTIONS, 'auth_bearer' => $accessToken, 'json' => ['raw' => $raw]])->getContent();
 
             return;
         }
@@ -76,7 +90,7 @@ final readonly class OauthMailProvider
         if (null !== $settings->getReplyTo()) {
             $payload['message']['replyTo'] = [['emailAddress' => ['address' => $settings->getReplyTo()]]];
         }
-        $this->httpClient->request('POST', 'https://graph.microsoft.com/v1.0/me/sendMail', ['auth_bearer' => $accessToken, 'json' => $payload])->getContent();
+        $this->httpClient->request('POST', 'https://graph.microsoft.com/v1.0/me/sendMail', [...self::HTTP_OPTIONS, 'auth_bearer' => $accessToken, 'json' => $payload])->getContent();
     }
 
     private function validAccessToken(EmailSettings $settings): string
@@ -90,7 +104,7 @@ final readonly class OauthMailProvider
             throw new \RuntimeException('Reconnexion OAuth nécessaire.');
         }
         $tokens = $this->tokenRequest($settings, ['grant_type' => 'refresh_token', 'refresh_token' => $this->cipher->decrypt($refresh)]);
-        $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.max(60, $tokens['expires_in']).' seconds'), $settings->getConnectedEmail() ?? $settings->getSenderEmail());
+        $settings->connectOauth($this->cipher->encrypt($tokens['access_token']), isset($tokens['refresh_token']) ? $this->cipher->encrypt($tokens['refresh_token']) : null, new \DateTimeImmutable('+'.$tokens['expires_in'].' seconds'), $settings->getConnectedEmail() ?? $settings->getSenderEmail());
         $this->entityManager->flush();
 
         return $tokens['access_token'];
@@ -103,6 +117,7 @@ final readonly class OauthMailProvider
      */
     private function tokenRequest(EmailSettings $settings, array $parameters): array
     {
+        $this->assertProvider($settings);
         $secret = $settings->getEncryptedOauthClientSecret();
         if (null === $secret || null === $settings->getOauthClientId()) {
             throw new \RuntimeException('Identifiants OAuth incomplets.');
@@ -113,12 +128,26 @@ final readonly class OauthMailProvider
             $parameters['scope'] = 'openid email offline_access User.Read Mail.Send';
         }
         $url = 'GOOGLE_WORKSPACE' === $settings->getProvider() ? 'https://oauth2.googleapis.com/token' : 'https://login.microsoftonline.com/'.rawurlencode($settings->getOauthTenant() ?? 'organizations').'/oauth2/v2.0/token';
-        $data = $this->httpClient->request('POST', $url, ['body' => $parameters])->toArray();
-        if (!isset($data['access_token']) || !is_string($data['access_token'])) {
+        $data = $this->httpClient->request('POST', $url, [...self::HTTP_OPTIONS, 'body' => $parameters])->toArray();
+        if (!isset($data['access_token']) || !is_string($data['access_token']) || '' === trim($data['access_token'])) {
             throw new \RuntimeException('Jeton OAuth absent.');
         }
+        $expires = $data['expires_in'] ?? 3600;
+        if (!is_int($expires) || $expires < 1 || $expires > 86400) {
+            throw new \RuntimeException('Durée du jeton OAuth invalide.');
+        }
+        if (array_key_exists('refresh_token', $data) && (!is_string($data['refresh_token']) || '' === trim($data['refresh_token']))) {
+            throw new \RuntimeException('Jeton de renouvellement OAuth invalide.');
+        }
 
-        return ['access_token' => $data['access_token'], 'expires_in' => (int) ($data['expires_in'] ?? 3600), ...(isset($data['refresh_token']) && is_string($data['refresh_token']) ? ['refresh_token' => $data['refresh_token']] : [])];
+        return ['access_token' => $data['access_token'], 'expires_in' => $expires, ...(isset($data['refresh_token']) ? ['refresh_token' => $data['refresh_token']] : [])];
+    }
+
+    private function assertProvider(EmailSettings $settings): void
+    {
+        if (!in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true)) {
+            throw new \InvalidArgumentException('Fournisseur OAuth de messagerie invalide.');
+        }
     }
 
     private function codeVerifier(string $state): string
