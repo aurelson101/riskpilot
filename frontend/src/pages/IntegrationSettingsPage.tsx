@@ -127,7 +127,7 @@ export function IntegrationSettingsPage() {
     queryKey: ["email-settings"],
     queryFn: async () => (await api.get<EmailSummary>("/settings/email")).data,
   });
-  const [form, setForm] = useState<Form>(initial);
+  const [form, updateForm] = useState<Form>(initial);
   const [secret, setSecret] = useState<string | null>(null);
   const [secretIntegrationId, setSecretIntegrationId] = useState<number | null>(
     null,
@@ -138,6 +138,10 @@ export function IntegrationSettingsPage() {
   const [directoryResult, setDirectoryResult] = useState<string | null>(null);
   const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  function setForm(next: Form) {
+    setOidcResult(null);
+    updateForm(next);
+  }
   const create = useMutation({
     mutationFn: async () => {
       if (form.type === "OIDC_DIAGNOSTIC") {
@@ -181,9 +185,11 @@ export function IntegrationSettingsPage() {
       return { created };
     },
     onSuccess: async (data) => {
-      setSecret(data.created?.secret ?? null);
-      setSecretIntegrationId(data.created?.id ?? null);
-      setSecretCopied(false);
+      if (data.created?.secret) {
+        setSecret(data.created.secret);
+        setSecretIntegrationId(data.created.id);
+        setSecretCopied(false);
+      }
       setOidcResult(data.oidc ?? null);
       if (data.created) setForm(initial);
       setOperationError(null);
@@ -201,7 +207,6 @@ export function IntegrationSettingsPage() {
   function submit(event: FormEvent) {
     event.preventDefault();
     if (create.isPending || operationLock.current) return;
-    setSecret(null);
     setOidcResult(null);
     setOperationError(null);
     create.mutate();
@@ -274,6 +279,22 @@ export function IntegrationSettingsPage() {
         </Typography>
       </div>
       {operationError && <Alert severity="error">{operationError}</Alert>}
+      {integrations.isError && (
+        <Alert
+          severity="error"
+          action={<Button onClick={() => integrations.refetch()}>Réessayer</Button>}
+        >
+          Impossible de charger les accès configurés.
+        </Alert>
+      )}
+      {email.isError && (
+        <Alert
+          severity="error"
+          action={<Button onClick={() => email.refetch()}>Réessayer</Button>}
+        >
+          Impossible de charger l’état de la messagerie.
+        </Alert>
+      )}
       {secret && (
         <Alert severity="warning">
           <Stack spacing={1}>
@@ -350,7 +371,12 @@ export function IntegrationSettingsPage() {
 
       <Card>
         <CardContent component="form" onSubmit={submit}>
-          <Stack spacing={2}>
+          <Stack
+            spacing={2}
+            component="fieldset"
+            disabled={create.isPending}
+            sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}
+          >
             <div>
               <Typography variant="h6">Nouvel accès ou diagnostic</Typography>
               <Typography color="text.secondary">
@@ -361,6 +387,7 @@ export function IntegrationSettingsPage() {
             <TextField
               select
               label="Usage"
+              disabled={create.isPending}
               value={form.type}
               onChange={(event) =>
                 setForm({
@@ -576,6 +603,7 @@ export function IntegrationSettingsPage() {
                 <TextField
                   select
                   label="Fournisseur d’identité"
+                  disabled={create.isPending}
                   value={form.oidcProvider}
                   onChange={(event) => {
                     const provider = event.target.value as Form["oidcProvider"];
