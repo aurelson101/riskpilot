@@ -15,9 +15,11 @@ produit. Les critères ci-dessous sont des travaux à réaliser, pas des livrais
    habillage HTML ajouté (texte+HTML SMTP/Gmail, HTML Graph) ; restent la traduction
    des notifications métier et les validations de réception/rendu par fournisseur.
    Le test suit la langue de l'administrateur.
-3. **P1 — Bibliothèques interopérables** : import contrôlé Excel/YAML, identifiants
-   stables, versions, traductions, licences, simulation et rapport d'erreurs ;
-   conserver les packs gouvernés et les imports existants.
+3. **P1 — Bibliothèques interopérables (partiel)** : import CSV de nouveaux
+   référentiels avec modèle téléchargeable, prévisualisation, confirmation et
+   validation de la hiérarchie ajouté ; voir le [guide CSV](framework-csv-import.md).
+   Restent Excel/YAML, mises à jour versionnées, traductions, licences structurées
+   et mappings externes ; conserver les packs gouvernés et les imports existants.
 4. **P1 — Identité complète** : parcours SSO OIDC avec fournisseur open source
    de préproduction, puis SAML/SCIM selon besoin ; ne pas activer les diagnostics
    actuels comme s'ils réalisaient une connexion ou un provisioning.

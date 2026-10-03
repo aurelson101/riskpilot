@@ -94,6 +94,21 @@ class Requirement
 
     public function setParentRequirement(?self $value): self
     {
+        $visited = [];
+        for ($ancestor = $value; null !== $ancestor; $ancestor = $ancestor->getParentRequirement()) {
+            if ($ancestor === $this || (null !== $this->id && $ancestor->getId() === $this->id)) {
+                throw new \InvalidArgumentException('Requirement hierarchy cannot contain a cycle.');
+            }
+            $framework = $ancestor->getFramework();
+            if ($framework !== $this->framework && (null === $this->framework->getId() || $framework->getId() !== $this->framework->getId())) {
+                throw new \InvalidArgumentException('Parent requirement must belong to the same framework.');
+            }
+            $identity = null !== $ancestor->getId() ? 'id:'.$ancestor->getId() : 'object:'.spl_object_id($ancestor);
+            if (isset($visited[$identity])) {
+                throw new \InvalidArgumentException('Parent requirement hierarchy already contains a cycle.');
+            }
+            $visited[$identity] = true;
+        }
         $this->parentRequirement = $value;
 
         return $this;

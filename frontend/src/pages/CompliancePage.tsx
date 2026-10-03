@@ -52,6 +52,7 @@ import { ComplianceGovernancePanel } from "../components/compliance/ComplianceGo
 import { ComplianceCopilotDialog } from "../components/compliance/ComplianceCopilotDialog";
 import { EvidenceRegistryPanel } from "../components/compliance/EvidenceRegistryPanel";
 import { buildComplianceSummary } from "./complianceSummary";
+import { FrameworkImportDialog } from "../components/compliance/FrameworkImportDialog";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
   COMPLIANT: "Conforme",
@@ -96,6 +97,7 @@ function summarizeReferences(items: ComplianceResult[]): string {
 export function CompliancePage() {
   const { user } = useAuth();
   const [tab, setTab] = useState(0);
+  const [importDialog, setImportDialog] = useState(false);
   const [selectedAssessment, setSelectedAssessment] = useState<number | null>(
     null,
   );
@@ -328,6 +330,8 @@ export function CompliancePage() {
       {tab === 1 && (
         <Card variant="outlined">
           <CardContent>
+            {user?.roles.some(role => ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role)) && <Button sx={{ mb: 2 }} variant="outlined" onClick={() => setImportDialog(true)}>{user.locale === "en" ? "Import a CSV framework" : "Importer un référentiel CSV"}</Button>}
+            <FrameworkImportDialog open={importDialog} onClose={() => setImportDialog(false)} onImported={() => { void client.invalidateQueries({ queryKey: ["frameworks"] }); }} />
             <Table aria-label="Référentiels">
               <TableHead>
                 <TableRow>

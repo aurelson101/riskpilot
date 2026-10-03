@@ -101,7 +101,12 @@ final readonly class FrameworkController
             return new JsonResponse(['code' => 'INVALID_PARENT', 'message' => 'Exigence parente invalide.'], 422);
         } $created = null === $item;
         $item ??= new Requirement($framework, $input->reference, $input->title, $input->category);
-        $item->setReference($input->reference)->setTitle($input->title)->setDescription($input->description)->setCategory($input->category)->setParentRequirement($parent)->setStatus($input->status);
+        try {
+            $item->setParentRequirement($parent);
+        } catch (\InvalidArgumentException) {
+            return new JsonResponse(['code' => 'INVALID_PARENT', 'message' => 'Le parent doit appartenir au même référentiel et ne pas créer de boucle.'], 422);
+        }
+        $item->setReference($input->reference)->setTitle($input->title)->setDescription($input->description)->setCategory($input->category)->setStatus($input->status);
         $this->entityManager->persist($item);
         $this->entityManager->flush();
 
