@@ -135,7 +135,11 @@ export function IntegrationSettingsPage() {
   const [secretCopied, setSecretCopied] = useState(false);
   const [operationPending, setOperationPending] = useState(false);
   const operationLock = useRef(false);
-  const [directoryResult, setDirectoryResult] = useState<string | null>(null);
+  const [directoryResult, setDirectoryResult] = useState<{
+    integrationId: number;
+    name: string;
+    matchedEntries: number;
+  } | null>(null);
   const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   function setForm(next: Form) {
@@ -217,6 +221,7 @@ export function IntegrationSettingsPage() {
     await runOperation(async () => {
       await api.delete(`/v1/integrations/${item.id}`);
       if (secretIntegrationId === item.id) setSecret(null);
+      if (directoryResult?.integrationId === item.id) setDirectoryResult(null);
     });
   }
 
@@ -756,9 +761,11 @@ export function IntegrationSettingsPage() {
                         const response = await api.post<{
                           matchedEntries: number;
                         }>(`/v1/integrations/${item.id}/directory-test`);
-                        setDirectoryResult(
-                          `LDAPS validé — ${response.data.matchedEntries} entrée(s) trouvée(s).`,
-                        );
+                        setDirectoryResult({
+                          integrationId: item.id,
+                          name: item.name,
+                          matchedEntries: response.data.matchedEntries,
+                        });
                       });
                     }}
                   >
@@ -779,12 +786,9 @@ export function IntegrationSettingsPage() {
       </Stack>
 
       {directoryResult && (
-        <Alert
-          severity={
-            directoryResult.startsWith("LDAPS validé") ? "success" : "error"
-          }
-        >
-          {directoryResult}
+        <Alert severity="success">
+          LDAPS validé — {directoryResult.name} : {directoryResult.matchedEntries}
+          {" "}entrée(s) trouvée(s).
         </Alert>
       )}
 

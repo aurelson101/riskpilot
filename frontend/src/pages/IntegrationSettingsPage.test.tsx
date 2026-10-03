@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +46,63 @@ function mockLoads() {
 }
 
 describe("IntegrationSettingsPage", () => {
+  it.each(["tested directory", "another directory", "failed deletion"])(
+    "keeps the LDAPS result associated with its directory after deleting %s",
+    async (operation) => {
+      let items = [1, 2].map((id) => ({
+        id,
+        name: `Directory ${id}`,
+        type: "DIRECTORY",
+        provider: "GENERIC",
+        configuration: {},
+        credentialConfigured: true,
+        enabled: false,
+      }));
+      vi.spyOn(api, "get").mockImplementation(async (url) => ({
+        data:
+          url === "/v1/integrations"
+            ? { items }
+            : { provider: "CUSTOM", enabled: false, ready: false },
+      }));
+      vi.spyOn(api, "post").mockResolvedValue({ data: { matchedEntries: 1 } });
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      vi.spyOn(api, "delete").mockImplementation(async (url) => {
+        if (operation === "failed deletion") throw new Error("Network failure");
+        items = items.filter((item) => url !== `/v1/integrations/${item.id}`);
+        return { data: {} };
+      });
+      renderPage();
+      const card = (name: string) =>
+        within(screen.getByText(name).closest(".MuiCard-root") as HTMLElement);
+      await screen.findByText("Directory 1");
+      fireEvent.click(
+        card("Directory 1").getByRole("button", { name: "Tester LDAPS" }),
+      );
+      const result = /LDAPS validé — Directory 1/;
+      expect(await screen.findByText(result)).toBeVisible();
+      const target =
+        operation === "another directory" ? "Directory 2" : "Directory 1";
+      await waitFor(() =>
+        expect(
+          card(target).getByRole("button", { name: "Supprimer" }),
+        ).toBeEnabled(),
+      );
+      fireEvent.click(card(target).getByRole("button", { name: "Supprimer" }));
+      if (operation === "failed deletion") {
+        expect(await screen.findByText("L’opération a échoué.")).toBeVisible();
+      } else {
+        await waitFor(() =>
+          expect(screen.queryByText(target)).not.toBeInTheDocument(),
+        );
+      }
+      if (operation === "tested directory") {
+        expect(screen.queryByText(result)).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText(result)).toBeVisible();
+      }
+    },
+  );
+
   it.each(["failed creation", "successful OIDC diagnostic"])(
     "preserves an unacknowledged API key after %s",
     async (operation) => {
