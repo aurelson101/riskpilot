@@ -21,9 +21,10 @@ describe("FrameworkImportDialog", () => {
     Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(csv).buffer });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
     await waitFor(() => expect(screen.getByRole("button", { name: "Preview" })).toBeEnabled());
-    post.mockResolvedValue({ data: { checksum: "test-checksum", count: 1, requirements: [{ reference: "A", title: "Root", parentReference: "" }] } });
+    post.mockResolvedValue({ data: { checksum: "test-checksum", count: 1, requirements: [{ reference: "A", title: "Root", parentReference: "", status: "ARCHIVED" }] } });
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
     expect(await screen.findByRole("button", { name: "Confirm creation" })).toBeEnabled();
+    expect(screen.getByText(/Archived$/)).toBeInTheDocument();
     expect(imported).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Version"), { target: { value: "2" } });
     expect(screen.queryByRole("button", { name: "Confirm creation" })).not.toBeInTheDocument();

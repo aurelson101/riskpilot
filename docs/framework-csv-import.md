@@ -12,8 +12,8 @@ aucun catalogue propriétaire EGERIE ni texte de norme ISO n'est fourni.
 
 ## Format
 
-CSV UTF-8, avec ou sans BOM, séparateur virgule, au plus 1 Mio et 500 exigences.
-En-tête exact et cinq colonnes :
+CSV UTF-8, avec ou sans BOM, séparateur virgule ou point-virgule (détecté depuis
+l'en-tête), au plus 1 Mio et 500 exigences. En-tête exact et cinq colonnes :
 
 ```csv
 reference,title,category,description,parentReference
@@ -26,6 +26,11 @@ désigner une ligne située plus loin dans le fichier. Les champs contenant des
 virgules ou des sauts de ligne doivent être entourés de guillemets CSV.
 Les parents absents, les boucles et les champs vides ou trop longs sont refusés.
 Le fichier n'est pas sauvegardé sur disque.
+
+Une sixième colonne `status` est optionnelle : `ACTIVE`, `INACTIVE` ou `ARCHIVED`.
+Sans cette colonne, les exigences sont actives ; si elle est présente, une valeur
+vide ou inconnue est refusée. Les exports incluent cette colonne et le réimport
+conserve les statuts, sans réactiver silencieusement une exigence archivée.
 
 ## API
 

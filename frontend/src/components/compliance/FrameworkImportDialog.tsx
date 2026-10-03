@@ -4,7 +4,7 @@ import { isAxiosError } from "axios";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/useAuth";
 
-type Preview = { checksum: string; count: number; requirements: { reference: string; title: string; parentReference: string }[] };
+type Preview = { checksum: string; count: number; requirements: { reference: string; title: string; parentReference: string; status?: string }[] };
 
 export function FrameworkImportDialog({ open, onClose, onImported }: { open: boolean; onClose: () => void; onImported: () => void }) {
   const { user } = useAuth();
@@ -39,7 +39,7 @@ export function FrameworkImportDialog({ open, onClose, onImported }: { open: boo
       <Alert severity="info">{t("Crée une nouvelle version sans écraser les référentiels existants. Importez uniquement les contenus que vous avez le droit d’utiliser. Catalogue partagé : réservé aux administrateurs.", "Creates a new version without overwriting existing frameworks. Only import content you are entitled to use. Shared catalogue: administrators only.")}</Alert>
       <TextField label={t("Nom du référentiel", "Framework name")} value={name} disabled={busy || reading} inputProps={{ maxLength: 180 }} onChange={e => { setName(e.target.value); resetPreview(); }} />
       <TextField label="Version" value={version} disabled={busy || reading} inputProps={{ maxLength: 50 }} onChange={e => { setVersion(e.target.value); resetPreview(); }} />
-      <Typography variant="body2">{t("CSV UTF-8, séparateur virgule, 1 Mio et 500 exigences maximum. Colonnes :", "UTF-8 CSV, comma-separated, maximum 1 MiB and 500 requirements. Columns:")}</Typography>
+      <Typography variant="body2">{t("CSV UTF-8, virgule ou point-virgule, 1 Mio et 500 exigences maximum. Colonne status optionnelle : ACTIVE, INACTIVE ou ARCHIVED ; ACTIVE par défaut. Colonnes :", "UTF-8 CSV, comma or semicolon, maximum 1 MiB and 500 requirements. Optional status column: ACTIVE, INACTIVE or ARCHIVED; defaults to ACTIVE. Columns:")}</Typography>
       <Typography component="code" sx={{ overflowWrap: "anywhere" }}>reference,title,category,description,parentReference</Typography>
       <Button component="a" download="riskpilot-framework-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("reference,title,category,description,parentReference\nA,Access management,Security,,\nA.1,Review access rights,Security,,A\n")}`}>{t("Télécharger le modèle CSV", "Download CSV template")}</Button>
       <Button component="label" disabled={busy || reading} variant="outlined">{t("Choisir le fichier CSV", "Choose CSV file")}<input hidden type="file" accept=".csv,text/csv" onChange={async e => {
@@ -53,7 +53,7 @@ export function FrameworkImportDialog({ open, onClose, onImported }: { open: boo
       }} /></Button>
       {csv && <Typography variant="body2">{t("Fichier chargé : prévisualisez avant de confirmer.", "File loaded: preview before confirming.")}</Typography>}
       {error && <Alert severity="error">{error}</Alert>}
-      {preview && <><Alert severity="success">{preview.count} {t("exigences validées. Aucune donnée enregistrée à ce stade.", "requirements validated. Nothing has been saved yet.")}</Alert><Typography variant="body2">{t("Aperçu des 20 premières exigences :", "Preview of the first 20 requirements:")}</Typography><Stack component="ul" sx={{ pl: 3, overflowWrap: "anywhere" }}>{preview.requirements.slice(0, 20).map(row => <Typography component="li" key={row.reference}>{row.reference} — {row.title}{row.parentReference ? ` (${t("parent", "parent")}: ${row.parentReference})` : ""}</Typography>)}</Stack></>}
+      {preview && <><Alert severity="success">{preview.count} {t("exigences validées. Aucune donnée enregistrée à ce stade.", "requirements validated. Nothing has been saved yet.")}</Alert><Typography variant="body2">{t("Aperçu des 20 premières exigences :", "Preview of the first 20 requirements:")}</Typography><Stack component="ul" sx={{ pl: 3, overflowWrap: "anywhere" }}>{preview.requirements.slice(0, 20).map(row => <Typography component="li" key={row.reference}>{row.reference} — {row.title}{row.parentReference ? ` (${t("parent", "parent")}: ${row.parentReference})` : ""} — {row.status === "ARCHIVED" ? t("Archivée", "Archived") : row.status === "INACTIVE" ? t("Inactive", "Inactive") : t("Active", "Active")}</Typography>)}</Stack></>}
     </Stack></DialogContent>
     <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}><Button onClick={onClose} disabled={busy || reading}>{t("Fermer", "Close")}</Button><Button variant="contained" disabled={busy || reading || !name.trim() || !version.trim() || !csv} onClick={() => void submit()}>{busy ? t("Traitement…", "Processing…") : preview ? t("Confirmer la création", "Confirm creation") : t("Prévisualiser", "Preview")}</Button></DialogActions>
   </Dialog>;

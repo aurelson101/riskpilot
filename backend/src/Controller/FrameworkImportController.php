@@ -58,7 +58,7 @@ final readonly class FrameworkImportController
             $this->em->persist($framework);
             $items = [];
             foreach ($rows as $row) {
-                $item = (new Requirement($framework, $row['reference'], $row['title'], $row['category']))->setDescription($row['description']);
+                $item = (new Requirement($framework, $row['reference'], $row['title'], $row['category']))->setDescription($row['description'])->setStatus($row['status']);
                 $items['ref:'.$row['reference']] = $item;
                 $this->em->persist($item);
             }

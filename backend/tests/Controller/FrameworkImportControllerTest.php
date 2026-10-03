@@ -27,7 +27,7 @@ final class FrameworkImportControllerTest extends WebTestCase
         foreach ([$org, $admin, $reader] as $entity) $em->persist($entity);
         $em->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
-        $body = ['name' => 'Original local test catalogue', 'version' => '1', 'csv' => "reference,title,category,description,parentReference\nA,Root,Security,,\nB,Child,Security,,A\n"];
+        $body = ['name' => 'Original local test catalogue', 'version' => '1', 'csv' => "reference;title;category;description;parentReference;status\r\nA;Root;Security;;;ACTIVE\r\nB;Child;Security;;A;ARCHIVED\r\n"];
         $client->jsonRequest('POST', '/api/frameworks/import/preview', $body);
         self::assertResponseStatusCodeSame(401);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($reader));
@@ -52,6 +52,7 @@ final class FrameworkImportControllerTest extends WebTestCase
         self::assertSame(2, $em->getRepository(Requirement::class)->count([]));
         $child = $em->getRepository(Requirement::class)->findOneBy(['reference' => 'B']);
         self::assertSame('A', $child->getParentRequirement()->getReference());
+        self::assertSame('ARCHIVED', $child->getStatus());
         $client->request('GET', '/api/frameworks/'.$child->getFramework()->getId().'/export.csv');
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('Content-Type', 'text/csv; charset=UTF-8');
@@ -60,7 +61,9 @@ final class FrameworkImportControllerTest extends WebTestCase
         $export = $client->getResponse()->getContent();
         $client->jsonRequest('POST', '/api/frameworks/import/preview', [...$body, 'version' => '2', 'csv' => $export]);
         self::assertResponseIsSuccessful();
-        self::assertSame(2, json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR)['count']);
+        $exportPreview = json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(2, $exportPreview['count']);
+        self::assertSame('ARCHIVED', $exportPreview['requirements'][1]['status']);
         $client->request('GET', '/api/frameworks/999999/export.csv');
         self::assertResponseStatusCodeSame(404);
         $client->jsonRequest('POST', '/api/frameworks/import/confirm', [...$body, 'checksum' => $preview['checksum']]);
