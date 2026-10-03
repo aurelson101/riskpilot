@@ -52,6 +52,17 @@ final class FrameworkImportControllerTest extends WebTestCase
         self::assertSame(2, $em->getRepository(Requirement::class)->count([]));
         $child = $em->getRepository(Requirement::class)->findOneBy(['reference' => 'B']);
         self::assertSame('A', $child->getParentRequirement()->getReference());
+        $client->request('GET', '/api/frameworks/'.$child->getFramework()->getId().'/export.csv');
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('Content-Type', 'text/csv; charset=UTF-8');
+        self::assertResponseHeaderSame('X-Content-Type-Options', 'nosniff');
+        self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control'));
+        $export = $client->getResponse()->getContent();
+        $client->jsonRequest('POST', '/api/frameworks/import/preview', [...$body, 'version' => '2', 'csv' => $export]);
+        self::assertResponseIsSuccessful();
+        self::assertSame(2, json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR)['count']);
+        $client->request('GET', '/api/frameworks/999999/export.csv');
+        self::assertResponseStatusCodeSame(404);
         $client->jsonRequest('POST', '/api/frameworks/import/confirm', [...$body, 'checksum' => $preview['checksum']]);
         self::assertResponseStatusCodeSame(409);
         self::assertSame(1, $em->getRepository(Framework::class)->count([]));

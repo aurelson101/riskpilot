@@ -29,6 +29,16 @@ Le fichier n'est pas sauvegardé sur disque.
 
 ## API
 
+Depuis le même onglet, le bouton **CSV** exporte toutes les exigences d'un
+référentiel dans ce format, y compris leurs parents. Le téléchargement est privé
+et non stockable en cache. Les cellules susceptibles d'être interprétées comme
+formules par Excel sont préfixées d'une apostrophe ; celle-ci reste présente lors
+du réimport. Un fichier dont les références deviennent ambiguës, une hiérarchie
+invalide ou un dépassement des limites est refusé explicitement, sans export
+partiel. Un référentiel vide n'est pas exporté.
+
+- `GET /api/frameworks/{id}/export.csv` : téléchargement du CSV réutilisable.
+
 - `POST /api/frameworks/import/preview` : JSON avec `name`, `version`, `csv` ;
   paramètres optionnels du référentiel : `description`, `publisher`, `status`.
   Retourne `count`, `requirements` et une empreinte `checksum`.

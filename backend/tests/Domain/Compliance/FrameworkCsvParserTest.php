@@ -5,12 +5,51 @@ declare(strict_types=1);
 namespace App\Tests\Domain\Compliance;
 
 use App\Domain\Compliance\FrameworkCsvParser;
+use App\Entity\Framework;
+use App\Entity\Requirement;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class FrameworkCsvParserTest extends TestCase
 {
     private const HEADER = "reference,title,category,description,parentReference\n";
+
+    public function testExportRoundTripEscapingAndHierarchy(): void
+    {
+        $framework = new Framework('Local', '1');
+        $root = new Requirement($framework, '=ROOT', 'Root, access', 'Security');
+        $child = (new Requirement($framework, 'CHILD', 'Child', 'Security'))->setParentRequirement($root)->setDescription("Line one\nLine two");
+        $parser = new FrameworkCsvParser();
+        $csv = $parser->export([$child, $root]);
+        self::assertStringStartsWith("\xEF\xBB\xBF", $csv);
+        $rows = $parser->parse($csv);
+        self::assertCount(2, $rows);
+        self::assertSame("'=ROOT", $rows[1]['reference']);
+        self::assertSame($rows[1]['reference'], $rows[0]['parentReference']);
+        self::assertSame("Line one\nLine two", $rows[0]['description']);
+        self::assertSame('Root, access', $rows[1]['title']);
+    }
+
+    public function testExportRefusesReferenceCollisionAfterFormulaEscaping(): void
+    {
+        $framework = new Framework('Local', '1');
+        $this->expectException(\InvalidArgumentException::class);
+        (new FrameworkCsvParser())->export([new Requirement($framework, '=ROOT', 'Root', 'Security'), new Requirement($framework, "'=ROOT", 'Other', 'Security')]);
+    }
+
+    public function testExportRefusesEmptyFramework(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new FrameworkCsvParser())->export([]);
+    }
+
+    public function testExportRefusesPartialFileOnRowLimit(): void
+    {
+        $framework = new Framework('Local', '1'); $items = [];
+        for ($i = 0; $i < 501; ++$i) $items[] = new Requirement($framework, (string) $i, 'Title', 'Security');
+        $this->expectException(\InvalidArgumentException::class);
+        (new FrameworkCsvParser())->export($items);
+    }
 
     public function testBomQuotedMultilineAndForwardParent(): void
     {

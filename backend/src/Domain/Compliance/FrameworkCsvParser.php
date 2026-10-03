@@ -4,10 +4,38 @@ declare(strict_types=1);
 
 namespace App\Domain\Compliance;
 
+use App\Entity\Requirement;
+
 final class FrameworkCsvParser
 {
     public const MAX_BYTES = 1048576;
     public const MAX_ROWS = 500;
+    private const HEADERS = ['reference', 'title', 'category', 'description', 'parentReference'];
+
+    /** @param iterable<Requirement> $requirements */
+    public function export(iterable $requirements): string
+    {
+        $stream = fopen('php://temp', 'w+');
+        if (false === $stream) throw new \RuntimeException('CSV stream unavailable.');
+        try {
+            fwrite($stream, "\xEF\xBB\xBF");
+            fputcsv($stream, self::HEADERS, ',', '"', '');
+            $count = 0;
+            foreach ($requirements as $item) {
+                if (++$count > self::MAX_ROWS) throw new \InvalidArgumentException('Maximum 500 exigences pour un fichier réimportable. Aucun export partiel créé.');
+                $row = [$item->getReference(), $item->getTitle(), $item->getCategory(), $item->getDescription() ?? '', $item->getParentRequirement()?->getReference() ?? ''];
+                fputcsv($stream, array_map(static fn (string $value): string => preg_match('/^[\s]*[=+\-@]/u', $value) ? "'".$value : $value, $row), ',', '"', '');
+                if (ftell($stream) > self::MAX_BYTES) throw new \InvalidArgumentException('Le fichier dépasse 1 Mio. Aucun export partiel créé.');
+            }
+            rewind($stream);
+            $csv = stream_get_contents($stream);
+            if (false === $csv) throw new \RuntimeException('CSV stream unavailable.');
+            $this->parse($csv);
+            return $csv;
+        } finally {
+            fclose($stream);
+        }
+    }
 
     /** @return list<array{reference: string, title: string, category: string, description: string, parentReference: string}> */
     public function parse(string $csv): array
@@ -21,7 +49,7 @@ final class FrameworkCsvParser
             fwrite($stream, preg_replace('/^\xEF\xBB\xBF/', '', $csv));
             rewind($stream);
             $headers = fgetcsv($stream, null, ',', '"', '');
-            if (['reference', 'title', 'category', 'description', 'parentReference'] !== $headers) {
+            if (self::HEADERS !== $headers) {
                 throw new \InvalidArgumentException('En-tête attendu : reference,title,category,description,parentReference (séparateur virgule).');
             }
             $rows = []; $references = []; $line = 1;

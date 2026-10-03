@@ -11,17 +11,19 @@ use App\Api\JsonInputMapper;
 use App\Entity\Framework;
 use App\Entity\Requirement;
 use App\Entity\User;
+use App\Domain\Compliance\FrameworkCsvParser;
 use App\Repository\FrameworkRepository;
 use App\Repository\RequirementRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 final readonly class FrameworkController
 {
-    public function __construct(private FrameworkRepository $frameworks, private RequirementRepository $requirements, private EntityManagerInterface $entityManager, private JsonInputMapper $mapper, private ApiResponseFactory $responses)
+    public function __construct(private FrameworkRepository $frameworks, private RequirementRepository $requirements, private EntityManagerInterface $entityManager, private JsonInputMapper $mapper, private ApiResponseFactory $responses, private FrameworkCsvParser $csv)
     {
     }
 
@@ -59,6 +61,23 @@ final readonly class FrameworkController
         $framework = $this->frameworks->find($id);
 
         return null === $framework ? $this->notFound() : new JsonResponse(array_map($this->responses->requirement(...), $this->requirements->findForFramework($framework)));
+    }
+
+    #[Route('/api/frameworks/{id<\d+>}/export.csv', methods: ['GET'])]
+    public function export(int $id): Response
+    {
+        $framework = $this->frameworks->find($id);
+        if (null === $framework) return $this->notFound();
+        try { $content = $this->csv->export($this->requirements->findForFramework($framework)); }
+        catch (\InvalidArgumentException $error) {
+            return new JsonResponse(['code' => 'FRAMEWORK_NOT_EXPORTABLE', 'message' => $error->getMessage()], 422);
+        }
+        return new Response($content, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="riskpilot-framework-'.$id.'.csv"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     #[Route('/api/frameworks/{id<\d+>}/requirements', methods: ['POST'])] #[IsGranted(User::ROLE_ADMIN)]

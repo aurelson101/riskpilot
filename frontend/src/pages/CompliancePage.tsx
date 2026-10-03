@@ -17,6 +17,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableContainer,
   Tabs,
   Typography,
   Button,
@@ -98,6 +99,8 @@ export function CompliancePage() {
   const { user } = useAuth();
   const [tab, setTab] = useState(0);
   const [importDialog, setImportDialog] = useState(false);
+  const [frameworkExportError, setFrameworkExportError] = useState(false);
+  const [frameworkExportId, setFrameworkExportId] = useState<number | null>(null);
   const [selectedAssessment, setSelectedAssessment] = useState<number | null>(
     null,
   );
@@ -332,6 +335,7 @@ export function CompliancePage() {
           <CardContent>
             {user?.roles.some(role => ["ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role)) && <Button sx={{ mb: 2 }} variant="outlined" onClick={() => setImportDialog(true)}>{user.locale === "en" ? "Import a CSV framework" : "Importer un référentiel CSV"}</Button>}
             <FrameworkImportDialog open={importDialog} onClose={() => setImportDialog(false)} onImported={() => { void client.invalidateQueries({ queryKey: ["frameworks"] }); }} />
+            <TableContainer>
             <Table aria-label="Référentiels">
               <TableHead>
                 <TableRow>
@@ -339,6 +343,7 @@ export function CompliancePage() {
                   <TableCell>Éditeur</TableCell>
                   <TableCell>Exigences</TableCell>
                   <TableCell>Statut</TableCell>
+                  <TableCell>{user?.locale === "en" ? "Reusable CSV" : "CSV réutilisable"}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -361,10 +366,20 @@ export function CompliancePage() {
                         }
                       />
                     </TableCell>
+                    <TableCell>
+                      <Button size="small" startIcon={<DownloadOutlined />} disabled={frameworkExportId !== null || framework.requirementCount === 0} aria-label={`${user?.locale === "en" ? "Export" : "Exporter"} ${framework.name} ${framework.version}`} onClick={async () => {
+                        setFrameworkExportId(framework.id); setFrameworkExportError(false);
+                        try { await downloadApiFile(`/frameworks/${framework.id}/export.csv`, `riskpilot-framework-${framework.id}.csv`); }
+                        catch { setFrameworkExportError(true); }
+                        finally { setFrameworkExportId(null); }
+                      }}>{frameworkExportId === framework.id ? "…" : "CSV"}</Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </TableContainer>
+            {frameworkExportError && <Alert severity="error" sx={{ mt: 2 }}>{user?.locale === "en" ? "Export failed. A reusable file is limited to 500 requirements and 1 MiB and requires a valid hierarchy. No partial file was downloaded." : "Export impossible. Un fichier réutilisable est limité à 500 exigences et 1 Mio et nécessite une hiérarchie valide. Aucun fichier partiel n’a été téléchargé."}</Alert>}
           </CardContent>
         </Card>
       )}

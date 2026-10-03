@@ -20,6 +20,10 @@ final class RequirementRepository extends ServiceEntityRepository
     /** @return list<Requirement> */
     public function findForFramework(Framework $framework): array
     {
-        return $this->findBy(['framework' => $framework], ['category' => 'ASC', 'reference' => 'ASC']);
+        return $this->createQueryBuilder('requirement')
+            ->leftJoin('requirement.parentRequirement', 'parent')->addSelect('parent')
+            ->where('requirement.framework = :framework')->setParameter('framework', $framework)
+            ->orderBy('requirement.category', 'ASC')->addOrderBy('requirement.reference', 'ASC')
+            ->getQuery()->getResult();
     }
 }
