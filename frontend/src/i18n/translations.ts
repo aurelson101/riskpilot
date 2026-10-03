@@ -833,6 +833,18 @@ const pairs: Array<[fr: string, en: string]> = [
     "Microsoft AD directory diagnostic (LDAPS)",
   ],
   ["Diagnostic SSO — découverte OIDC", "SSO diagnostic — OIDC discovery"],
+  ["Diagnostic annuaire LDAPS", "LDAPS directory diagnostic"],
+  ["Type d’annuaire", "Directory type"],
+  ["OpenLDAP / annuaire LDAP compatible", "OpenLDAP / compatible LDAP directory"],
+  ["Groupe de l’annuaire (DN)", "Directory group (DN)"],
+  [
+    "La découverte OIDC Google/Entra peut être vérifiée ici, ainsi que Keycloak/Authentik si l’émetteur est autorisé côté serveur. L’activation du SSO OIDC/SAML et du provisioning SCIM reste masquée tant que le parcours complet de connexion n’est pas disponible.",
+    "Google/Entra OIDC discovery can be checked here, as well as Keycloak/Authentik when the issuer is allowed by the server. OIDC/SAML SSO and SCIM provisioning remain hidden until the complete sign-in workflow is available.",
+  ],
+  [
+    "URL HTTPS du realm Keycloak ou de l’application Authentik (mode émetteur par application), à autoriser dans OIDC_DIAGNOSTIC_ISSUERS côté serveur.",
+    "HTTPS URL of the Keycloak realm or Authentik application (per-application issuer mode), to allow in OIDC_DIAGNOSTIC_ISSUERS on the server.",
+  ],
   ["Groupe Microsoft AD", "Microsoft AD group"],
   ["Droits accordés", "Granted permissions"],
   [

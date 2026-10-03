@@ -27,6 +27,9 @@ use Symfony\Component\Routing\Attribute\Route;
     {
         $this->admin();
         $data = $request->toArray();
+        if (!is_string($data['provider'] ?? null) || !is_string($data['issuer'] ?? null) || strlen($data['issuer']) > 2048) {
+            return new JsonResponse(['code' => 'OIDC_DISCOVERY_TEST_FAILED', 'message' => 'Fournisseur et émetteur OIDC textuels requis.', 'validated' => false], 422);
+        }
         try {
             return new JsonResponse($this->oidcDiscoveryValidator->validate((string) ($data['provider'] ?? ''), (string) ($data['issuer'] ?? '')));
         } catch (\RuntimeException $e) {

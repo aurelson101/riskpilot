@@ -10,7 +10,7 @@ final readonly class OidcDiscoveryValidator
 {
     private const SAFE_SIGNING_ALGORITHMS = ['RS256', 'PS256', 'ES256'];
 
-    public function __construct(private HttpClientInterface $httpClient)
+    public function __construct(private HttpClientInterface $httpClient, private array $allowedIssuers = [])
     {
     }
 
@@ -26,25 +26,38 @@ final readonly class OidcDiscoveryValidator
                 'headers' => ['Accept' => 'application/json'],
                 'max_redirects' => 0,
                 'timeout' => 5,
+                'max_duration' => 10,
+                'verify_peer' => true,
+                'verify_host' => true,
+                'on_progress' => static function (int $downloaded, int $total): void {
+                    if ($downloaded > 262144 || $total > 262144) throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+                },
             ]);
         } catch (\Throwable $e) {
             throw new \RuntimeException('Découverte OIDC inaccessible.', previous: $e);
         }
-        if (200 !== $response->getStatusCode()) {
-            throw new \RuntimeException('Le fournisseur OIDC n’a pas renvoyé une configuration valide.');
-        }
         try {
-            $metadata = $response->toArray(false);
+            if (200 !== $response->getStatusCode()) throw new \RuntimeException('Statut OIDC invalide.');
+            $content = $response->getContent(false);
+            if (strlen($content) > 262144) throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+            $metadata = json_decode($content, true, 32, JSON_THROW_ON_ERROR);
+            if (!is_array($metadata) || array_is_list($metadata)) throw new \RuntimeException('Objet OIDC requis.');
         } catch (\Throwable $e) {
             throw new \RuntimeException('La configuration OIDC reçue est invalide.', previous: $e);
         }
 
-        if (rtrim((string) ($metadata['issuer'] ?? ''), '/') !== $issuer) {
+        if (!is_string($metadata['issuer'] ?? null) || rtrim($metadata['issuer'], '/') !== $issuer) {
             throw new \RuntimeException('L’émetteur annoncé par le fournisseur OIDC ne correspond pas à la configuration.');
         }
         foreach (['authorization_endpoint', 'token_endpoint', 'jwks_uri'] as $field) {
-            if (!$this->validHttpsUrl((string) ($metadata[$field] ?? ''))) {
+            if (!is_string($metadata[$field] ?? null) || !$this->validHttpsUrl($metadata[$field])) {
                 throw new \RuntimeException('La configuration OIDC contient un endpoint non sécurisé.');
+            }
+        }
+        foreach (['response_types_supported', 'scopes_supported', 'id_token_signing_alg_values_supported', 'code_challenge_methods_supported'] as $field) {
+            $values = $metadata[$field] ?? [];
+            if (!is_array($values) || !array_is_list($values) || [] !== array_filter($values, static fn ($value): bool => !is_string($value))) {
+                throw new \RuntimeException('Les capacités OIDC doivent être des listes de chaînes.');
             }
         }
         if (!in_array('code', (array) ($metadata['response_types_supported'] ?? []), true)
@@ -75,6 +88,14 @@ final readonly class OidcDiscoveryValidator
             return;
         }
 
+        if (in_array($provider, ['KEYCLOAK', 'AUTHENTIK'], true) && $this->validHttpsUrl($issuer) && !isset(parse_url($issuer)['query'])) {
+            $allowed = array_map(static fn ($value): string => is_string($value) ? rtrim(trim($value), '/') : '', $this->allowedIssuers);
+            $path = parse_url($issuer, PHP_URL_PATH);
+            $expected = 'KEYCLOAK' === $provider ? '#/realms/[^/]+$#' : '#/application/o/[^/]+$#';
+            if (is_string($path) && preg_match($expected, $path) && in_array($issuer, $allowed, true)) return;
+            throw new \RuntimeException('Cet émetteur doit être autorisé par l’administrateur serveur dans OIDC_DIAGNOSTIC_ISSUERS, avec le chemin realm Keycloak ou application Authentik.');
+        }
+
         throw new \RuntimeException('Utilisez l’émetteur officiel Google ou l’URL Entra ID avec l’identifiant UUID du tenant.');
     }
 
@@ -88,6 +109,6 @@ final readonly class OidcDiscoveryValidator
         return is_array($parts)
             && 'https' === strtolower((string) ($parts['scheme'] ?? ''))
             && '' !== (string) ($parts['host'] ?? '')
-            && !isset($parts['user'], $parts['pass']);
+            && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['fragment']);
     }
 }

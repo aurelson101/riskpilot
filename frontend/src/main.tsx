@@ -6,6 +6,7 @@ import App from "./App.tsx";
 import { AuthProvider } from "./auth/AuthContext.tsx";
 import "./index.css";
 import axios from "axios";
+import { AccessibleFormTheme } from "./components/AccessibleFormTheme";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ const queryClient = new QueryClient({
 });
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <AccessibleFormTheme>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
@@ -29,5 +31,6 @@ createRoot(document.getElementById("root")!).render(
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
+    </AccessibleFormTheme>
   </StrictMode>,
 );

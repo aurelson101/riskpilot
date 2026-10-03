@@ -13,6 +13,7 @@ parameters:
     document_storage_quota_bytes: '1073741824'
     document_s3_empty: ''
     document_s3_region: 'eu-west-1'
+    oidc_diagnostic_issuers: '[]'
 
 services:
     # default configuration for services in *this* file
@@ -47,6 +48,10 @@ services:
         arguments:
             $loginLimiter: '@limiter.login'
             $appUrl: '%app.url%'
+
+    App\Application\OidcDiscoveryValidator:
+        arguments:
+            $allowedIssuers: '%env(json:default:oidc_diagnostic_issuers:OIDC_DIAGNOSTIC_ISSUERS)%'
 
     App\Controller\EmailSettingsController:
         arguments:

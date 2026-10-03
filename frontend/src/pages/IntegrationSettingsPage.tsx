@@ -62,7 +62,8 @@ type Form = {
   groupDn: string;
   groupRole: string;
   caCertificate: string;
-  oidcProvider: "GOOGLE_WORKSPACE" | "MICROSOFT_ENTRA";
+  directoryProvider: "ACTIVE_DIRECTORY" | "GENERIC";
+  oidcProvider: "GOOGLE_WORKSPACE" | "MICROSOFT_ENTRA" | "KEYCLOAK" | "AUTHENTIK";
   issuer: string;
   enabled: boolean;
 };
@@ -82,6 +83,7 @@ const initial: Form = {
   groupDn: "",
   groupRole: "ROLE_RISK_MANAGER",
   caCertificate: "",
+  directoryProvider: "ACTIVE_DIRECTORY",
   oidcProvider: "GOOGLE_WORKSPACE",
   issuer: "https://accounts.google.com",
   enabled: false,
@@ -166,7 +168,7 @@ export function IntegrationSettingsPage() {
           "/v1/integrations",
           {
             type: form.type,
-            provider: directory ? "ACTIVE_DIRECTORY" : "GENERIC",
+            provider: directory ? form.directoryProvider : "GENERIC",
             name: form.name,
             configuration,
             ...(directory ? {} : { expiresInDays: Number(form.expiresInDays) }),
@@ -341,7 +343,7 @@ export function IntegrationSettingsPage() {
       </Card>
 
       <Alert severity="info">
-        La découverte OIDC Google/Entra peut être vérifiée ici. L’activation du
+        La découverte OIDC Google/Entra peut être vérifiée ici, ainsi que Keycloak/Authentik si l’émetteur est autorisé côté serveur. L’activation du
         SSO OIDC/SAML et du provisioning SCIM reste masquée tant que le parcours
         complet de connexion n’est pas disponible.
       </Alert>
@@ -369,7 +371,7 @@ export function IntegrationSettingsPage() {
             >
               <MenuItem value="API_KEY">Accès API RiskPilot</MenuItem>
               <MenuItem value="DIRECTORY">
-                Diagnostic annuaire Microsoft AD (LDAPS)
+                Diagnostic annuaire LDAPS
               </MenuItem>
               <MenuItem value="OIDC_DIAGNOSTIC">
                 Diagnostic SSO — découverte OIDC
@@ -455,6 +457,13 @@ export function IntegrationSettingsPage() {
                   Ce diagnostic vérifie le chiffrement, le bind et la recherche.
                   Il n’active pas la connexion des utilisateurs.
                 </Alert>
+                <TextField select label="Type d’annuaire" value={form.directoryProvider} onChange={event => {
+                  const provider = event.target.value as Form["directoryProvider"];
+                  setForm({ ...form, directoryProvider: provider, userFilter: provider === "GENERIC" ? "(&(objectClass=inetOrgPerson)(uid={username}))" : initial.userFilter });
+                }}>
+                  <MenuItem value="ACTIVE_DIRECTORY">Microsoft Active Directory</MenuItem>
+                  <MenuItem value="GENERIC">OpenLDAP / annuaire LDAP compatible</MenuItem>
+                </TextField>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     required
@@ -525,7 +534,7 @@ export function IntegrationSettingsPage() {
                   <TextField
                     required
                     fullWidth
-                    label="Groupe Microsoft AD"
+                    label="Groupe de l’annuaire (DN)"
                     value={form.groupDn}
                     onChange={(event) =>
                       setForm({ ...form, groupDn: event.target.value })
@@ -576,7 +585,9 @@ export function IntegrationSettingsPage() {
                       issuer:
                         provider === "GOOGLE_WORKSPACE"
                           ? "https://accounts.google.com"
-                          : "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0",
+                          : provider === "MICROSOFT_ENTRA" ? "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0"
+                          : provider === "KEYCLOAK" ? "https://sso.example.com/realms/riskpilot"
+                          : "https://sso.example.com/application/o/riskpilot/",
                     });
                   }}
                 >
@@ -584,6 +595,8 @@ export function IntegrationSettingsPage() {
                   <MenuItem value="MICROSOFT_ENTRA">
                     Microsoft Entra ID
                   </MenuItem>
+                  <MenuItem value="KEYCLOAK">Keycloak</MenuItem>
+                  <MenuItem value="AUTHENTIK">Authentik</MenuItem>
                 </TextField>
                 <TextField
                   required
@@ -595,7 +608,8 @@ export function IntegrationSettingsPage() {
                   helperText={
                     form.oidcProvider === "MICROSOFT_ENTRA"
                       ? "Remplacez les zéros par l’identifiant UUID du tenant Entra ID."
-                      : "Émetteur officiel Google, sans chemin supplémentaire."
+                      : form.oidcProvider === "GOOGLE_WORKSPACE" ? "Émetteur officiel Google, sans chemin supplémentaire."
+                      : "URL HTTPS du realm Keycloak ou de l’application Authentik (mode émetteur par application), à autoriser dans OIDC_DIAGNOSTIC_ISSUERS côté serveur."
                   }
                 />
               </Stack>

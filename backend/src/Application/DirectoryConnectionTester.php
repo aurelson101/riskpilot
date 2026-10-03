@@ -50,6 +50,7 @@ final readonly class DirectoryConnectionTester
                 throw new \RuntimeException('Recherche LDAP de validation refusée.');
             }
             $entries = ldap_get_entries($connection, $search);
+            self::requireUniqueEntry($entries);
 
             return [
                 'validated' => true,
@@ -86,5 +87,12 @@ final readonly class DirectoryConnectionTester
         }
 
         return $path;
+    }
+
+    private static function requireUniqueEntry(array|false $entries): void
+    {
+        if (false === $entries || 1 !== ($entries['count'] ?? null)) {
+            throw new \RuntimeException('La recherche LDAPS doit trouver exactement un utilisateur. Vérifiez la base DN, le filtre et le nom de test.');
+        }
     }
 }

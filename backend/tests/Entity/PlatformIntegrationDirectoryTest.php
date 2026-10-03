@@ -11,6 +11,12 @@ use PHPUnit\Framework\TestCase;
 
 final class PlatformIntegrationDirectoryTest extends TestCase
 {
+    public function testOpenLdapDiagnosticConfigurationUsesGenericProvider(): void
+    {
+        $item = new PlatformIntegration(new Organization('Tenant'), 'DIRECTORY', 'GENERIC', 'OpenLDAP', [...$this->validConfiguration(), 'userFilter' => '(&(objectClass=inetOrgPerson)(uid={username}))']);
+        self::assertSame('GENERIC', $item->getProvider());
+        self::assertFalse($item->isEnabled());
+    }
     public function testLastUseTrackingAvoidsWritingOnEveryApiRead(): void
     {
         $integration = new PlatformIntegration(new Organization('Tenant'), 'API_KEY', 'GENERIC', 'Reader', ['scopes' => ['risks:read']], true);

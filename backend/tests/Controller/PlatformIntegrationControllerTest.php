@@ -50,6 +50,10 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
+        foreach ([['provider' => ['GOOGLE_WORKSPACE'], 'issuer' => 'https://accounts.google.com'], ['provider' => 'GOOGLE_WORKSPACE', 'issuer' => ['invalid']], ['provider' => 'KEYCLOAK', 'issuer' => 'https://127.0.0.1/realms/riskpilot']] as $diagnostic) {
+            $client->jsonRequest('POST', '/api/v1/integrations/oidc-discovery-test', $diagnostic);
+            self::assertResponseStatusCodeSame(422);
+        }
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'API_KEY', 'provider' => 'GENERIC', 'name' => 'SIEM', 'configuration' => ['scopes' => ['events:write']], 'enabled' => true]);
         self::assertResponseStatusCodeSame(201);
         $created = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
