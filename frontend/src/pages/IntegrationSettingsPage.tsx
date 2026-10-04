@@ -128,7 +128,8 @@ export function IntegrationSettingsPage() {
     queryFn: async () => (await api.get<EmailSummary>("/settings/email")).data,
   });
   const [form, updateForm] = useState<Form>(initial);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [secret, updateSecret] = useState<string | null>(null);
+  const secretVersion = useRef(0);
   const [secretIntegrationId, setSecretIntegrationId] = useState<number | null>(
     null,
   );
@@ -142,6 +143,11 @@ export function IntegrationSettingsPage() {
   } | null>(null);
   const [oidcResult, setOidcResult] = useState<OidcResult | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  function setSecret(next: string | null) {
+    secretVersion.current += 1;
+    updateSecret(next);
+    setSecretCopied(false);
+  }
   function setForm(next: Form) {
     setOidcResult(null);
     updateForm(next);
@@ -312,10 +318,12 @@ export function IntegrationSettingsPage() {
                 size="small"
                 variant="outlined"
                 onClick={async () => {
+                  const version = secretVersion.current;
                   try {
                     await navigator.clipboard.writeText(secret);
-                    setSecretCopied(true);
+                    if (version === secretVersion.current) setSecretCopied(true);
                   } catch {
+                    if (version !== secretVersion.current) return;
                     setSecretCopied(false);
                     setOperationError(
                       "La copie automatique est indisponible. Sélectionnez et copiez la clé affichée.",

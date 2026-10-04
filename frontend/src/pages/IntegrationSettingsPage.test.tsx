@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -15,6 +16,7 @@ import { IntegrationSettingsPage } from "./IntegrationSettingsPage";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function renderPage() {
@@ -46,6 +48,59 @@ function mockLoads() {
 }
 
 describe("IntegrationSettingsPage", () => {
+  it.each(["success", "failure"])(
+    "ignores a delayed clipboard %s for a replaced API key",
+    async (outcome) => {
+      mockLoads();
+      vi.spyOn(api, "post")
+        .mockResolvedValueOnce({
+          data: { id: 1, secret: "test-only-first-key" },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 2, secret: "test-only-second-key" },
+        });
+      let finish = () => {};
+      const writeText = vi.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            finish = () =>
+              outcome === "success"
+                ? resolve()
+                : reject(new Error("Clipboard denied"));
+          }),
+      );
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      renderPage();
+      const createKey = () =>
+        fireEvent.submit(
+          screen
+            .getByRole("button", { name: "Créer la clé API" })
+            .closest("form")!,
+        );
+      createKey();
+      expect(await screen.findByText("test-only-first-key")).toBeVisible();
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Créer la clé API" }),
+        ).toBeEnabled(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Copier la clé" }));
+      expect(writeText).toHaveBeenCalledWith("test-only-first-key");
+      createKey();
+      expect(await screen.findByText("test-only-second-key")).toBeVisible();
+      await act(async () => {
+        finish();
+      });
+      expect(
+        screen.getByRole("button", { name: "Copier la clé" }),
+      ).toBeVisible();
+      expect(screen.queryByText("Clé copiée")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/La copie automatique est indisponible/),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it.each(["API_KEY", "DIRECTORY"])(
     "locks every select while saving %s",
     async (type) => {
