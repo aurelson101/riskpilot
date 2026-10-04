@@ -46,6 +46,50 @@ function mockLoads() {
 }
 
 describe("IntegrationSettingsPage", () => {
+  it.each(["API_KEY", "DIRECTORY"])(
+    "locks every select while saving %s",
+    async (type) => {
+      mockLoads();
+      let complete = (_value: unknown) => {};
+      const post = vi.spyOn(api, "post").mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      renderPage();
+      if (type === "DIRECTORY") {
+        fireEvent.mouseDown(screen.getByLabelText("Usage"));
+        fireEvent.click(
+          await screen.findByRole("option", {
+            name: "Diagnostic annuaire LDAPS",
+          }),
+        );
+      }
+      fireEvent.submit(
+        screen
+          .getByRole("button", {
+            name:
+              type === "DIRECTORY"
+                ? "Enregistrer le diagnostic"
+                : "Créer la clé API",
+          })
+          .closest("form")!,
+      );
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      for (const select of screen.getAllByRole("combobox")) {
+        expect(select).toHaveAttribute("aria-disabled", "true");
+        expect(select).not.toHaveAttribute("tabindex", "0");
+      }
+      complete({ data: { id: 123, secret: null } });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("combobox", { name: "Usage" }),
+        ).not.toHaveAttribute("aria-disabled", "true"),
+      );
+    },
+  );
+
   it.each(["tested directory", "another directory", "failed deletion"])(
     "keeps the LDAPS result associated with its directory after deleting %s",
     async (operation) => {

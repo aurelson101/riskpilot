@@ -458,6 +458,7 @@ export function IntegrationSettingsPage() {
                 <TextField
                   select
                   label="Durée de validité"
+                  disabled={create.isPending}
                   value={form.expiresInDays}
                   onChange={(event) =>
                     setForm({
@@ -489,7 +490,7 @@ export function IntegrationSettingsPage() {
                   Ce diagnostic vérifie le chiffrement, le bind et la recherche.
                   Il n’active pas la connexion des utilisateurs.
                 </Alert>
-                <TextField select label="Type d’annuaire" value={form.directoryProvider} onChange={event => {
+                <TextField select disabled={create.isPending} label="Type d’annuaire" value={form.directoryProvider} onChange={event => {
                   const provider = event.target.value as Form["directoryProvider"];
                   setForm({ ...form, directoryProvider: provider, userFilter: provider === "GENERIC" ? "(&(objectClass=inetOrgPerson)(uid={username}))" : initial.userFilter });
                 }}>
@@ -576,6 +577,7 @@ export function IntegrationSettingsPage() {
                     select
                     fullWidth
                     label="Rôle RiskPilot"
+                    disabled={create.isPending}
                     value={form.groupRole}
                     onChange={(event) =>
                       setForm({ ...form, groupRole: event.target.value })
