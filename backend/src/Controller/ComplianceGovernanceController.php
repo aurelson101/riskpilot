@@ -238,16 +238,22 @@ final readonly class ComplianceGovernanceController
         if (null === $source || null === $target) {
             return $this->invalid('Exigence source ou cible invalide.');
         }
+        $organization = $this->currentUser->get()->getOrganization();
         try {
-            $mapping = new RequirementMapping($this->currentUser->get()->getOrganization(), $source, $target, (int) ($data['coveragePercent'] ?? 100), (bool) ($data['inheritEvidence'] ?? true), $this->currentUser->get(), isset($data['rationale']) ? (string) $data['rationale'] : null);
-            $existing = $this->mappings->findOneBy(['organization' => $mapping->getOrganization(), 'sourceRequirement' => $source, 'targetRequirement' => $target]);
+            $mapping = new RequirementMapping($organization, $source, $target, (int) ($data['coveragePercent'] ?? 100), (bool) ($data['inheritEvidence'] ?? false), $this->currentUser->get(), isset($data['rationale']) ? (string) $data['rationale'] : null);
+            $existing = $this->mappings->findOneBy(['organization' => $organization, 'sourceRequirement' => $source, 'targetRequirement' => $target]);
             if ($existing instanceof RequirementMapping) {
                 if ($existing->getCoveragePercent() === $mapping->getCoveragePercent()
                     && $existing->doesInheritEvidence() === $mapping->doesInheritEvidence()
                     && $existing->getRationale() === $mapping->getRationale()) {
                     return new JsonResponse($this->mappingResponse($existing));
                 }
+
                 return new JsonResponse(['code' => 'MAPPING_CONFLICT', 'message' => 'Cette correspondance existe avec une configuration différente.'], 409);
+            }
+            if ('ACTIVE' !== $source->getStatus() || 'ACTIVE' !== $target->getStatus()
+                || 'ACTIVE' !== $source->getFramework()->getStatus() || 'ACTIVE' !== $target->getFramework()->getStatus()) {
+                return $this->invalid('Les exigences et référentiels source et cible doivent être actifs.');
             }
             $this->entityManager->persist($mapping);
             $this->entityManager->flush();

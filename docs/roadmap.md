@@ -27,6 +27,9 @@ produit. Les critères ci-dessous sont des travaux à réaliser, pas des livrais
    en bout ; liens limités, expiration, preuves et validation indépendante.
 6. **P1 — Cartographie multinorme** : enrichir les liens existants avec direction,
    type, provenance et revue ; ne pas déduire automatiquement une conformité.
+   Le lot du 4 octobre 2026 ajoute la création/suppression guidée FR/EN dans
+   Conformité → SoA & contrôles, la liste complète et le consentement explicite
+   aux propositions de preuves ; les types de relation et la revue indépendante restent à réaliser.
 7. **P1 — Calendriers** : matrice de réception/actualisation/révocation Thunderbird,
    Outlook web/classique et Google ; synchronisation bidirectionnelle hors socle actuel.
 8. **P2 — Quantification** : expliquer et tester les hypothèses du simulateur

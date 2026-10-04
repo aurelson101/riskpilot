@@ -25,6 +25,8 @@ final class ComplianceGovernanceControllerTest extends WebTestCase
     private JWTTokenManagerInterface $tokens;
     private User $manager;
     private User $admin;
+    private User $auditor;
+    private User $viewer;
     private User $foreignAdmin;
     private Framework $framework;
     private Requirement $requirement;
@@ -44,13 +46,15 @@ final class ComplianceGovernanceControllerTest extends WebTestCase
         $foreign = new Organization('Organisation étrangère');
         $this->manager = new User('risk@example.test', 'Marie', 'Risques', $organization, [User::ROLE_RISK_MANAGER]);
         $this->admin = new User('admin@example.test', 'Alice', 'Admin', $organization, [User::ROLE_ADMIN]);
+        $this->auditor = new User('auditor@example.test', 'Audrey', 'Audit', $organization, [User::ROLE_AUDITOR]);
+        $this->viewer = new User('viewer@example.test', 'Victor', 'Lecture', $organization, [User::ROLE_VIEWER]);
         $this->foreignAdmin = new User('foreign@example.test', 'François', 'Externe', $foreign, [User::ROLE_ADMIN]);
         $this->framework = new Framework('ISO 27001', '2022');
         $this->requirement = new Requirement($this->framework, 'A.5.1', 'Politiques de sécurité', 'Organisation');
         $secondRequirement = new Requirement($this->framework, 'A.5.2', 'Rôles et responsabilités', 'Organisation');
         $this->scope = new Scope('SMSI principal', 'ORGANIZATION', $organization);
         $this->control = new SecurityControl('Revue des politiques', 'Gouvernance', $organization);
-        foreach ([$organization, $foreign, $this->manager, $this->admin, $this->foreignAdmin, $this->framework, $this->requirement, $secondRequirement, $this->scope, $this->control] as $entity) {
+        foreach ([$organization, $foreign, $this->manager, $this->admin, $this->auditor, $this->viewer, $this->foreignAdmin, $this->framework, $this->requirement, $secondRequirement, $this->scope, $this->control] as $entity) {
             $manager->persist($entity);
         }
         $manager->flush();
@@ -123,6 +127,84 @@ final class ComplianceGovernanceControllerTest extends WebTestCase
         $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
         self::assertResponseStatusCodeSame(201);
         self::assertNotSame($created['id'], $this->payload()['id']);
+    }
+
+    public function testMappingEvidenceInheritanceIsExplicitlyOptIn(): void
+    {
+        $this->authenticate($this->manager);
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $target = $manager->getRepository(Requirement::class)->findOneBy(['reference' => 'A.5.2']);
+
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', [
+            'sourceRequirementId' => $this->requirement->getId(),
+            'targetRequirementId' => $target->getId(),
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $defaultMapping = $this->payload();
+        self::assertFalse($defaultMapping['inheritEvidence']);
+        self::assertSame('SOURCE_TO_TARGET', $defaultMapping['direction']);
+        self::assertSame($this->manager->getId(), $defaultMapping['createdBy']['id']);
+        self::assertNotEmpty($defaultMapping['createdAt']);
+
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', [
+            'sourceRequirementId' => $target->getId(),
+            'targetRequirementId' => $this->requirement->getId(),
+            'inheritEvidence' => true,
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        self::assertTrue($this->payload()['inheritEvidence']);
+    }
+
+    public function testMappingRejectsInactiveRequirementsAndFrameworks(): void
+    {
+        $this->authenticate($this->manager);
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $inactiveRequirement = new Requirement($this->framework, 'A.5.3', 'Exigence archivée', 'Organisation');
+        $inactiveRequirement->setStatus('ARCHIVED');
+        $inactiveFramework = new Framework('Référentiel archivé', '1');
+        $inactiveFramework->setStatus('ARCHIVED');
+        $requirementFromInactiveFramework = new Requirement($inactiveFramework, 'R.1', 'Exigence active', 'Gouvernance');
+        foreach ([$inactiveRequirement, $inactiveFramework, $requirementFromInactiveFramework] as $entity) {
+            $manager->persist($entity);
+        }
+        $manager->flush();
+
+        foreach ([
+            [$inactiveRequirement, $this->requirement],
+            [$this->requirement, $inactiveRequirement],
+            [$requirementFromInactiveFramework, $this->requirement],
+            [$this->requirement, $requirementFromInactiveFramework],
+        ] as [$source, $target]) {
+            $this->client->jsonRequest('POST', '/api/requirement-mappings', [
+                'sourceRequirementId' => $source->getId(),
+                'targetRequirementId' => $target->getId(),
+            ]);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('INVALID_INPUT', $this->payload()['code']);
+        }
+        self::assertSame(0, $manager->getRepository(RequirementMapping::class)->count([]));
+    }
+
+    public function testMappingManagementKeepsExistingRbacAndTenantIsolation(): void
+    {
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        $target = $manager->getRepository(Requirement::class)->findOneBy(['reference' => 'A.5.2']);
+        $input = ['sourceRequirementId' => $this->requirement->getId(), 'targetRequirementId' => $target->getId()];
+
+        $this->authenticate($this->viewer);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
+        self::assertResponseStatusCodeSame(403);
+
+        $this->authenticate($this->auditor);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings', $input);
+        self::assertResponseStatusCodeSame(201);
+        $created = $this->payload();
+        self::assertSame($this->auditor->getId(), $created['createdBy']['id']);
+
+        $this->authenticate($this->foreignAdmin);
+        $this->client->request('DELETE', '/api/requirement-mappings/'.$created['id']);
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame(1, $manager->getRepository(RequirementMapping::class)->count([]));
     }
 
     public function testMappingRejectsAmbiguousTypesAndOversizedRationale(): void

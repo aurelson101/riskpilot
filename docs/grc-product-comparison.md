@@ -5,6 +5,12 @@ lecture ciblée du code ; aucun accès aux consoles privées des produits compar
 « Présent » signifie repéré dans le code, pas testé en production dans cette passe.
 Les fonctionnalités commerciales peuvent dépendre de l'édition et du contrat.
 
+Complément du 4 octobre 2026 : la gestion guidée des correspondances multinormes
+est ajoutée dans Conformité → SoA & contrôles. Les exigences et référentiels
+doivent être actifs pour créer un lien ; la proposition de preuves réutilisables
+reste désactivée par défaut et nécessite un choix explicite. Ce lot n'ajoute ni
+rapprochement automatique ni validation indépendante de la relation.
+
 ## Parcours de référence
 
 EGERIE présente des bibliothèques, des questionnaires collaboratifs, des vues
@@ -26,7 +32,7 @@ restent stables lors des mises à jour. Sources :
 | --- | --- | --- |
 | Analyse et EBIOS RM | `RiskScenario`, `AnalysisWorkspaceController`, cinq ateliers et validation indépendante | Tester un parcours complet et réduire les doubles saisies ; ne pas recréer un moteur déjà présent. |
 | Bibliothèques | `StarterFrameworkCatalog`, packs adoptés/hachés, bibliothèque gouvernée et imports d'analyse | Adaptateur aux bibliothèques externes Excel/YAML non établi ; ajouter prévisualisation, versions, traductions et rapport d'erreurs. |
-| Contrôles multinormes | `RequirementMapping`, SoA versionnées, direction/auteur/date dans l'API, création idempotente et preuves filtrées par périmètre | Types de relations et validation indépendante à compléter ; aucun rapprochement ne vaut conformité automatique. |
+| Contrôles multinormes | `RequirementMapping`, SoA versionnées, direction/auteur/date dans l'API, création idempotente, formulaire FR/EN sans JSON et preuves filtrées par périmètre | Types de relations et validation indépendante à compléter ; aucun rapprochement ne vaut conformité automatique. |
 | Collecte et tiers | Questionnaires, campagnes, TPRM et relances dans le module opérationnel | Vérifier l'expérience répondant, expiration des accès, réception des relances et validation des preuves. |
 | Traitement et décision | Actions, Kanban/calendrier, portefeuille et rapports décisionnels | Unifier le parcours guidé et tester les vues 360° plutôt que multiplier les menus. |
 | Quantification | `DecisionWorkspaceController::quantify`, pertes annuelles et percentiles | Méthode locale à expliquer/valider ; ne pas annoncer une équivalence avec un moteur éditeur ou une estimation financière garantie. |

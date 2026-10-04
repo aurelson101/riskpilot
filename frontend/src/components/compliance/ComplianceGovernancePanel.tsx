@@ -23,13 +23,13 @@ import { useState, type FormEvent } from "react";
 import { api } from "../../api/client";
 import type {
   Framework,
-  RequirementMapping,
   Scope,
   SecurityControlTest,
   StatementOfApplicability,
   User,
 } from "../../api/types";
 import { useAuth } from "../../auth/useAuth";
+import { RequirementMappingsPanel } from "./RequirementMappingsPanel";
 
 export function ComplianceGovernancePanel() {
   const { user } = useAuth();
@@ -66,11 +66,6 @@ export function ComplianceGovernancePanel() {
     queryKey: ["control-tests"],
     queryFn: async () =>
       (await api.get<SecurityControlTest[]>("/control-tests")).data,
-  });
-  const mappings = useQuery({
-    queryKey: ["requirement-mappings"],
-    queryFn: async () =>
-      (await api.get<RequirementMapping[]>("/requirement-mappings")).data,
   });
   const create = useMutation({
     mutationFn: () =>
@@ -259,30 +254,7 @@ export function ComplianceGovernancePanel() {
             </Stack>
           </CardContent>
         </Card>
-        <Card variant="outlined">
-          <CardContent>
-            <Typography fontWeight={750} gutterBottom>
-              Correspondances multinormes
-            </Typography>
-            <Stack spacing={1}>
-              {mappings.data?.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  Aucune correspondance de preuves entre référentiels.
-                </Typography>
-              )}
-              {mappings.data?.slice(0, 8).map((mapping) => (
-                <Stack key={mapping.id} direction="row" gap={1}>
-                  <Chip size="small" label={`${mapping.coveragePercent}%`} />
-                  <Typography variant="body2">
-                    {mapping.source.framework} {mapping.source.reference} →{" "}
-                    {mapping.target.framework} {mapping.target.reference}
-                    {mapping.inheritEvidence ? " · preuves héritées" : ""}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
+        <RequirementMappingsPanel />
       </Stack>
       <Dialog
         open={dialog}

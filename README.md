@@ -62,6 +62,12 @@ est disponible pour créer une nouvelle version de référentiel depuis l'onglet
 **Conformité → Référentiels** (administrateur). Il ne remplace pas encore les
 imports XLSX/YAML ni les bibliothèques externes avec traductions et mappings.
 
+Dans **Conformité → SoA & contrôles**, les correspondances multinormes se gèrent
+sans JSON : choisissez les exigences source et cible, justifiez la couverture
+estimée et autorisez explicitement les propositions de preuves réutilisables.
+Cette relation est directionnelle et ne modifie ni les scores ni les statuts de
+conformité. Les preuves proposées restent limitées à l'organisation et au périmètre.
+
 ## Authentification et administration
 
 La connexion JWT est disponible sur `POST /api/auth/login`. Les jetons expirent après 15 minutes et les tentatives sont limitées. `GET /api/me` retourne le profil courant. Chaque utilisateur peut activer un MFA TOTP compatible Google Authenticator et Microsoft Authenticator depuis **Paramètres → Mon profil et MFA**, avec QR code et codes de secours à usage unique. Les administrateurs gèrent les utilisateurs de leur organisation ; seuls les super-administrateurs peuvent gérer plusieurs organisations.
