@@ -125,8 +125,10 @@ final readonly class ThirdPartyController
             return $this->invalid('Responsable invalide.');
         } $created = null === $item;
         try {
+            $contractEndsAt = $this->dateOnly($data['contractEndsAt'] ?? null, 'La date de fin de contrat');
+            $nextAssessmentAt = $this->dateOnly($data['nextAssessmentAt'] ?? null, 'La date de prochaine évaluation');
             $item ??= new ThirdParty($actor->getOrganization(), $owner, (string) ($data['name'] ?? ''), (string) ($data['criticality'] ?? 'MEDIUM'));
-            $item->update((string) ($data['name'] ?? ''), isset($data['contactEmail']) ? (string) $data['contactEmail'] : null, isset($data['services']) ? (string) $data['services'] : null, $this->strings((array) ($data['dataCategories'] ?? [])), (string) ($data['criticality'] ?? 'MEDIUM'), (string) ($data['status'] ?? 'ACTIVE'), isset($data['contractReference']) ? (string) $data['contractReference'] : null, isset($data['sla']) ? (string) $data['sla'] : null, isset($data['dependencies']) ? (string) $data['dependencies'] : null, isset($data['exitPlan']) ? (string) $data['exitPlan'] : null, empty($data['contractEndsAt']) ? null : new \DateTimeImmutable((string) $data['contractEndsAt']), empty($data['nextAssessmentAt']) ? null : new \DateTimeImmutable((string) $data['nextAssessmentAt']), $owner);
+            $item->update((string) ($data['name'] ?? ''), isset($data['contactEmail']) ? (string) $data['contactEmail'] : null, isset($data['services']) ? (string) $data['services'] : null, $this->strings((array) ($data['dataCategories'] ?? [])), (string) ($data['criticality'] ?? 'MEDIUM'), (string) ($data['status'] ?? 'ACTIVE'), isset($data['contractReference']) ? (string) $data['contractReference'] : null, isset($data['sla']) ? (string) $data['sla'] : null, isset($data['dependencies']) ? (string) $data['dependencies'] : null, isset($data['exitPlan']) ? (string) $data['exitPlan'] : null, $contractEndsAt, $nextAssessmentAt, $owner);
             $item->assessRisk($this->strings((array) ($data['certifications'] ?? [])), isset($data['riskSummary']) ? (string) $data['riskSummary'] : null, isset($data['compensatingMeasures']) ? (string) $data['compensatingMeasures'] : null);
             $this->entityManager->persist($item);
             $this->entityManager->flush();
@@ -135,6 +137,26 @@ final readonly class ThirdPartyController
         }
 
         return new JsonResponse($this->thirdPartyResponse($item), $created ? 201 : 200);
+    }
+
+    private function dateOnly(mixed $value, string $label): ?\DateTimeImmutable
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        if (!is_string($value) || 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)) {
+            throw new \InvalidArgumentException($label.' doit respecter le format AAAA-MM-JJ.');
+        }
+        [$year, $month, $day] = array_map('intval', explode('-', $value));
+        if (!checkdate($month, $day, $year)) {
+            throw new \InvalidArgumentException($label.' est invalide.');
+        }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if (false === $date || $date->format('Y-m-d') !== $value) {
+            throw new \InvalidArgumentException($label.' est invalide.');
+        }
+
+        return $date;
     }
 
     private function assessment(int $id): ?SupplierAssessment

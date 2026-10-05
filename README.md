@@ -109,6 +109,12 @@ L’authentification utilise des JWT courts liés à une session serveur et un r
 
 Les écrans `/scopes`, `/assets`, `/threats`, `/vulnerabilities` et `/security-controls` donnent accès à l’inventaire de l’organisation. Le registre `/risks` présente les scores brut, actuel et résiduel ainsi que la gouvernance : appétence/tolérance/capacité par domaine et famille, scénarios stratégiques, méthodes simplifiée, ISO 27005 ou EBIOS RM, recommandations selon coût/charge/réduction, acceptations formelles et campagnes de revue historisées. La matrice interactive `/risk-matrix` restitue ces évaluations sur une grille 5 × 5 selon les seuils configurés par organisation. Les API associées contrôlent systématiquement les rôles et relations entre tenants.
 
+Le registre **Tiers et fournisseurs** permet de créer et modifier les fiches,
+de filtrer les fournisseurs et de suivre les fins de contrat et réévaluations.
+Un tiers sans évaluation revue est affiché « Non évalué » ; les certifications
+restent des déclarations, pas une preuve de conformité. Les dates de l'API tiers
+acceptent `AAAA-MM-JJ` ou `null` ; une date impossible est refusée avec HTTP 422.
+
 L'espace `/ebios` matérialise les cinq ateliers EBIOS RM : cadrage et socle,
 sources de risque, scénarios stratégiques, scénarios opérationnels et traitement.
 Chaque atelier est persisté, versionné, contrôlé selon ses champs obligatoires et
