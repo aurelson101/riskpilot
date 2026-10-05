@@ -48,18 +48,37 @@ final readonly class ThirdPartyController
         if (null === $thirdParty || !$this->canManage()) {
             return null === $thirdParty ? $this->notFound() : $this->forbidden();
         } $data = $request->toArray();
-        $reviewer = $this->users->findOneVisibleTo((int) ($data['reviewerId'] ?? 0), $this->currentUser->get());
+        if (!is_int($data['reviewerId'] ?? null) || $data['reviewerId'] < 1 || $data['reviewerId'] > 2147483647) {
+            return $this->invalid('Évaluateur invalide.');
+        }
+        $reviewer = $this->users->findOneVisibleTo($data['reviewerId'], $this->currentUser->get());
         if (null === $reviewer) {
             return $this->invalid('Évaluateur invalide.');
         }
+        $version = array_key_exists('version', $data) ? $data['version'] : 1;
+        if (!is_string($data['title'] ?? null) || '' === trim($data['title']) || mb_strlen(trim($data['title'])) > 200 || !is_int($version) || $version < 1 || $version > 2147483647) {
+            return $this->invalid('Le titre et la version du questionnaire sont invalides.');
+        }
+        if (!is_array($data['questions'] ?? null) || !array_is_list($data['questions']) || [] === $data['questions'] || count($data['questions']) > 100) {
+            return $this->invalid('Le questionnaire doit contenir entre 1 et 100 questions.');
+        }
         $questions = [];
-        foreach ((array) ($data['questions'] ?? []) as $question) {
-            if (!is_array($question) || '' === trim((string) ($question['id'] ?? '')) || '' === trim((string) ($question['label'] ?? ''))) {
+        $questionIds = [];
+        foreach ($data['questions'] as $question) {
+            $weight = is_array($question) && array_key_exists('weight', $question) ? $question['weight'] : 1;
+            if (!is_array($question) || !is_string($question['id'] ?? null) || '' === trim($question['id']) || mb_strlen(trim($question['id'])) > 100 || !is_string($question['label'] ?? null) || '' === trim($question['label']) || mb_strlen(trim($question['label'])) > 2000 || !is_int($weight) || $weight < 1 || $weight > 100) {
                 return $this->invalid('Questionnaire invalide.');
-            } $questions[] = ['id' => (string) $question['id'], 'label' => (string) $question['label'], 'weight' => max(1, (int) ($question['weight'] ?? 1))];
+            }
+            $questionId = trim($question['id']);
+            if (in_array($questionId, $questionIds, true)) {
+                return $this->invalid('Les identifiants des questions doivent être uniques.');
+            }
+            $questionIds[] = $questionId;
+            $questions[] = ['id' => $questionId, 'label' => trim($question['label']), 'weight' => $weight];
         }
         try {
-            $assessment = new SupplierAssessment($thirdParty, $reviewer, (string) ($data['title'] ?? ''), (int) ($data['version'] ?? 1), $questions, new \DateTimeImmutable((string) ($data['expiresAt'] ?? 'now')));
+            $expiresAt = $this->assessmentExpiry($data['expiresAt'] ?? null);
+            $assessment = new SupplierAssessment($thirdParty, $reviewer, $data['title'], $version, $questions, $expiresAt);
             $this->entityManager->persist($assessment);
             $this->entityManager->flush();
         } catch (\InvalidArgumentException $exception) {
@@ -123,8 +142,26 @@ final readonly class ThirdPartyController
         if (!$assessment instanceof SupplierAssessment) {
             return $this->notFound();
         } $data = $request->toArray();
+        if (!is_array($data['responses'] ?? null)) {
+            return $this->invalid('Les réponses doivent être associées aux identifiants des questions.');
+        }
+        $questionIds = array_column($assessment->getQuestions(), 'id');
+        foreach ($data['responses'] as $id => $answer) {
+            if (!in_array((string) $id, $questionIds, true) || (!is_bool($answer) && (!is_string($answer) || '' === trim($answer) || mb_strlen($answer) > 4000))) {
+                return $this->invalid('Chaque réponse doit être un booléen ou un texte non vide de 4 000 caractères maximum.');
+            }
+        }
+        $evidence = array_key_exists('evidence', $data) ? $data['evidence'] : [];
+        if (!is_array($evidence) || !array_is_list($evidence) || count($evidence) > 10) {
+            return $this->invalid('Les justificatifs doivent être une liste de références textuelles.');
+        }
+        foreach ($evidence as $reference) {
+            if (!is_string($reference) || '' === trim($reference) || mb_strlen($reference) > 500 || str_contains($reference, '<') || str_contains($reference, '>')) {
+                return $this->invalid('Chaque justificatif doit être une référence textuelle non vide de 500 caractères maximum, sans HTML.');
+            }
+        }
         try {
-            $assessment->submit((array) ($data['responses'] ?? []), $this->strings((array) ($data['evidence'] ?? [])));
+            $assessment->submit($data['responses'], array_map(trim(...), $evidence));
             $this->entityManager->flush();
         } catch (\InvalidArgumentException|\LogicException $exception) {
             return $this->invalid($exception->getMessage());
@@ -176,6 +213,18 @@ final readonly class ThirdPartyController
         }
 
         return $date;
+    }
+
+    private function assessmentExpiry(mixed $value): \DateTimeImmutable
+    {
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException('La date d’expiration doit être une date ISO 8601 valide.');
+        }
+        if (1 !== preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/D', $value, $matches) || !checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) || (int) $matches[4] > 23 || (int) $matches[5] > 59 || (int) $matches[6] > 59) {
+            throw new \InvalidArgumentException('La date d’expiration doit être une date ISO 8601 valide.');
+        }
+
+        return new \DateTimeImmutable($value);
     }
 
     private function assessment(int $id): ?SupplierAssessment

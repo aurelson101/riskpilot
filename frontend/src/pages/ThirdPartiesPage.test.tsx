@@ -200,6 +200,24 @@ function setField(
 }
 
 describe("ThirdPartiesPage", () => {
+  it("ouvre la création de campagne depuis un tiers actif", async () => {
+    identity.roles = ["ROLE_RISK_MANAGER"];
+    mockReads([thirdParty, terminated]);
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Créer une campagne pour Cloud Payroll",
+      }),
+    );
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByRole("dialog").textContent).toContain("Cloud Payroll");
+    expect(
+      screen.queryByRole("button", {
+        name: "Créer une campagne pour Legacy Hosting",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("ouvre les réponses d'une évaluation en lecture seule depuis la fiche tiers", async () => {
     const get = mockReads();
     get.mockImplementation(async (url) => {
@@ -251,6 +269,9 @@ describe("ThirdPartiesPage", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Modifier/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Créer une campagne/ }),
     ).not.toBeInTheDocument();
     expect(get.mock.calls.some(([url]) => url === "/users")).toBe(false);
   });

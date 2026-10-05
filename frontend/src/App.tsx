@@ -166,6 +166,11 @@ const PublicDocumentPage = lazy(() =>
     default: module.PublicDocumentPage,
   })),
 );
+const PublicSupplierAssessmentPage = lazy(() =>
+  import("./pages/PublicSupplierAssessmentPage").then((module) => ({
+    default: module.PublicSupplierAssessmentPage,
+  })),
+);
 const ThirdPartiesPage = lazy(() =>
   import("./pages/ThirdPartiesPage").then((module) => ({
     default: module.ThirdPartiesPage,
@@ -987,8 +992,15 @@ function Layout() {
 
 export default function App() {
   const { user } = useAuth();
+  const location = useLocation();
   const [storedLocale, setStoredLocale] = useState(initialInterfaceLocale);
-  const locale = user?.locale ?? storedLocale;
+  const supplierLocale = location.pathname.startsWith("/supplier-assessments/")
+    ? new URLSearchParams(location.search).get("lang")
+    : null;
+  const locale =
+    supplierLocale === "fr" || supplierLocale === "en"
+      ? supplierLocale
+      : (user?.locale ?? storedLocale);
 
   useEffect(() => {
     if (!user?.locale) return;
@@ -1012,6 +1024,10 @@ export default function App() {
             <Route
               path="/shared/documents/:token"
               element={<PublicDocumentPage />}
+            />
+            <Route
+              path="/supplier-assessments/:token"
+              element={<PublicSupplierAssessmentPage />}
             />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>

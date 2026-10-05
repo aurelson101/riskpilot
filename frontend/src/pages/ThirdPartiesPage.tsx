@@ -28,6 +28,7 @@ import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import { SupplierAssessmentDialog } from "../components/SupplierAssessmentDialog";
+import { SupplierCampaignDialog } from "../components/SupplierCampaignDialog";
 
 type Criticality = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 type ThirdPartyStatus =
@@ -188,6 +189,7 @@ export function ThirdPartiesPage() {
   );
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [assessmentId, setAssessmentId] = useState<number | null>(null);
+  const [campaignParty, setCampaignParty] = useState<ThirdParty | null>(null);
 
   const query = useQuery({
     queryKey: ["third-parties"],
@@ -617,6 +619,15 @@ export function ThirdPartiesPage() {
                           : `${item.assessments.length} évaluation(s)`
                       }
                     />
+                    {canManage && item.status !== "TERMINATED" && (
+                      <Button
+                        size="small"
+                        aria-label={`${english ? "Create campaign for" : "Créer une campagne pour"} ${item.name}`}
+                        onClick={() => setCampaignParty(item)}
+                      >
+                        {english ? "Create campaign" : "Créer une campagne"}
+                      </Button>
+                    )}
                   </Stack>
                   {item.assessments.length > 0 && (
                     <Stack spacing={0.5}>
@@ -1004,6 +1015,13 @@ export function ThirdPartiesPage() {
           assessmentId={assessmentId}
           canManage={canManage}
           onClose={() => setAssessmentId(null)}
+        />
+      )}
+      {campaignParty !== null && (
+        <SupplierCampaignDialog
+          key={campaignParty.id}
+          thirdParty={campaignParty}
+          onClose={() => setCampaignParty(null)}
         />
       )}
     </Stack>

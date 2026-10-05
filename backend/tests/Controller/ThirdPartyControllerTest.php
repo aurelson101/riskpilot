@@ -72,6 +72,146 @@ final class ThirdPartyControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
     }
 
+    public function testCampaignValidationRejectsMalformedInputBeforeCreation(): void
+    {
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/third-parties', $this->thirdPartyInput('Tiers campagne'));
+        self::assertResponseStatusCodeSame(201);
+        $thirdParty = $this->payload();
+        $valid = $this->campaignInput();
+        $invalidInputs = [
+            ['expiresAt' => 'tomorrow'],
+            ['expiresAt' => '2030-02-30T12:00:00+00:00'],
+            ['expiresAt' => '2030-01-01T25:00:00+00:00'],
+            ['expiresAt' => '2030-01-01T12:00:00'],
+            ['expiresAt' => '2030-01-01'],
+            ['expiresAt' => '2020-01-01T12:00:00Z'],
+            ['expiresAt' => []],
+            ['expiresAt' => null],
+            ['title' => []],
+            ['title' => str_repeat('é', 201)],
+            ['title' => '   '],
+            ['version' => '1'],
+            ['version' => null],
+            ['version' => 0],
+            ['reviewerId' => $this->foreign->getId()],
+            ['reviewerId' => (string) $this->manager->getId()],
+            ['questions' => []],
+            ['questions' => ['q1' => $valid['questions'][0]]],
+            ['questions' => [$valid['questions'][0], [...$valid['questions'][0], 'id' => ' q1 ']]],
+            ['questions' => [[...$valid['questions'][0], 'id' => ['q1']]]],
+            ['questions' => [[...$valid['questions'][0], 'label' => true]]],
+            ['questions' => [[...$valid['questions'][0], 'weight' => 0]]],
+            ['questions' => [[...$valid['questions'][0], 'weight' => 101]]],
+            ['questions' => [[...$valid['questions'][0], 'weight' => '5']]],
+            ['questions' => [[...$valid['questions'][0], 'weight' => null]]],
+            ['questions' => array_map(static fn (int $id): array => ['id' => 'q'.$id, 'label' => 'Question', 'weight' => 1], range(1, 101))],
+        ];
+        foreach ($invalidInputs as $input) {
+            $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', [...$valid, ...$input]);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('INVALID_INPUT', $this->payload()['code']);
+            $this->client->request('GET', '/api/third-parties');
+            self::assertSame([], $this->payload()[0]['assessments']);
+        }
+
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', [
+            ...$valid,
+            'expiresAt' => (new \DateTimeImmutable('+30 days', new \DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.v\Z'),
+            'questions' => [['id' => ' q1 ', 'label' => ' MFA activé ? ']],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $created = $this->payload();
+        self::assertSame('DRAFT', $created['status']);
+        self::assertSame(64, strlen($created['publicToken']));
+        $this->client->request('GET', '/api/supplier-assessments/'.$created['id']);
+        self::assertSame([['id' => 'q1', 'label' => 'MFA activé ?', 'weight' => 1]], $this->payload()['questions']);
+
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', [
+            ...$valid,
+            'questions' => [['id' => '0', 'label' => 'MFA ?', 'weight' => 1], ['id' => '1', 'label' => 'PRA ?', 'weight' => 1]],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $numeric = $this->payload();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$numeric['publicToken'], ['responses' => (object) ['0' => false, '1' => 'Conforme']]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('SUBMITTED', $this->payload()['status']);
+    }
+
+    public function testCampaignCreationIsPermissionAndTenantScoped(): void
+    {
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/third-parties', $this->thirdPartyInput('Tiers campagne'));
+        self::assertResponseStatusCodeSame(201);
+        $thirdParty = $this->payload();
+
+        $this->authenticate($this->viewer);
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', $this->campaignInput());
+        self::assertResponseStatusCodeSame(403);
+        $this->authenticate($this->foreign);
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', [...$this->campaignInput(), 'reviewerId' => $this->foreign->getId()]);
+        self::assertResponseStatusCodeSame(404);
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/third-parties');
+        self::assertSame([], $this->payload()[0]['assessments']);
+    }
+
+    public function testPublicResponsesAndEvidenceAreValidatedBeforeMutation(): void
+    {
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/third-parties', $this->thirdPartyInput('Tiers réponse'));
+        self::assertResponseStatusCodeSame(201);
+        $thirdParty = $this->payload();
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', $this->campaignInput());
+        self::assertResponseStatusCodeSame(201);
+        $assessment = $this->payload();
+        $valid = ['responses' => ['q1' => false, 'q2' => 'PRA testé et planifié'], 'evidence' => [' Rapport déclaré.pdf ']];
+        $invalidInputs = [
+            ['responses' => 'oui'],
+            ['responses' => []],
+            ['responses' => [true, false]],
+            ['responses' => ['q1' => true]],
+            ['responses' => ['q1' => true, 'q2' => null]],
+            ['responses' => ['q1' => true, 'q2' => []]],
+            ['responses' => ['q1' => true, 'q2' => 1]],
+            ['responses' => ['q1' => true, 'q2' => '   ']],
+            ['responses' => ['q1' => true, 'q2' => str_repeat('é', 4001)]],
+            ['responses' => ['q1' => true, 'q2' => true, 'unknown' => true]],
+            ['evidence' => 'Rapport.pdf'],
+            ['evidence' => null],
+            ['evidence' => [['name' => 'Rapport.pdf']]],
+            ['evidence' => [true]],
+            ['evidence' => ['   ']],
+            ['evidence' => ['<a href="https://example.test">Rapport</a>']],
+            ['evidence' => ['name' => 'Rapport.pdf']],
+            ['evidence' => [str_repeat('é', 501)]],
+            ['evidence' => array_fill(0, 11, 'Rapport.pdf')],
+        ];
+        foreach ($invalidInputs as $input) {
+            $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+            $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], [...$valid, ...$input]);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('INVALID_INPUT', $this->payload()['code']);
+            $this->authenticate($this->manager);
+            $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+            $details = $this->payload();
+            self::assertSame('DRAFT', $details['status']);
+            self::assertSame([], $details['responses']);
+            self::assertSame([], $details['evidence']);
+            self::assertNull($details['submittedAt']);
+        }
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], $valid);
+        self::assertResponseIsSuccessful();
+        self::assertSame('SUBMITTED', $this->payload()['status']);
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame($valid['responses'], $this->payload()['responses']);
+        self::assertSame(['Rapport déclaré.pdf'], $this->payload()['evidence']);
+    }
+
     public function testAssessmentDetailsAreReadableWithoutExposingThePublicToken(): void
     {
         $assessment = $this->submittedAssessment();
@@ -313,6 +453,18 @@ final class ThirdPartyControllerTest extends WebTestCase
             'criticality' => 'HIGH',
             'status' => 'ACTIVE',
             'ownerId' => $this->manager->getId(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function campaignInput(): array
+    {
+        return [
+            'reviewerId' => $this->manager->getId(),
+            'title' => 'Évaluation fournisseur',
+            'version' => 1,
+            'expiresAt' => (new \DateTimeImmutable('+30 days'))->format(DATE_ATOM),
+            'questions' => [['id' => 'q1', 'label' => 'MFA activé ?', 'weight' => 5], ['id' => 'q2', 'label' => 'PRA testé ?', 'weight' => 5]],
         ];
     }
 
