@@ -27,6 +27,7 @@ import { api } from "../api/client";
 import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
+import { SupplierAssessmentDialog } from "../components/SupplierAssessmentDialog";
 
 type Criticality = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 type ThirdPartyStatus =
@@ -186,6 +187,7 @@ export function ThirdPartiesPage() {
     "ALL",
   );
   const [followUpOnly, setFollowUpOnly] = useState(false);
+  const [assessmentId, setAssessmentId] = useState<number | null>(null);
 
   const query = useQuery({
     queryKey: ["third-parties"],
@@ -274,6 +276,15 @@ export function ThirdPartiesPage() {
       EXIT_PLANNED: english ? "Exit planned" : "Sortie planifiée",
       TERMINATED: english ? "Terminated" : "Terminé",
     })[value];
+  const assessmentStatusLabel = (value: string) =>
+    ({
+      DRAFT: english ? "Draft" : "Brouillon",
+      SENT: english ? "Sent" : "Envoyée",
+      IN_PROGRESS: english ? "In progress" : "En cours",
+      SUBMITTED: english ? "Awaiting review" : "À valider",
+      REVIEWED: english ? "Reviewed" : "Validée",
+      EXPIRED: english ? "Expired" : "Expirée",
+    })[value] ?? (english ? "Unknown status" : "Statut inconnu");
   const today = localDateYmd();
   const overdue = (item: ThirdParty) => ({
     contract:
@@ -607,6 +618,25 @@ export function ThirdPartiesPage() {
                       }
                     />
                   </Stack>
+                  {item.assessments.length > 0 && (
+                    <Stack spacing={0.5}>
+                      {item.assessments.map((assessment) => (
+                        <Button
+                          key={assessment.id}
+                          size="small"
+                          sx={{
+                            justifyContent: "flex-start",
+                            overflowWrap: "anywhere",
+                          }}
+                          aria-label={`${english ? "View assessment" : "Consulter l’évaluation"} ${assessment.title}`}
+                          onClick={() => setAssessmentId(assessment.id)}
+                        >
+                          {assessment.title} ·{" "}
+                          {assessmentStatusLabel(assessment.status)}
+                        </Button>
+                      ))}
+                    </Stack>
+                  )}
                 </Stack>
               </CardContent>
             </Card>
@@ -968,6 +998,14 @@ export function ThirdPartiesPage() {
           </DialogActions>
         </Stack>
       </Dialog>
+      {assessmentId !== null && (
+        <SupplierAssessmentDialog
+          key={assessmentId}
+          assessmentId={assessmentId}
+          canManage={canManage}
+          onClose={() => setAssessmentId(null)}
+        />
+      )}
     </Stack>
   );
 }

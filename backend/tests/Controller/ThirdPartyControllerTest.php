@@ -72,6 +72,113 @@ final class ThirdPartyControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
     }
 
+    public function testAssessmentDetailsAreReadableWithoutExposingThePublicToken(): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->authenticate($this->viewer);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertResponseIsSuccessful();
+        $details = $this->payload();
+        self::assertSame('SUBMITTED', $details['status']);
+        self::assertSame('Évaluation fournisseur', $details['title']);
+        self::assertSame(1, $details['version']);
+        self::assertSame($this->manager->getId(), $details['reviewer']['id']);
+        self::assertSame([['id' => 'q1', 'label' => 'MFA activé ?', 'weight' => 5]], $details['questions']);
+        self::assertSame(['q1' => true], $details['responses']);
+        self::assertSame(['Rapport déclaré.pdf'], $details['evidence']);
+        self::assertArrayNotHasKey('publicToken', $details);
+
+        $this->client->jsonRequest('POST', '/api/supplier-assessments/'.$assessment['id'].'/review', ['score' => 82, 'comment' => 'Tentative en lecture seule']);
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame($details, $this->payload());
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testAssessmentDetailsAndReviewAreTenantScoped(): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->authenticate($this->foreign);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame('NOT_FOUND', $this->payload()['code']);
+
+        $this->client->jsonRequest('POST', '/api/supplier-assessments/'.$assessment['id'].'/review', ['score' => 82, 'comment' => 'Tentative autre organisation']);
+        self::assertResponseStatusCodeSame(404);
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame('SUBMITTED', $this->payload()['status']);
+        self::assertNull($this->payload()['reviewedAt']);
+    }
+
+    #[DataProvider('invalidReviewProvider')]
+    public function testInvalidReviewIsRejectedWithoutMutation(mixed $score, mixed $comment): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        $before = $this->payload();
+
+        $this->client->jsonRequest('POST', '/api/supplier-assessments/'.$assessment['id'].'/review', ['score' => $score, 'comment' => $comment]);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame('INVALID_INPUT', $this->payload()['code']);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame($before, $this->payload());
+        $this->client->request('GET', '/api/third-parties');
+        self::assertSame(0, $this->payload()[0]['cyberScore']);
+    }
+
+    /** @return iterable<string, array{mixed, mixed}> */
+    public static function invalidReviewProvider(): iterable
+    {
+        yield 'score chaîne' => ['82', 'Preuves cohérentes'];
+        yield 'score fractionnaire' => [82.5, 'Preuves cohérentes'];
+        yield 'score booléen' => [true, 'Preuves cohérentes'];
+        yield 'score tableau' => [[], 'Preuves cohérentes'];
+        yield 'score absent' => [null, 'Preuves cohérentes'];
+        yield 'score négatif' => [-1, 'Preuves cohérentes'];
+        yield 'score au-delà de cent' => [101, 'Preuves cohérentes'];
+        yield 'commentaire tableau' => [82, []];
+        yield 'commentaire booléen' => [82, true];
+        yield 'commentaire numérique' => [82, 123];
+        yield 'commentaire absent' => [82, null];
+        yield 'commentaire vide' => [82, '   '];
+    }
+
+    public function testPublicSubmissionCannotOverwriteSubmittedOrReviewedAssessment(): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        $submitted = $this->payload();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], ['responses' => ['q1' => false], 'evidence' => ['Remplacement.pdf']]);
+        self::assertResponseStatusCodeSame(422);
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame($submitted, $this->payload());
+
+        $this->client->jsonRequest('POST', '/api/supplier-assessments/'.$assessment['id'].'/review', ['score' => 82, 'comment' => 'Preuves cohérentes']);
+        self::assertResponseIsSuccessful();
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        $reviewed = $this->payload();
+        self::assertSame('REVIEWED', $reviewed['status']);
+        self::assertSame(82, $reviewed['score']);
+        self::assertSame('Preuves cohérentes', $reviewed['reviewComment']);
+        self::assertNotNull($reviewed['reviewedAt']);
+        self::assertArrayNotHasKey('publicToken', $reviewed);
+
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], ['responses' => ['q1' => false], 'evidence' => ['Remplacement.pdf']]);
+        self::assertResponseStatusCodeSame(422);
+        $this->authenticate($this->manager);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame($reviewed, $this->payload());
+        $this->client->request('GET', '/api/third-parties');
+        self::assertSame(82, $this->payload()[0]['cyberScore']);
+    }
+
     public function testCreateAndUpdateThirdPartyWithStrictContractDates(): void
     {
         $this->authenticate($this->manager);
@@ -172,6 +279,30 @@ final class ThirdPartyControllerTest extends WebTestCase
     private function authenticate(User $user): void
     {
         $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$this->tokens->create($user));
+    }
+
+    /** @return array<string, mixed> */
+    private function submittedAssessment(): array
+    {
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/third-parties', $this->thirdPartyInput('Tiers évalué'));
+        self::assertResponseStatusCodeSame(201);
+        $thirdParty = $this->payload();
+        $this->client->jsonRequest('POST', '/api/third-parties/'.$thirdParty['id'].'/assessments', [
+            'reviewerId' => $this->manager->getId(),
+            'title' => 'Évaluation fournisseur',
+            'version' => 1,
+            'expiresAt' => (new \DateTimeImmutable('+30 days'))->format(DATE_ATOM),
+            'questions' => [['id' => 'q1', 'label' => 'MFA activé ?', 'weight' => 5]],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $assessment = $this->payload();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->jsonRequest('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], ['responses' => ['q1' => true], 'evidence' => ['Rapport déclaré.pdf']]);
+        self::assertResponseIsSuccessful();
+        $this->authenticate($this->manager);
+
+        return $assessment;
     }
 
     /** @return array<string, mixed> */

@@ -200,6 +200,47 @@ function setField(
 }
 
 describe("ThirdPartiesPage", () => {
+  it("ouvre les réponses d'une évaluation en lecture seule depuis la fiche tiers", async () => {
+    const get = mockReads();
+    get.mockImplementation(async (url) => {
+      if (url === "/third-parties") return { data: [thirdParty] };
+      if (url === "/supplier-assessments/71")
+        return {
+          data: {
+            ...thirdParty.assessments[0],
+            version: 1,
+            reviewer: thirdParty.owner,
+            expiresAt: "2027-12-31T23:59:59+00:00",
+            submittedAt: "2026-10-01T12:00:00+00:00",
+            reviewedAt: "2026-10-02T12:00:00+00:00",
+            reviewComment: "Justification de la revue",
+            questions: [
+              {
+                id: "mfa",
+                label: "Authentification forte utilisée ?",
+                weight: 5,
+              },
+            ],
+            responses: { mfa: true },
+            evidence: ["Référence documentaire"],
+          },
+        };
+      throw new Error(`Unexpected GET ${url}`);
+    });
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Consulter l’évaluation Revue annuelle",
+      }),
+    );
+    expect(
+      await screen.findByText("Authentification forte utilisée ?"),
+    ).toBeVisible();
+    expect(screen.getByText("Référence documentaire")).toBeVisible();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    expect(get.mock.calls.some(([url]) => url === "/users")).toBe(false);
+  });
+
   it("laisse le viewer consulter sans actions ni chargement des utilisateurs", async () => {
     const get = mockReads();
     renderPage();

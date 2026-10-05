@@ -69,6 +69,22 @@ final readonly class ThirdPartyController
         return new JsonResponse($this->assessmentResponse($assessment, true), 201);
     }
 
+    #[Route('/api/supplier-assessments/{id<\d+>}', methods: ['GET'])]
+    public function assessmentDetails(int $id): JsonResponse
+    {
+        $assessment = $this->assessment($id);
+        if (null === $assessment) {
+            return $this->notFound();
+        }
+
+        return new JsonResponse([
+            ...$this->assessmentResponse($assessment),
+            'questions' => $assessment->getQuestions(),
+            'responses' => $assessment->getResponses(),
+            'evidence' => $assessment->getEvidence(),
+        ]);
+    }
+
     #[Route('/api/supplier-assessments/{id<\d+>}/review', methods: ['POST'])]
     public function reviewAssessment(int $id, Request $request): JsonResponse
     {
@@ -76,8 +92,11 @@ final readonly class ThirdPartyController
         if (null === $assessment || !$this->canManage()) {
             return null === $assessment ? $this->notFound() : $this->forbidden();
         } $data = $request->toArray();
+        if (!is_int($data['score'] ?? null) || !is_string($data['comment'] ?? null)) {
+            return $this->invalid('Le score doit être un entier et le commentaire un texte.');
+        }
         try {
-            $assessment->review((int) ($data['score'] ?? -1), (string) ($data['comment'] ?? ''));
+            $assessment->review($data['score'], $data['comment']);
             $this->entityManager->flush();
         } catch (\LogicException $exception) {
             return $this->invalid($exception->getMessage());

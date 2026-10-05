@@ -125,6 +125,9 @@ class SupplierAssessment
      */
     public function submit(array $responses, array $evidence): void
     {
+        if (!in_array($this->status, ['DRAFT', 'SENT', 'IN_PROGRESS'], true)) {
+            throw new \LogicException('Ce questionnaire ne peut plus être soumis.');
+        }
         if ($this->expiresAt < new \DateTimeImmutable()) {
             $this->status = 'EXPIRED';
             throw new \LogicException('Ce questionnaire a expiré.');
