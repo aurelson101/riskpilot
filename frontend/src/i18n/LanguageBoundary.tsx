@@ -5,6 +5,10 @@ import { enToFr, frToEn, phrasePairs, type Locale } from "./translations";
 const originalText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const translatedAttributes = ["aria-label", "placeholder", "title"];
+const invariantPhrases = phrasePairs
+  .filter(([fr, en]) => fr === en && fr.length >= 4)
+  .map(([phrase]) => phrase)
+  .sort((a, b) => b.length - a.length);
 
 function replacePhrase(value: string, source: string, target: string) {
   if (source.startsWith(" ") || source.endsWith(" "))
@@ -23,6 +27,13 @@ function translateValue(value: string, locale: Locale): string {
   const dictionary = locale === "en" ? frToEn : enToFr;
   const exact = dictionary.get(value);
   if (exact) return exact;
+
+  const invariant = invariantPhrases.find((phrase) => value.includes(phrase));
+  if (invariant)
+    return value
+      .split(invariant)
+      .map((part) => (part ? translateValue(part, locale) : part))
+      .join(invariant);
 
   let translated = value;
   for (const [fr, en] of phrasePairs) {

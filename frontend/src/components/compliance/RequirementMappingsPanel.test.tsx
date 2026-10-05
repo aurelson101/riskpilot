@@ -100,18 +100,16 @@ afterEach(() => {
   identity.locale = "fr";
 });
 
-function renderPanel() {
+function renderPanel(
+  client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  }),
+) {
   render(
-    <QueryClientProvider
-      client={
-        new QueryClient({
-          defaultOptions: {
-            queries: { retry: false },
-            mutations: { retry: false },
-          },
-        })
-      }
-    >
+    <QueryClientProvider client={client}>
       <RequirementMappingsPanel />
     </QueryClientProvider>,
   );
@@ -164,6 +162,32 @@ async function fillValidMapping() {
 }
 
 describe("RequirementMappingsPanel", () => {
+  it("keeps cached fields usable during background refreshes", async () => {
+    identity.roles = ["ROLE_RISK_MANAGER"];
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(["frameworks"], frameworks);
+    client.setQueryData(["framework-requirements", "1"], requirements[1]);
+    client.setQueryData(["framework-requirements", "2"], requirements[2]);
+    vi.spyOn(api, "get").mockImplementation((url) =>
+      url === "/requirement-mappings"
+        ? Promise.resolve({ data: [] })
+        : new Promise(() => {}),
+    );
+
+    renderPanel(client);
+    await openCreateDialog();
+    await selectOption("Référentiel source", /ISO 27001/);
+    await selectOption("Exigence source", /A\.5\.1/);
+    await selectOption("Référentiel cible", /NIS2/);
+    await selectOption("Exigence cible", /21\.2\.a/);
+
+    expect(client.isFetching()).toBe(3);
+    expect(
+      screen.getByRole("button", { name: "Créer la correspondance" }),
+    ).toBeEnabled();
+  });
   it("permet au viewer de lire les correspondances sans aucune action", async () => {
     mockReads([mapping]);
     renderPanel();

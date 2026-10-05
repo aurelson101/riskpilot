@@ -162,9 +162,9 @@ export function RequirementMappingsPanel() {
   );
   const formPending =
     createMapping.isPending ||
-    frameworks.isFetching ||
-    sourceRequirements.isFetching ||
-    targetRequirements.isFetching;
+    frameworks.isLoading ||
+    sourceRequirements.isLoading ||
+    targetRequirements.isLoading;
   const activeFrameworks = (frameworks.data ?? []).filter(
     (framework) => framework.status === "ACTIVE",
   );
@@ -201,6 +201,7 @@ export function RequirementMappingsPanel() {
               <Button
                 variant="outlined"
                 startIcon={<Add />}
+                sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
                 onClick={() => {
                   createMapping.reset();
                   setDialogOpen(true);
