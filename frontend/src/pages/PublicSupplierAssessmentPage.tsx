@@ -6,12 +6,14 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  LinearProgress,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import axios from "axios";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
@@ -49,6 +51,8 @@ function PublicAssessmentForm({ token }: { token: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [expiredOnSubmit, setExpiredOnSubmit] = useState(false);
   const [invalidForm, setInvalidForm] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [now, setNow] = useState(Date.now);
   const detail = useQuery({
     queryKey: ["public-supplier-assessment", token],
     enabled: validToken,
@@ -63,6 +67,20 @@ function PublicAssessmentForm({ token }: { token: string }) {
       ).data,
   });
   const assessment = detail.data;
+  useEffect(() => {
+    if (!assessment) return;
+    const remaining = Date.parse(assessment.expiresAt) - Date.now();
+    if (!Number.isFinite(remaining)) return;
+    if (remaining <= 0) {
+      if (now < Date.parse(assessment.expiresAt)) setNow(Date.now());
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.min(Math.max(remaining, 0), 2147483647),
+    );
+    return () => window.clearTimeout(timer);
+  }, [assessment, now]);
   const answered =
     submitted ||
     assessment?.status === "SUBMITTED" ||
@@ -72,7 +90,7 @@ function PublicAssessmentForm({ token }: { token: string }) {
     (expiredOnSubmit ||
       assessment.status === "EXPIRED" ||
       !Number.isFinite(Date.parse(assessment.expiresAt)) ||
-      Date.parse(assessment.expiresAt) <= detail.dataUpdatedAt);
+      Date.parse(assessment.expiresAt) <= Math.max(now, detail.dataUpdatedAt));
   const unavailable =
     !validToken || expired || (detail.isError && !isTransient(detail.error));
   const canAnswer =
@@ -84,10 +102,32 @@ function PublicAssessmentForm({ token }: { token: string }) {
     assessment.questions.length > 0;
   const answer = (questionId: string) =>
     Object.hasOwn(responses, questionId) ? responses[questionId] : "";
-  const evidence = references
-    .split(/\r?\n/)
-    .map((reference) => reference.trim())
-    .filter(Boolean);
+  useUnsavedChanges(
+    canAnswer && (Object.values(responses).some(Boolean) || references !== ""),
+  );
+  const evidence = [
+    ...new Set(
+      references
+        .split(/\r\n|\r|\n/)
+        .map((reference) => reference.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const completed =
+    assessment?.questions.filter(
+      (question) =>
+        answer(question.id).trim().length > 0 &&
+        answer(question.id).length <= 4000,
+    ).length ?? 0;
+  const focusIncomplete = () => {
+    setInvalidForm(true);
+    const index =
+      assessment?.questions.findIndex(
+        (question) =>
+          !answer(question.id).trim() || answer(question.id).length > 4000,
+      ) ?? -1;
+    if (index >= 0) document.getElementById(`${id}-answer-${index}`)?.focus();
+  };
   const validEvidence =
     evidence.length <= 10 &&
     evidence.every(
@@ -117,12 +157,23 @@ function PublicAssessmentForm({ token }: { token: string }) {
       setResponses({});
       setReferences("");
     },
-    onError: (error) => {
+    onError: async (error) => {
       if (
         axios.isAxiosError(error) &&
         [404, 410].includes(error.response?.status ?? 0)
       ) {
         setExpiredOnSubmit(true);
+      }
+      if (axios.isAxiosError(error) && error.response?.status === 422) {
+        const result = await detail.refetch();
+        if (
+          result.data &&
+          ["SUBMITTED", "REVIEWED"].includes(result.data.status)
+        ) {
+          setSubmitted(true);
+          setResponses({});
+          setReferences("");
+        }
       }
     },
   });
@@ -277,6 +328,26 @@ function PublicAssessmentForm({ token }: { token: string }) {
                     "All questions are required. Answers will be reviewed by a person; no compliance score is calculated automatically.",
                   )}
                 </Alert>
+                <Typography aria-live="polite">
+                  {t("Réponses complétées", "Completed answers")}: {completed}/
+                  {assessment.questions.length}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={(completed * 100) / assessment.questions.length}
+                  aria-label={t("Progression des réponses", "Answer progress")}
+                />
+                <Button
+                  onClick={focusIncomplete}
+                  disabled={
+                    send.isPending || completed === assessment.questions.length
+                  }
+                >
+                  {t(
+                    "Aller à la première réponse manquante",
+                    "Go to first missing answer",
+                  )}
+                </Button>
                 {assessment.questions.map((question, index) => (
                   <Stack key={`${question.id}-${index}`} spacing={1}>
                     <Typography
@@ -290,6 +361,16 @@ function PublicAssessmentForm({ token }: { token: string }) {
                       id={`${id}-answer-${index}`}
                       label={`${t("Votre réponse", "Your answer")} ${index + 1}`}
                       value={answer(question.id)}
+                      onBlur={() =>
+                        setTouched((current) => ({
+                          ...current,
+                          [question.id]: true,
+                        }))
+                      }
+                      error={
+                        Boolean(touched[question.id] || invalidForm) &&
+                        !answer(question.id).trim()
+                      }
                       onChange={(event) =>
                         setResponses((current) => ({
                           ...current,
@@ -302,11 +383,27 @@ function PublicAssessmentForm({ token }: { token: string }) {
                       fullWidth
                       disabled={send.isPending}
                       slotProps={{ htmlInput: { maxLength: 4000 } }}
-                      helperText={t(
+                      helperText={`${answer(question.id).length}/4000 · ${t(
                         "4 000 caractères maximum.",
                         "Maximum 4,000 characters.",
-                      )}
+                      )}`}
                     />
+                    <Button
+                      disabled={send.isPending || !answer(question.id)}
+                      aria-label={`${t("Effacer la réponse", "Clear answer")} ${index + 1}`}
+                      onClick={() => {
+                        setResponses((current) => ({
+                          ...current,
+                          [question.id]: "",
+                        }));
+                        setTouched((current) => ({
+                          ...current,
+                          [question.id]: true,
+                        }));
+                      }}
+                    >
+                      {t("Effacer", "Clear")}
+                    </Button>
                   </Stack>
                 ))}
                 <TextField
@@ -322,10 +419,10 @@ function PublicAssessmentForm({ token }: { token: string }) {
                   fullWidth
                   disabled={send.isPending}
                   error={!validEvidence}
-                  helperText={t(
+                  helperText={`${evidence.length}/10 · ${t(
                     "Une référence par ligne, 10 maximum, 500 caractères par référence, sans HTML. Aucun fichier n’est téléversé ; ces déclarations ne sont pas des preuves vérifiées.",
                     "One reference per line, maximum 10, 500 characters each, without HTML. No files are uploaded; these declarations are not verified evidence.",
-                  )}
+                  )}`}
                 />
                 {invalidForm && (
                   <Alert severity="warning">

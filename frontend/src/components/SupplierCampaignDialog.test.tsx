@@ -88,6 +88,62 @@ async function createCampaign() {
 }
 
 describe("SupplierCampaignDialog", () => {
+  it("duplicates and reorders questions while preserving unique IDs", async () => {
+    const post = vi
+      .spyOn(api, "post")
+      .mockResolvedValue({ data: { publicToken: token } });
+    showDialog();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dupliquer la question 1" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Descendre la question 1" }),
+    );
+    fireEvent.click(createButton());
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const payload = post.mock.calls[0][1] as {
+      questions: Array<{ id: string; label: string }>;
+    };
+    expect(payload.questions.map((q) => q.id)).toEqual([
+      "q4",
+      "q1",
+      "q2",
+      "q3",
+    ]);
+    expect(payload.questions[0].label).toBe(payload.questions[1].label);
+  });
+
+  it.each(["Cloud", "Données personnelles", "Service critique"])(
+    "appends the %s template without replacing the draft",
+    async (preset) => {
+      const post = vi
+        .spyOn(api, "post")
+        .mockResolvedValue({ data: { publicToken: token } });
+      showDialog();
+      fireEvent.click(
+        screen.getByRole("button", { name: `Ajouter modèle : ${preset}` }),
+      );
+      fireEvent.click(createButton());
+      await waitFor(() => expect(post).toHaveBeenCalled());
+      const payload = post.mock.calls[0][1] as {
+        questions: Array<{ id: string }>;
+      };
+      expect(payload.questions).toHaveLength(6);
+      expect(new Set(payload.questions.map((q) => q.id)).size).toBe(6);
+    },
+  );
+
+  it("asks before discarding a modified draft", () => {
+    const { onClose } = showDialog();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    change("Titre de la campagne", "Brouillon");
+    fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
+    expect(confirm).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
   it.each(["ROLE_VIEWER", "ROLE_USER"])(
     "ne crée ni ne charge un annuaire pour le rôle %s",
     (role) => {

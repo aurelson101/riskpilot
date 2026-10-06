@@ -103,7 +103,8 @@ function AssessmentDetail({
   const canReview =
     canManage && assessment?.status === "SUBMITTED" && !detail.isError;
   const validScore = /^\d{1,3}$/.test(score) && Number(score) <= 100;
-  const validReview = validScore && comment.trim().length > 0;
+  const validReview =
+    validScore && comment.trim().length > 0 && comment.length <= 10000;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!canReview || !validReview || review.isPending) return;
@@ -319,6 +320,8 @@ function AssessmentDetail({
                       id={`${id}-comment`}
                       label={t("Commentaire de revue", "Review comment")}
                       value={comment}
+                      slotProps={{ htmlInput: { maxLength: 10000 } }}
+                      helperText={`${comment.length}/10000`}
                       onChange={(event) => setComment(event.target.value)}
                       required
                       fullWidth

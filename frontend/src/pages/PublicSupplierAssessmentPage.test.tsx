@@ -82,6 +82,73 @@ async function fillAnswers() {
 }
 
 describe("PublicSupplierAssessmentPage", () => {
+  it("expires an open questionnaire at its deadline without submitting", async () => {
+    mockReads({
+      ...assessment,
+      expiresAt: new Date(Date.now() + 500).toISOString(),
+    });
+    const post = vi.spyOn(api, "post");
+    showPage();
+    await screen.findByLabelText(/Votre réponse 1/);
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(/Votre réponse 1/),
+      ).not.toBeInTheDocument(),
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("shows progress, focuses missing answers, clears answers and flags whitespace", async () => {
+    mockReads();
+    showPage();
+    const first = await screen.findByLabelText(/Votre réponse 1/);
+    fireEvent.change(first, { target: { value: "MFA" } });
+    expect(screen.getByText("Réponses complétées: 1/2")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Aller à la première réponse manquante",
+      }),
+    );
+    expect(screen.getByLabelText(/Votre réponse 2/)).toHaveFocus();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Effacer la réponse 1" }),
+    );
+    expect(first).toHaveValue("");
+    expect(first).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("normalizes all line endings and deduplicates plain references", async () => {
+    mockReads();
+    const post = vi
+      .spyOn(api, "post")
+      .mockResolvedValue({ data: { status: "SUBMITTED" } });
+    showPage();
+    await fillAnswers();
+    fireEvent.change(screen.getByLabelText(/Références complémentaires/), {
+      target: { value: " A\rB\r\nA\n C " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer/ }));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect((post.mock.calls[0][1] as { evidence: string[] }).evidence).toEqual([
+      "A",
+      "B",
+      "C",
+    ]);
+  });
+
+  it("reconciles a concurrent submission without resending", async () => {
+    const read = mockReads();
+    const post = vi.spyOn(api, "post").mockRejectedValue(apiError(422));
+    showPage();
+    await fillAnswers();
+    read.mockResolvedValue({ data: { ...assessment, status: "SUBMITTED" } });
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer/ }));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(/Votre réponse 1/),
+      ).not.toBeInTheDocument(),
+    );
+    expect(post).toHaveBeenCalledOnce();
+  });
   it("loads a cancellable anonymous questionnaire without automatic submission", async () => {
     const get = mockReads();
     const post = vi.spyOn(api, "post");

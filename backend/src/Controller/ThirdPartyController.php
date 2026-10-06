@@ -111,7 +111,7 @@ final readonly class ThirdPartyController
         if (null === $assessment || !$this->canManage()) {
             return null === $assessment ? $this->notFound() : $this->forbidden();
         } $data = $request->toArray();
-        if (!is_int($data['score'] ?? null) || !is_string($data['comment'] ?? null)) {
+        if (!is_int($data['score'] ?? null) || !is_string($data['comment'] ?? null) || mb_strlen($data['comment']) > 10000) {
             return $this->invalid('Le score doit être un entier et le commentaire un texte.');
         }
         try {
@@ -127,21 +127,32 @@ final readonly class ThirdPartyController
     #[Route('/api/public/supplier-assessments/{token}', methods: ['GET'])]
     public function publicForm(string $token): JsonResponse
     {
-        $assessment = $this->entityManager->getRepository(SupplierAssessment::class)->findOneBy(['publicToken' => $token]);
+        if (1 !== preg_match('/^[a-fA-F0-9]{64}$/D', $token)) {
+            return $this->noCache($this->notFound());
+        }
+        $assessment = $this->entityManager->getRepository(SupplierAssessment::class)->findOneBy(['publicToken' => strtolower($token)]);
         if (!$assessment instanceof SupplierAssessment || $assessment->getExpiresAt() < new \DateTimeImmutable()) {
-            return $this->notFound();
+            return $this->noCache($this->notFound());
         }
 
-        return new JsonResponse(['thirdParty' => $assessment->getThirdParty()->getName(), 'title' => $assessment->getTitle(), 'version' => $assessment->getQuestionnaireVersion(), 'questions' => $assessment->getQuestions(), 'expiresAt' => $assessment->getExpiresAt()->format(DATE_ATOM), 'status' => $assessment->getStatus()]);
+        return $this->noCache(new JsonResponse(['thirdParty' => $assessment->getThirdParty()->getName(), 'title' => $assessment->getTitle(), 'version' => $assessment->getQuestionnaireVersion(), 'questions' => $assessment->getQuestions(), 'expiresAt' => $assessment->getExpiresAt()->format(DATE_ATOM), 'status' => $assessment->getStatus()]));
     }
 
     #[Route('/api/public/supplier-assessments/{token}', methods: ['POST'])]
     public function publicSubmit(string $token, Request $request): JsonResponse
     {
-        $assessment = $this->entityManager->getRepository(SupplierAssessment::class)->findOneBy(['publicToken' => $token]);
+        if (1 !== preg_match('/^[a-fA-F0-9]{64}$/D', $token)) {
+            return $this->noCache($this->notFound());
+        }
+        $assessment = $this->entityManager->getRepository(SupplierAssessment::class)->findOneBy(['publicToken' => strtolower($token)]);
         if (!$assessment instanceof SupplierAssessment) {
             return $this->notFound();
-        } $data = $request->toArray();
+        }
+        try {
+            $data = $request->toArray();
+        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+            return $this->invalid('Le corps de la requête doit être un objet JSON valide.');
+        }
         if (!is_array($data['responses'] ?? null)) {
             return $this->invalid('Les réponses doivent être associées aux identifiants des questions.');
         }
@@ -167,7 +178,7 @@ final readonly class ThirdPartyController
             return $this->invalid($exception->getMessage());
         }
 
-        return new JsonResponse(['status' => $assessment->getStatus(), 'submittedAt' => $assessment->getSubmittedAt()?->format(DATE_ATOM)]);
+        return $this->noCache(new JsonResponse(['status' => $assessment->getStatus(), 'submittedAt' => $assessment->getSubmittedAt()?->format(DATE_ATOM)]));
     }
 
     private function save(?ThirdParty $item, Request $request): JsonResponse
@@ -176,16 +187,38 @@ final readonly class ThirdPartyController
             return $this->forbidden();
         } $data = $request->toArray();
         $actor = $this->currentUser->get();
-        $owner = $this->users->findOneVisibleTo((int) ($data['ownerId'] ?? 0), $actor);
+        if (!is_int($data['ownerId'] ?? null) || $data['ownerId'] < 1 || $data['ownerId'] > 2147483647) {
+            return $this->invalid('Responsable invalide.');
+        }
+        $owner = $this->users->findOneVisibleTo($data['ownerId'], $actor);
         if (null === $owner) {
             return $this->invalid('Responsable invalide.');
         } $created = null === $item;
         try {
+            $name = $this->text($data['name'] ?? null, 'Le nom', 200);
+            if (null === $name) {
+                throw new \InvalidArgumentException('Le nom est obligatoire.');
+            }
+            $criticality = array_key_exists('criticality', $data) ? $data['criticality'] : 'MEDIUM';
+            $status = array_key_exists('status', $data) ? $data['status'] : 'ACTIVE';
+            if (!is_string($criticality) || !in_array($criticality, ThirdParty::CRITICALITIES, true) || !is_string($status) || !in_array($status, ThirdParty::STATUSES, true)) {
+                throw new \InvalidArgumentException('Criticité ou statut invalide.');
+            }
+            $contactEmail = $this->text($data['contactEmail'] ?? null, 'Le contact', 180);
+            if (null !== $contactEmail && false === filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('Le contact doit être une adresse email valide.');
+            }
+            $fields = [];
+            foreach (['services', 'dependencies', 'exitPlan', 'riskSummary', 'compensatingMeasures', 'contractReference', 'sla'] as $field) {
+                $fields[$field] = $this->text($data[$field] ?? null, $field, in_array($field, ['contractReference', 'sla'], true) ? 200 : 10000);
+            }
+            $dataCategories = $this->stringList(array_key_exists('dataCategories', $data) ? $data['dataCategories'] : [], 'Les catégories de données');
+            $certifications = $this->stringList(array_key_exists('certifications', $data) ? $data['certifications'] : [], 'Les certifications déclarées');
             $contractEndsAt = $this->dateOnly($data['contractEndsAt'] ?? null, 'La date de fin de contrat');
             $nextAssessmentAt = $this->dateOnly($data['nextAssessmentAt'] ?? null, 'La date de prochaine évaluation');
-            $item ??= new ThirdParty($actor->getOrganization(), $owner, (string) ($data['name'] ?? ''), (string) ($data['criticality'] ?? 'MEDIUM'));
-            $item->update((string) ($data['name'] ?? ''), isset($data['contactEmail']) ? (string) $data['contactEmail'] : null, isset($data['services']) ? (string) $data['services'] : null, $this->strings((array) ($data['dataCategories'] ?? [])), (string) ($data['criticality'] ?? 'MEDIUM'), (string) ($data['status'] ?? 'ACTIVE'), isset($data['contractReference']) ? (string) $data['contractReference'] : null, isset($data['sla']) ? (string) $data['sla'] : null, isset($data['dependencies']) ? (string) $data['dependencies'] : null, isset($data['exitPlan']) ? (string) $data['exitPlan'] : null, $contractEndsAt, $nextAssessmentAt, $owner);
-            $item->assessRisk($this->strings((array) ($data['certifications'] ?? [])), isset($data['riskSummary']) ? (string) $data['riskSummary'] : null, isset($data['compensatingMeasures']) ? (string) $data['compensatingMeasures'] : null);
+            $item ??= new ThirdParty($actor->getOrganization(), $owner, $name, $criticality);
+            $item->update($name, $contactEmail, $fields['services'], $dataCategories, $criticality, $status, $fields['contractReference'], $fields['sla'], $fields['dependencies'], $fields['exitPlan'], $contractEndsAt, $nextAssessmentAt, $owner);
+            $item->assessRisk($certifications, $fields['riskSummary'], $fields['compensatingMeasures']);
             $this->entityManager->persist($item);
             $this->entityManager->flush();
         } catch (\InvalidArgumentException $exception) {
@@ -251,14 +284,35 @@ final readonly class ThirdPartyController
         return $response;
     }
 
-    /**
-     * @param list<mixed> $values
-     *
-     * @return list<string>
-     */
-    private function strings(array $values): array
+    private function text(mixed $value, string $label, int $limit): ?string
     {
-        return array_values(array_filter(array_map(static fn (mixed $value): string => trim((string) $value), $values)));
+        if (null === $value) return null;
+        if (!is_string($value) || mb_strlen($value) > $limit) {
+            throw new \InvalidArgumentException($label.' doit être un texte de '.$limit.' caractères maximum.');
+        }
+        return '' === trim($value) ? null : trim($value);
+    }
+
+    /** @return list<string> */
+    private function stringList(mixed $values, string $label): array
+    {
+        if (!is_array($values) || !array_is_list($values) || count($values) > 100) {
+            throw new \InvalidArgumentException($label.' doivent être une liste de 100 éléments maximum.');
+        }
+        $result = [];
+        foreach ($values as $value) {
+            if (!is_string($value)) throw new \InvalidArgumentException($label.' doivent contenir uniquement du texte.');
+            $text = $this->text($value, $label, 200);
+            if (null !== $text && !in_array($text, $result, true)) $result[] = $text;
+        }
+        return $result;
+    }
+
+    private function noCache(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'no-store');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        return $response;
     }
 
     private function canManage(): bool
@@ -273,11 +327,11 @@ final readonly class ThirdPartyController
 
     private function invalid(string $message): JsonResponse
     {
-        return new JsonResponse(['code' => 'INVALID_INPUT', 'message' => $message], 422);
+        return $this->noCache(new JsonResponse(['code' => 'INVALID_INPUT', 'message' => $message], 422));
     }
 
     private function notFound(): JsonResponse
     {
-        return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Ressource introuvable ou expirée.'], 404);
+        return $this->noCache(new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Ressource introuvable ou expirée.'], 404));
     }
 }

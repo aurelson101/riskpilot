@@ -10,6 +10,7 @@ import {
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
+import * as csv from "../api/csv";
 import { ThirdPartiesPage } from "./ThirdPartiesPage";
 
 const identity = vi.hoisted(() => ({
@@ -200,6 +201,94 @@ function setField(
 }
 
 describe("ThirdPartiesPage", () => {
+  it("exports all filtered rows beyond the displayed page without capability tokens", async () => {
+    const download = vi.spyOn(csv, "downloadCsv").mockImplementation(() => {});
+    mockReads(
+      Array.from({ length: 13 }, (_, index) => ({
+        ...thirdParty,
+        id: index + 1,
+        name: `Supplier ${index}`,
+        assessments: [],
+      })),
+    );
+    renderPage();
+    const exportButton = await screen.findByRole("button", {
+      name: "Exporter le CSV filtré",
+    });
+    await waitFor(() => expect(exportButton).toBeEnabled());
+    fireEvent.click(exportButton);
+    expect(download).toHaveBeenCalledOnce();
+    const rows = download.mock.calls[0][1];
+    expect(rows).toHaveLength(14);
+    expect(rows[0]).toHaveLength(19);
+    expect(rows.slice(1).every((row) => row[17] === null)).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain("publicToken");
+  });
+
+  it("filters reviewed assessments and owners using the visible register", async () => {
+    mockReads([
+      thirdParty,
+      { ...unevaluated, owner: { id: 9, name: "Current User" } },
+    ]);
+    renderPage();
+    await screen.findByText(thirdParty.name);
+    await selectOption(
+      document.body,
+      "Filtrer les évaluations",
+      "Non validées",
+    );
+    expect(screen.queryByText(thirdParty.name)).not.toBeInTheDocument();
+    expect(screen.getByText(unevaluated.name)).toBeInTheDocument();
+    await selectOption(
+      document.body,
+      "Filtrer par responsable",
+      "Olivia Owner",
+    );
+    expect(screen.getByText(/Aucun tiers ne correspond/)).toBeInTheDocument();
+  });
+  it("paginates the register and resets filters", async () => {
+    mockReads(
+      Array.from({ length: 13 }, (_, index) => ({
+        ...thirdParty,
+        id: index + 1,
+        name: `Supplier ${String(index).padStart(2, "0")}`,
+      })),
+    );
+    renderPage();
+    await screen.findByText("Supplier 00");
+    expect(screen.queryByText("Supplier 12")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /page 2/i }));
+    expect(screen.getByText("Supplier 12")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Rechercher"), {
+      target: { value: "no matches" },
+    });
+    expect(screen.getByText(/Aucun tiers ne correspond/)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Réinitialiser les filtres" }),
+    );
+    expect(screen.getByText("Supplier 00")).toBeInTheDocument();
+  });
+
+  it("searches contact and declared certifications without querying users", async () => {
+    const get = mockReads([
+      thirdParty,
+      {
+        ...unevaluated,
+        contactEmail: "other@example.test",
+        certifications: [],
+      },
+    ]);
+    renderPage();
+    await screen.findByText(thirdParty.name);
+    fireEvent.change(screen.getByLabelText("Rechercher"), {
+      target: { value: "SOC 2" },
+    });
+    expect(screen.getByText(thirdParty.name)).toBeInTheDocument();
+    expect(screen.queryByText(unevaluated.name)).not.toBeInTheDocument();
+    expect(get.mock.calls.every(([url]) => url === "/third-parties")).toBe(
+      true,
+    );
+  });
   it("ouvre la création de campagne depuis un tiers actif", async () => {
     identity.roles = ["ROLE_RISK_MANAGER"];
     mockReads([thirdParty, terminated]);

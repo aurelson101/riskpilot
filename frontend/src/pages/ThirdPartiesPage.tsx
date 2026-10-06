@@ -16,13 +16,15 @@ import {
   FormControlLabel,
   InputLabel,
   MenuItem,
+  Pagination,
   Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import axios from "axios";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { downloadCsv } from "../api/csv";
 import { api } from "../api/client";
 import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
@@ -188,6 +190,23 @@ export function ThirdPartiesPage() {
     "ALL",
   );
   const [followUpOnly, setFollowUpOnly] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState("ALL");
+  const [reviewFilter, setReviewFilter] = useState("ALL");
+  const [sort, setSort] = useState("name");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  useEffect(() => {
+    setPage(1);
+  }, [
+    search,
+    criticalityFilter,
+    statusFilter,
+    followUpOnly,
+    ownerFilter,
+    reviewFilter,
+    sort,
+    pageSize,
+  ]);
   const [assessmentId, setAssessmentId] = useState<number | null>(null);
   const [campaignParty, setCampaignParty] = useState<ThirdParty | null>(null);
 
@@ -315,7 +334,16 @@ export function ThirdPartiesPage() {
     );
   };
   const visibleItems = (query.data ?? []).filter((item) => {
-    const matchesSearch = [item.name, item.services ?? "", item.owner.name]
+    const matchesSearch = [
+      item.name,
+      item.services ?? "",
+      item.owner.name,
+      item.contactEmail ?? "",
+      item.contractReference ?? "",
+      item.sla ?? "",
+      ...item.dataCategories,
+      ...item.certifications,
+    ]
       .join(" ")
       .toLocaleLowerCase(locale)
       .includes(normalizedSearch);
@@ -323,10 +351,125 @@ export function ThirdPartiesPage() {
       matchesSearch &&
       (criticalityFilter === "ALL" || item.criticality === criticalityFilter) &&
       (statusFilter === "ALL" || item.status === statusFilter) &&
+      (ownerFilter === "ALL" || String(item.owner.id) === ownerFilter) &&
+      (reviewFilter === "ALL" ||
+        item.assessments.some((a) => a.status === "REVIEWED") ===
+          (reviewFilter === "REVIEWED")) &&
       (!followUpOnly || needsFollowUp(item))
     );
   });
 
+  visibleItems.sort((a, b) => {
+    if (sort === "criticality") {
+      const priority =
+        criticalities.indexOf(b.criticality) -
+        criticalities.indexOf(a.criticality);
+      if (priority) return priority;
+    }
+    if (sort === "assessment") {
+      const date = (a.nextAssessmentAt ?? "9999-12-31").localeCompare(
+        b.nextAssessmentAt ?? "9999-12-31",
+      );
+      if (date) return date;
+    }
+    return a.name.localeCompare(b.name, locale) || a.id - b.id;
+  });
+  const pageCount = Math.max(1, Math.ceil(visibleItems.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = visibleItems.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const filterOwners = new Map(
+    (query.data ?? []).map((item) => [item.owner.id, item.owner.name]),
+  );
+  const resetFilters = () => {
+    setSearch("");
+    setCriticalityFilter("ALL");
+    setStatusFilter("ALL");
+    setFollowUpOnly(false);
+    setOwnerFilter("ALL");
+    setReviewFilter("ALL");
+    setPage(1);
+  };
+  const exportCsv = () =>
+    downloadCsv(`riskpilot-tiers-${today}.csv`, [
+      english
+        ? [
+            "ID",
+            "Name",
+            "Contact",
+            "Owner",
+            "Criticality",
+            "Status",
+            "Services",
+            "Data categories",
+            "Contract",
+            "SLA",
+            "Dependencies",
+            "Exit plan",
+            "Contract end",
+            "Next assessment",
+            "Declared certifications",
+            "Risk summary",
+            "Compensating measures",
+            "Reviewed score (%)",
+            "Assessments",
+          ]
+        : [
+            "ID",
+            "Nom",
+            "Contact",
+            "Responsable",
+            "Criticité",
+            "Statut",
+            "Services",
+            "Catégories de données",
+            "Contrat",
+            "SLA",
+            "Dépendances",
+            "Réversibilité",
+            "Fin du contrat",
+            "Prochaine évaluation",
+            "Certifications déclarées",
+            "Synthèse des risques",
+            "Mesures compensatoires",
+            "Score validé (%)",
+            "Évaluations",
+          ],
+      ...visibleItems.map((item) => [
+        item.id,
+        item.name,
+        item.contactEmail,
+        item.owner.name,
+        criticalityLabel(item.criticality),
+        statusLabel(item.status),
+        item.services,
+        item.dataCategories.join(" | "),
+        item.contractReference,
+        item.sla,
+        item.dependencies,
+        item.exitPlan,
+        item.contractEndsAt,
+        item.nextAssessmentAt,
+        item.certifications.join(" | "),
+        item.riskSummary,
+        item.compensatingMeasures,
+        item.assessments.some((a) => a.status === "REVIEWED")
+          ? item.cyberScore
+          : null,
+        item.assessments
+          .map(
+            (a) =>
+              `${a.title}: ${assessmentStatusLabel(a.status)}${a.score === null ? "" : ` (${a.score}%)`}`,
+          )
+          .join(" | "),
+      ]),
+    ]);
+  const nextMonth = new Date(`${today}T12:00:00`);
+  nextMonth.setDate(nextMonth.getDate() + 30);
+  const upcoming = (date: string | null) =>
+    date !== null && date >= today && date <= localDateYmd(nextMonth);
   const ownerOptions = new Map<number, string>();
   if (canListUsers) {
     users.data?.forEach((item) =>
@@ -383,7 +526,9 @@ export function ThirdPartiesPage() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           helperText={
-            english ? "Name, services or owner" : "Nom, services ou responsable"
+            english
+              ? "Name, contact, services, owner, contract or declarations"
+              : "Nom, contact, services, responsable, contrat ou déclarations"
           }
         />
         <FormControl fullWidth>
@@ -429,6 +574,99 @@ export function ThirdPartiesPage() {
           </Select>
         </FormControl>
       </Stack>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        flexWrap="wrap"
+        useFlexGap
+      >
+        {[
+          {
+            label: english ? "Owner filter" : "Filtrer par responsable",
+            value: ownerFilter,
+            set: setOwnerFilter,
+            options: [
+              ["ALL", english ? "All" : "Tous"],
+              ...[...filterOwners].map(([key, name]) => [String(key), name]),
+            ],
+          },
+          {
+            label: english ? "Assessment filter" : "Filtrer les évaluations",
+            value: reviewFilter,
+            set: setReviewFilter,
+            options: [
+              ["ALL", english ? "All" : "Toutes"],
+              ["REVIEWED", english ? "Reviewed" : "Validées"],
+              ["UNREVIEWED", english ? "Not reviewed" : "Non validées"],
+            ],
+          },
+          {
+            label: english ? "Sort" : "Trier",
+            value: sort,
+            set: setSort,
+            options: [
+              ["name", english ? "Name" : "Nom"],
+              ["criticality", english ? "Criticality" : "Criticité"],
+              [
+                "assessment",
+                english ? "Next assessment" : "Prochaine évaluation",
+              ],
+            ],
+          },
+        ].map((filter, index) => (
+          <TextField
+            key={filter.label}
+            id={`third-party-extra-filter-${index}`}
+            select
+            label={filter.label}
+            value={filter.value}
+            onChange={(event) => filter.set(event.target.value)}
+            sx={{ minWidth: 180, flex: 1 }}
+          >
+            {filter.options.map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </TextField>
+        ))}
+        <Button onClick={resetFilters}>
+          {english ? "Reset filters" : "Réinitialiser les filtres"}
+        </Button>
+        <Button
+          onClick={exportCsv}
+          disabled={!query.isSuccess || visibleItems.length === 0}
+        >
+          {english ? "Export filtered CSV" : "Exporter le CSV filtré"}
+        </Button>
+      </Stack>
+      {query.isSuccess && (
+        <Stack
+          direction="row"
+          flexWrap="wrap"
+          useFlexGap
+          gap={1}
+          aria-label={
+            english
+              ? "Filtered register summary"
+              : "Synthèse du registre filtré"
+          }
+        >
+          <Chip label={`Total: ${visibleItems.length}`} />
+          <Chip
+            label={`${english ? "Active" : "Actifs"}: ${visibleItems.filter((item) => item.status === "ACTIVE").length}`}
+          />
+          <Chip
+            label={`${english ? "High priority" : "Prioritaires"}: ${visibleItems.filter((item) => ["HIGH", "CRITICAL"].includes(item.criticality)).length}`}
+          />
+          <Chip
+            label={`${english ? "Follow-up" : "À suivre"}: ${visibleItems.filter(needsFollowUp).length}`}
+          />
+          <Chip
+            label={`${english ? "Reviewed" : "Validés"}: ${visibleItems.filter((item) => item.assessments.some((a) => a.status === "REVIEWED")).length}`}
+          />
+        </Stack>
+      )}
       <FormControlLabel
         control={
           <Checkbox
@@ -489,7 +727,7 @@ export function ThirdPartiesPage() {
           gap: 2,
         }}
       >
-        {visibleItems.map((item) => {
+        {pageItems.map((item) => {
           const dates = overdue(item);
           const hasReviewedAssessment = item.assessments.some(
             (assessment) => assessment.status === "REVIEWED",
@@ -576,6 +814,47 @@ export function ThirdPartiesPage() {
                         : `Réévaluation en retard depuis le ${item.nextAssessmentAt}`}
                     </Alert>
                   )}
+                  {item.status !== "TERMINATED" &&
+                    upcoming(item.contractEndsAt) && (
+                      <Alert severity="info">
+                        {english
+                          ? "Contract ends within 30 days."
+                          : "Le contrat se termine dans les 30 jours."}
+                      </Alert>
+                    )}
+                  {item.status !== "TERMINATED" &&
+                    upcoming(item.nextAssessmentAt) && (
+                      <Alert severity="info">
+                        {english
+                          ? "Assessment due within 30 days."
+                          : "Évaluation prévue dans les 30 jours."}
+                      </Alert>
+                    )}
+                  {item.status !== "TERMINATED" && !item.contactEmail && (
+                    <Alert severity="info">
+                      {english
+                        ? "Supplier contact is missing."
+                        : "Le contact du fournisseur est manquant."}
+                    </Alert>
+                  )}
+                  {item.status !== "TERMINATED" &&
+                    ["HIGH", "CRITICAL"].includes(item.criticality) &&
+                    !item.exitPlan?.trim() && (
+                      <Alert severity="warning">
+                        {english
+                          ? "Document the exit plan for this priority supplier."
+                          : "Documentez la réversibilité de ce tiers prioritaire."}
+                      </Alert>
+                    )}
+                  {item.status !== "TERMINATED" &&
+                    ["HIGH", "CRITICAL"].includes(item.criticality) &&
+                    !item.nextAssessmentAt && (
+                      <Alert severity="warning">
+                        {english
+                          ? "Schedule the assessment of this priority supplier."
+                          : "Planifiez l’évaluation de ce tiers prioritaire."}
+                      </Alert>
+                    )}
                   {item.status !== "TERMINATED" && hasSubmittedAssessment && (
                     <Alert severity="info">
                       {english
@@ -655,6 +934,34 @@ export function ThirdPartiesPage() {
         })}
       </Stack>
 
+      {visibleItems.length > 0 && (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+        >
+          <Pagination
+            page={currentPage}
+            count={pageCount}
+            onChange={(_, value) => setPage(value)}
+            aria-label={english ? "Register pages" : "Pages du registre"}
+          />
+          <TextField
+            id="third-party-page-size"
+            select
+            label={english ? "Per page" : "Par page"}
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+            sx={{ minWidth: 120 }}
+          >
+            {[12, 24, 48].map((size) => (
+              <MenuItem key={size} value={size}>
+                {size}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      )}
       <Dialog
         open={dialog}
         onClose={closeDialog}

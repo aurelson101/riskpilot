@@ -446,6 +446,63 @@ final class ThirdPartyControllerTest extends WebTestCase
     }
 
     /** @return array<string, mixed> */
+    public function testProfileValidationRejectsMalformedFieldsWithoutPartialMutation(): void
+    {
+        $this->authenticate($this->manager);
+        $valid = $this->thirdPartyInput('Tiers inchangé');
+        $this->client->jsonRequest('POST', '/api/third-parties', $valid);
+        self::assertResponseStatusCodeSame(201);
+        $original = $this->payload();
+        $invalid = [
+            ['ownerId' => (string) $this->manager->getId()], ['ownerId' => 0], ['ownerId' => 2147483648],
+            ['name' => []], ['name' => ' '], ['name' => str_repeat('é', 201)],
+            ['contactEmail' => []], ['contactEmail' => 'invalid'], ['contactEmail' => str_repeat('a', 181)],
+            ['criticality' => null], ['criticality' => []], ['status' => 'UNKNOWN'], ['status' => null],
+            ['dataCategories' => 'clients'], ['dataCategories' => [null]], ['dataCategories' => [123]], ['dataCategories' => ['key' => 'value']], ['dataCategories' => array_fill(0, 101, 'x')], ['dataCategories' => [str_repeat('x', 201)]],
+            ['certifications' => [false]], ['certifications' => str_repeat('x', 201)], ['certifications' => array_fill(0, 101, 'x')],
+            ['dataCategories' => null], ['certifications' => null],
+            ['services' => false], ['exitPlan' => []], ['dependencies' => str_repeat('x', 10001)], ['riskSummary' => 5], ['compensatingMeasures' => []], ['sla' => str_repeat('x', 201)], ['contractReference' => str_repeat('x', 201)],
+        ];
+        foreach ($invalid as $patch) {
+            $this->client->jsonRequest('PUT', '/api/third-parties/'.$original['id'], [...$valid, 'name' => 'Mutation interdite', ...$patch]);
+            self::assertResponseStatusCodeSame(422);
+            $this->client->request('GET', '/api/third-parties');
+            self::assertSame($original, $this->payload()[0]);
+        }
+        $this->client->jsonRequest('PUT', '/api/third-parties/'.$original['id'], [...$valid, 'contactEmail' => ' owner@example.test ', 'dataCategories' => [' clients ', 'clients', ''], 'certifications' => ['ISO 27001', ' ISO 27001 ']]);
+        self::assertResponseIsSuccessful();
+        self::assertSame('owner@example.test', $this->payload()['contactEmail']);
+        self::assertSame(['clients'], $this->payload()['dataCategories']);
+        self::assertSame(['ISO 27001'], $this->payload()['certifications']);
+    }
+
+    public function testPublicResponsesAreNotCachedAndSupportCanonicalUppercaseTokens(): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+        $this->client->request('GET', '/api/public/supplier-assessments/'.strtoupper($assessment['publicToken']));
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('Cache-Control', 'no-store, private');
+        self::assertResponseHeaderSame('Referrer-Policy', 'no-referrer');
+        $this->client->request('POST', '/api/public/supplier-assessments/'.$assessment['publicToken'], server: ['CONTENT_TYPE' => 'application/json'], content: '{broken');
+        self::assertResponseStatusCodeSame(422);
+        self::assertResponseHeaderSame('Cache-Control', 'no-store, private');
+        foreach (['short', str_repeat('z', 64), str_repeat('a', 65)] as $token) {
+            $this->client->request('GET', '/api/public/supplier-assessments/'.$token);
+            self::assertResponseStatusCodeSame(404);
+            self::assertResponseHeaderSame('Cache-Control', 'no-store, private');
+        }
+    }
+
+    public function testReviewCommentLimitDoesNotMutateSubmittedAssessment(): void
+    {
+        $assessment = $this->submittedAssessment();
+        $this->client->jsonRequest('POST', '/api/supplier-assessments/'.$assessment['id'].'/review', ['score' => 70, 'comment' => str_repeat('é', 10001)]);
+        self::assertResponseStatusCodeSame(422);
+        $this->client->request('GET', '/api/supplier-assessments/'.$assessment['id']);
+        self::assertSame('SUBMITTED', $this->payload()['status']);
+    }
+
     private function thirdPartyInput(string $name): array
     {
         return [
