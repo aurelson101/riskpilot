@@ -66,6 +66,8 @@ Lot centré sur le registre des tiers et les évaluations fournisseurs, sans nou
 
 ## Vérification et livraison
 
-Validation avant livraison : 110 tests ciblés de l'interface, 31 tests API sur PostgreSQL isolé (481 assertions), compilation TypeScript et build de production. Les contrôles de livraison prévus sont l'alignement du commit GitHub/démo, la santé des services, l'authentification, le téléchargement CSV réel et le parcours fournisseur en français/anglais.
+Validation : 111 tests ciblés de l'interface, 31 tests API sur PostgreSQL isolé (481 assertions), compilation TypeScript et build de production. Les essais navigateur de la démo ont validé le téléchargement CSV réel (19 colonnes, filtrage et neutralisation des formules), le registre à 375/768/1440 pixels CSS, la campagne à 375 pixels, le questionnaire anglais à 375/768/1440 pixels et français à 375 pixels, puis la soumission anonyme et la revue humaine. Les données fictives ont été supprimées et le registre préexistant est resté identique.
+
+Le contrôle final de livraison vérifie l'alignement du commit GitHub/démo et la santé des services. Le score individuel d'une évaluation non validée est également omis du CSV, même si l'API contient un zéro par défaut.
 
 Les avertissements de fermeture dépendent du comportement du navigateur et ne remplacent pas une sauvegarde. Les références du fournisseur restent des déclarations textuelles non vérifiées. Le contrôle des sauvegardes vérifie les empreintes et les archives ; il ne constitue pas un exercice complet de restauration.

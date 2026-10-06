@@ -225,6 +225,22 @@ describe("ThirdPartiesPage", () => {
     expect(JSON.stringify(rows)).not.toContain("publicToken");
   });
 
+  it("exports scores only for reviewed assessments, including a real zero", async () => {
+    const download = vi.spyOn(csv, "downloadCsv").mockImplementation(() => {});
+    mockReads([thirdParty, unevaluated]);
+    renderPage();
+    const button = await screen.findByRole("button", {
+      name: "Exporter le CSV filtré",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    const rows = download.mock.calls[0][1];
+    expect(rows[1][17]).toBe(0);
+    expect(rows[1][18]).toContain("(0%)");
+    expect(rows[2][17]).toBeNull();
+    expect(rows[2][18]).not.toContain("86%");
+  });
+
   it("filters reviewed assessments and owners using the visible register", async () => {
     mockReads([
       thirdParty,

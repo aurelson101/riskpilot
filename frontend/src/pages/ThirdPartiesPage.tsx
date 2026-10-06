@@ -461,7 +461,7 @@ export function ThirdPartiesPage() {
         item.assessments
           .map(
             (a) =>
-              `${a.title}: ${assessmentStatusLabel(a.status)}${a.score === null ? "" : ` (${a.score}%)`}`,
+              `${a.title}: ${assessmentStatusLabel(a.status)}${a.status !== "REVIEWED" || a.score === null ? "" : ` (${a.score}%)`}`,
           )
           .join(" | "),
       ]),
