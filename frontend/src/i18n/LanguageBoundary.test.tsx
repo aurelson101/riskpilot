@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LanguageBoundary } from "./LanguageBoundary";
 
@@ -38,5 +38,25 @@ describe("LanguageBoundary", () => {
       </LanguageBoundary>,
     );
     expect(screen.getByRole("button", { name: "Copier la clé" })).toBeVisible();
+  });
+
+  it("retranslates an accessible label changed after rendering", async () => {
+    const { rerender } = render(
+      <LanguageBoundary locale="en">
+        <button aria-label="Gestion des risques">Menu</button>
+      </LanguageBoundary>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Risk management" }),
+    ).toBeVisible();
+
+    rerender(
+      <LanguageBoundary locale="en">
+        <button aria-label="Catalogue GRC">Menu</button>
+      </LanguageBoundary>,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "GRC catalog" })).toBeVisible(),
+    );
   });
 });

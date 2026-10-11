@@ -72,11 +72,16 @@ function translateElement(element: Element, locale: Locale) {
   for (const attribute of translatedAttributes) {
     const current = element.getAttribute(attribute);
     if (current === null) continue;
-    if (!originals.has(attribute)) originals.set(attribute, current);
-    element.setAttribute(
-      attribute,
-      translateValue(originals.get(attribute) ?? current, locale),
-    );
+    let original = originals.get(attribute);
+    if (
+      original === undefined ||
+      (current !== original && current !== translateValue(original, locale))
+    ) {
+      original = current;
+      originals.set(attribute, original);
+    }
+    const translated = translateValue(original, locale);
+    if (current !== translated) element.setAttribute(attribute, translated);
   }
   originalAttributes.set(element, originals);
 }
@@ -114,6 +119,9 @@ export function LanguageBoundary({
         if (mutation.type === "characterData") {
           translateTextNode(mutation.target as Text, locale);
         }
+        if (mutation.type === "attributes") {
+          translateElement(mutation.target as Element, locale);
+        }
         for (const node of mutation.addedNodes) translateTree(node, locale);
       }
     });
@@ -121,6 +129,8 @@ export function LanguageBoundary({
       characterData: true,
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: translatedAttributes,
     });
     return () => observer.disconnect();
   }, [locale]);

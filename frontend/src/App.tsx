@@ -240,6 +240,7 @@ const AnnualReportsPage = lazy(() =>
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
+const MENU_COLLAPSED_STORAGE_KEY = "riskpilot.menuCollapsed";
 
 function ProtectedRoute() {
   return useAuth().token ? <Outlet /> : <Navigate to="/login" replace />;
@@ -273,7 +274,9 @@ function Layout() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(MENU_COLLAPSED_STORAGE_KEY) === "true",
+  );
   const riskActive = [
     "/risks",
     "/analysis-workspace",
@@ -293,7 +296,6 @@ function Layout() {
   const steeringActive = [
     "/actions",
     "/operations",
-    "/search",
     "/decision",
     "/experiments",
     "/indicators",
@@ -307,9 +309,7 @@ function Layout() {
     "/third-parties",
     "/resilience",
   ].some((path) => location.pathname === path);
-  const settingsActive =
-    location.pathname === "/profile" ||
-    location.pathname.startsWith("/administration");
+  const administrationActive = location.pathname.startsWith("/administration");
   const activeGroup = riskActive
     ? "risk"
     : catalogActive
@@ -318,8 +318,8 @@ function Layout() {
         ? "steering"
         : complianceActive
           ? "compliance"
-          : settingsActive
-            ? "settings"
+          : administrationActive
+            ? "administration"
             : null;
   const [openGroup, setOpenGroup] = useState<string | null>(activeGroup);
   const isAdmin = user?.roles.some((role) =>
@@ -380,7 +380,7 @@ function Layout() {
     "/notifications": "Notifications",
     "/reports/executive": "Rapport exécutif",
     "/annual-reports": "Rapports annuels",
-    "/isms-documents": "Documents ISMS",
+    "/isms-documents": "Documents du SMSI",
     "/profile": "Mon profil",
     "/administration/users": "Utilisateurs",
     "/administration/organizations": "Organisations",
@@ -475,6 +475,7 @@ function Layout() {
             onClick={() => {
               if (collapsed) {
                 setCollapsed(false);
+                localStorage.setItem(MENU_COLLAPSED_STORAGE_KEY, "false");
                 if (!open) onToggle();
                 return;
               }
@@ -553,6 +554,11 @@ function Layout() {
           label="Tableau de bord"
           icon={<DashboardOutlined />}
         />
+        <NavItem
+          path="/search"
+          label="Recherche transverse"
+          icon={<SearchOutlined />}
+        />
         <NavGroup
           id="risk"
           label="Gestion des risques"
@@ -590,7 +596,7 @@ function Layout() {
         </NavGroup>
         <NavGroup
           id="catalog"
-          label="Référentiels"
+          label="Catalogue GRC"
           icon={<Inventory2Outlined />}
           active={catalogActive}
           open={openGroup === "catalog"}
@@ -653,12 +659,6 @@ function Layout() {
           />
           <NavItem
             nested
-            path="/search"
-            label="Recherche transverse"
-            icon={<SearchOutlined fontSize="small" />}
-          />
-          <NavItem
-            nested
             path="/indicators"
             label="Indicateurs"
             icon={<AssessmentOutlined fontSize="small" />}
@@ -691,7 +691,7 @@ function Layout() {
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
         <NavGroup
           id="compliance"
-          label="Conformité et contrôles"
+          label="Conformité et résilience"
           icon={<VerifiedUserOutlined />}
           active={complianceActive}
           open={openGroup === "compliance"}
@@ -734,7 +734,7 @@ function Layout() {
         </NavGroup>
         <NavItem
           path="/isms-documents"
-          label="Documents ISMS"
+          label="Documents du SMSI"
           icon={<FolderCopyOutlined />}
         />
         <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,.12)" }} />
@@ -743,87 +743,74 @@ function Layout() {
           label="Notifications"
           icon={<NotificationsOutlined />}
         />
-        <NavGroup
-          id="settings"
-          label="Paramètres"
-          icon={<SettingsOutlined />}
-          active={settingsActive}
-          open={openGroup === "settings"}
-          onToggle={() =>
-            setOpenGroup((value) => (value === "settings" ? null : "settings"))
-          }
-        >
-          <NavItem
-            nested
-            path="/profile"
-            label="Mon profil et MFA"
-            icon={<AccountCircleOutlined fontSize="small" />}
-          />
-          {isAdmin && (
-            <NavItem
-              nested
-              path="/administration/rbac"
-              label="Rôles et permissions"
-              icon={<AdminPanelSettingsOutlined fontSize="small" />}
-            />
-          )}
-          {isAdmin && (
-            <NavItem
-              nested
-              path="/administration/action-fields"
-              label="Colonnes des actions"
-              icon={<GridViewOutlined fontSize="small" />}
-            />
-          )}
-          {isAdmin && (
-            <NavItem
-              nested
-              path="/administration/integrations"
-              label="Intégrations"
-              icon={<AccountTreeOutlined fontSize="small" />}
-            />
-          )}
-          {isAdmin && (
-            <NavItem
-              nested
-              path="/administration/ai-settings"
-              label="Intelligence artificielle"
-              icon={<SmartToyOutlined fontSize="small" />}
-            />
-          )}
-          {isAdmin && (
-            <NavItem
-              nested
-              path="/administration/email-settings"
-              label="Messagerie"
-              icon={<SettingsOutlined fontSize="small" />}
-            />
-          )}
-          {isAdmin && (
+        <NavItem
+          path="/profile"
+          label="Mon profil et MFA"
+          icon={<AccountCircleOutlined />}
+        />
+        {isAdmin && (
+          <NavGroup
+            id="administration"
+            label="Administration"
+            icon={<SettingsOutlined />}
+            active={administrationActive}
+            open={openGroup === "administration"}
+            onToggle={() =>
+              setOpenGroup((value) =>
+                value === "administration" ? null : "administration",
+              )
+            }
+          >
             <NavItem
               nested
               path="/administration/users"
               label="Utilisateurs"
               icon={<AdminPanelSettingsOutlined fontSize="small" />}
             />
-          )}
-          {isAdmin && (
             <NavItem
               nested
               path="/administration/organizations"
               label="Organisations"
               icon={<BusinessOutlined fontSize="small" />}
             />
-          )}
-          {isAdmin && (
+            <NavItem
+              nested
+              path="/administration/rbac"
+              label="Rôles et permissions"
+              icon={<AdminPanelSettingsOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/administration/integrations"
+              label="Intégrations"
+              icon={<AccountTreeOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/administration/email-settings"
+              label="Messagerie"
+              icon={<SettingsOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/administration/ai-settings"
+              label="Intelligence artificielle"
+              icon={<SmartToyOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/administration/action-fields"
+              label="Colonnes des actions"
+              icon={<GridViewOutlined fontSize="small" />}
+            />
             <NavItem
               nested
               path="/administration/audit-logs"
               label="Journal d’audit"
               icon={<HistoryOutlined fontSize="small" />}
             />
-          )}
-        </NavGroup>
+          </NavGroup>
+        )}
       </List>
       <Box
         sx={{
@@ -856,7 +843,16 @@ function Layout() {
             <IconButton
               aria-label={collapsed ? "Déployer le menu" : "Réduire le menu"}
               color="inherit"
-              onClick={() => setCollapsed((value) => !value)}
+              onClick={() =>
+                setCollapsed((value) => {
+                  const next = !value;
+                  localStorage.setItem(
+                    MENU_COLLAPSED_STORAGE_KEY,
+                    String(next),
+                  );
+                  return next;
+                })
+              }
               sx={{ width: "100%", borderRadius: 1.5, mt: 0.5 }}
             >
               {collapsed ? (

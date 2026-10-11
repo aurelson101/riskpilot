@@ -171,30 +171,49 @@ describe("App", () => {
     });
     const steeringMenu = screen.getByRole("button", { name: "Pilotage" });
     const complianceMenu = screen.getByRole("button", {
-      name: "Conformité et contrôles",
+      name: "Conformité et résilience",
+    });
+    const administrationMenu = screen.getByRole("button", {
+      name: "Administration",
     });
     expect(riskMenu).toHaveAttribute("aria-expanded", "false");
     expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
     expect(complianceMenu).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(riskMenu);
+    expect(administrationMenu).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: "Recherche transverse" }),
+    ).toBeInTheDocument();
+    fireEvent.click(administrationMenu);
+    expect(await screen.findByText("Utilisateurs")).toBeInTheDocument();
+    expect(screen.getByText("Messagerie")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Gestion des risques" }),
+    );
     expect(await screen.findByText("Registre des risques")).toBeInTheDocument();
     expect(screen.queryByText("Périmètres")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Référentiels" }));
+    fireEvent.click(screen.getByRole("button", { name: "Catalogue GRC" }));
     expect(await screen.findByText("Périmètres")).toBeInTheDocument();
     expect(screen.getByText("Actifs")).toBeInTheDocument();
     expect(screen.getByText("Mesures de sécurité")).toBeInTheDocument();
-    expect(riskMenu).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: "Gestion des risques" }),
+    ).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("button", { name: "Pilotage" }));
     expect(await screen.findByText("Indicateurs")).toBeInTheDocument();
-    expect(riskMenu).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: "Gestion des risques" }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Registre des risques")).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("button", { name: "Conformité et contrôles" }),
+      screen.getByRole("button", { name: "Conformité et résilience" }),
     );
     expect(
       await screen.findByText("Évaluations de conformité"),
     ).toBeInTheDocument();
-    expect(steeringMenu).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Pilotage" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
     expect(screen.queryByText("Indicateurs")).not.toBeInTheDocument();
     expect(screen.getByText("Tableau de bord NIS2")).toBeInTheDocument();
     expect(screen.getByText("Tiers et fournisseurs")).toBeInTheDocument();
@@ -217,7 +236,7 @@ describe("App", () => {
       await screen.findByText("My profile", { selector: "h4" }),
     ).toBeInTheDocument();
     expect(localStorage.getItem("riskpilot.interfaceLocale")).toBe("en");
-    expect(screen.getByText("Compliance and controls")).toBeInTheDocument();
+    expect(screen.getByText("Compliance and resilience")).toBeInTheDocument();
     expect(screen.queryByText("Assets")).not.toBeInTheDocument();
     expect(screen.queryByText("All assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Hardware assets")).not.toBeInTheDocument();
@@ -227,7 +246,15 @@ describe("App", () => {
     expect(ismsItem).not.toHaveAttribute("aria-expanded");
     expect(screen.queryByText("Recent publications")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
+    expect(localStorage.getItem("riskpilot.menuCollapsed")).toBe("true");
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Risk management" }),
+    );
+    expect(localStorage.getItem("riskpilot.menuCollapsed")).toBe("false");
+    expect(
+      await screen.findByRole("button", { name: "Risk management" }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
 
   it("bloque une route d’administration lors d’un accès direct sans rôle", async () => {
