@@ -133,6 +133,46 @@ final readonly class UserController
         return new JsonResponse(null, JsonResponse::HTTP_NO_CONTENT);
     }
 
+    #[Route('/{id<\d+>}/mfa/disable', methods: ['POST'])]
+    #[IsGranted(User::ROLE_ADMIN)]
+    public function disableMfa(int $id, Request $request): JsonResponse
+    {
+        $actor = $this->actor();
+        $user = $this->users->findOneVisibleTo($id, $actor);
+        if (null === $user) {
+            return $this->notFound();
+        }
+        if ($user === $actor) {
+            return new JsonResponse(['code' => 'SELF_MFA_RESET_FORBIDDEN', 'message' => 'Désactivez votre propre MFA depuis votre profil.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if (in_array(User::ROLE_SUPER_ADMIN, $user->getRoles(), true) && !in_array(User::ROLE_SUPER_ADMIN, $actor->getRoles(), true)) {
+            return new JsonResponse(['code' => 'INSUFFICIENT_PRIVILEGES', 'message' => 'Seul un super administrateur peut réinitialiser ce compte.'], JsonResponse::HTTP_FORBIDDEN);
+        }
+        if (!$user->isMfaEnabled()) {
+            return new JsonResponse(['code' => 'MFA_NOT_ENABLED', 'message' => 'Le MFA de cet utilisateur est déjà désactivé.'], JsonResponse::HTTP_CONFLICT);
+        }
+        try {
+            $input = $request->toArray();
+        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+            return new JsonResponse(['code' => 'INVALID_INPUT', 'message' => 'Un objet JSON valide est requis.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        $password = $input['currentPassword'] ?? null;
+        $confirmation = $input['confirmation'] ?? null;
+        if (!is_string($password) || mb_strlen($password) > 1024 || !$this->passwordHasher->isPasswordValid($actor, $password)) {
+            return new JsonResponse(['code' => 'INVALID_PASSWORD', 'message' => 'Le mot de passe administrateur est incorrect.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if (!is_string($confirmation) || !hash_equals($user->getEmail(), trim($confirmation))) {
+            return new JsonResponse(['code' => 'INVALID_CONFIRMATION', 'message' => 'Saisissez exactement l’adresse email de l’utilisateur.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $user->disableMfa();
+        $this->sessions->revokeAll($user);
+        $request->attributes->set('_audit_after', ['mfaEnabled' => false, 'sessionsRevoked' => true]);
+        $this->entityManager->flush();
+
+        return new JsonResponse(['message' => 'MFA désactivé et sessions révoquées.']);
+    }
+
     /** @param list<string> $roles */
     private function rolesAreAllowed(array $roles): bool
     {

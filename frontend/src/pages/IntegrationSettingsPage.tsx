@@ -38,7 +38,10 @@ type OidcResult = {
   issuer: string;
   authorizationCode: boolean;
   pkceS256: boolean;
+  singleLogout: boolean;
+  userinfo: boolean;
   signingAlgorithms: string[];
+  activationReady: boolean;
 };
 type EmailSummary = {
   provider: string;
@@ -803,10 +806,18 @@ export function IntegrationSettingsPage() {
       )}
 
       {oidcResult && (
-        <Alert severity="success">
-          Découverte OIDC validée pour {oidcResult.issuer}. Authorization Code :
-          oui · PKCE S256 annoncé : {oidcResult.pkceS256 ? "oui" : "non"} ·
-          signatures : {oidcResult.signingAlgorithms.join(", ")}.
+        <Alert
+          severity={
+            oidcResult.pkceS256 && oidcResult.userinfo ? "success" : "warning"
+          }
+        >
+          Découverte OIDC compatible pour {oidcResult.issuer}. Le SSO RiskPilot
+          reste inactif tant que le parcours de connexion et l’association des
+          comptes ne sont pas raccordés. Authorization Code : oui · PKCE S256 :{" "}
+          {oidcResult.pkceS256 ? "oui" : "non"} · UserInfo :{" "}
+          {oidcResult.userinfo ? "oui" : "non"} · déconnexion IdP :{" "}
+          {oidcResult.singleLogout ? "oui" : "non"} · signatures :{" "}
+          {oidcResult.signingAlgorithms.join(", ")}.
         </Alert>
       )}
 

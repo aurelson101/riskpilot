@@ -61,13 +61,14 @@ export function OrganizationsPage() {
     queryFn: async () => (await api.get<Organization[]>("/organizations")).data,
   });
   const save = useMutation({
-    mutationFn: () =>
-      editing
-        ? api.put(`/organizations/${editing.id}`, form)
-        : api.post("/organizations", {
-            name: form.name,
-            description: form.description,
-          }),
+    mutationFn: async () => {
+      if (editing) await api.put(`/organizations/${editing.id}`, form);
+      else
+        await api.post("/organizations", {
+          name: form.name,
+          description: form.description,
+        });
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
       setDialogOpen(false);

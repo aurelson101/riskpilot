@@ -239,6 +239,9 @@ describe("IntegrationSettingsPage", () => {
             issuer: "https://accounts.google.com",
             authorizationCode: true,
             pkceS256: true,
+            userinfo: true,
+            singleLogout: false,
+            activationReady: false,
             signingAlgorithms: ["RS256"],
           },
         });
@@ -252,7 +255,7 @@ describe("IntegrationSettingsPage", () => {
           screen.getByRole("button", { name: "Vérifier la découverte OIDC" }),
         );
         expect(
-          await screen.findByText(/Découverte OIDC validée pour/),
+          await screen.findByText(/Découverte OIDC compatible pour/),
         ).toBeVisible();
       }
       expect(screen.getByText("test-only-unacknowledged-key")).toBeVisible();
@@ -297,6 +300,9 @@ describe("IntegrationSettingsPage", () => {
         issuer: "https://accounts.google.com",
         authorizationCode: true,
         pkceS256: true,
+        userinfo: true,
+        singleLogout: false,
+        activationReady: false,
         signingAlgorithms: ["RS256"],
       },
     });
@@ -311,13 +317,13 @@ describe("IntegrationSettingsPage", () => {
       screen.getByRole("button", { name: "Vérifier la découverte OIDC" }),
     );
     expect(
-      await screen.findByText(/Découverte OIDC validée pour/),
+      await screen.findByText(/Découverte OIDC compatible pour/),
     ).toBeVisible();
     fireEvent.change(screen.getByLabelText("Émetteur OIDC", { exact: false }), {
       target: { value: "https://different.example" },
     });
     expect(
-      screen.queryByText(/Découverte OIDC validée pour/),
+      screen.queryByText(/Découverte OIDC compatible pour/),
     ).not.toBeInTheDocument();
   });
 
@@ -357,6 +363,9 @@ describe("IntegrationSettingsPage", () => {
         issuer: "https://accounts.google.com",
         authorizationCode: true,
         pkceS256: true,
+        userinfo: true,
+        singleLogout: false,
+        activationReady: false,
         signingAlgorithms: ["RS256"],
       },
     });

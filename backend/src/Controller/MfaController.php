@@ -38,7 +38,7 @@ final readonly class MfaController
         }
         $secret = $this->totp->generateSecret();
 
-        return new JsonResponse(['secret' => $secret, 'provisioningUri' => $this->totp->provisioningUri($secret, $user->getEmail())]);
+        return $this->sensitive(new JsonResponse(['secret' => $secret, 'provisioningUri' => $this->totp->provisioningUri($secret, $user->getEmail())]));
     }
 
     #[Route('/enable', methods: ['POST'])]
@@ -60,7 +60,7 @@ final readonly class MfaController
         $user->enableMfa($this->cipher->encrypt($secret), array_map(static fn (string $code): string => password_hash($code, PASSWORD_ARGON2ID), $codes));
         $this->entityManager->flush();
 
-        return new JsonResponse(['recoveryCodes' => $codes]);
+        return $this->sensitive(new JsonResponse(['recoveryCodes' => $codes]));
     }
 
     #[Route('/disable', methods: ['POST'])]
@@ -84,6 +84,15 @@ final readonly class MfaController
     private function invalidPassword(): JsonResponse
     {
         return new JsonResponse(['code' => 'INVALID_PASSWORD', 'message' => 'Le mot de passe actuel est incorrect.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    private function sensitive(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
     }
 
     private function actor(): User

@@ -31,7 +31,11 @@ use Symfony\Component\Routing\Attribute\Route;
             return new JsonResponse(['code' => 'OIDC_DISCOVERY_TEST_FAILED', 'message' => 'Fournisseur et émetteur OIDC textuels requis.', 'validated' => false], 422);
         }
         try {
-            return new JsonResponse($this->oidcDiscoveryValidator->validate((string) ($data['provider'] ?? ''), (string) ($data['issuer'] ?? '')));
+            $response = new JsonResponse($this->oidcDiscoveryValidator->validate($data['provider'], $data['issuer']));
+            $response->headers->set('Cache-Control', 'no-store, private');
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+
+            return $response;
         } catch (\RuntimeException $e) {
             return new JsonResponse(['code' => 'OIDC_DISCOVERY_TEST_FAILED', 'message' => $e->getMessage(), 'validated' => false], 422);
         }

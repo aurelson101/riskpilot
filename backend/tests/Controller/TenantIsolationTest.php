@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\ActionPlan;
 use App\Entity\Asset;
+use App\Entity\AuthSession;
 use App\Entity\ComplianceAssessment;
 use App\Entity\ComplianceResult;
 use App\Entity\EmailSettings;
@@ -287,6 +288,50 @@ final class TenantIsolationTest extends WebTestCase
         $reloadedUser = $entityManager->getRepository(User::class)->find($this->adminA->getId());
         self::assertInstanceOf(User::class, $reloadedUser);
         self::assertSame([], $reloadedUser->getMfaRecoveryCodes());
+    }
+
+    public function testAdministratorCanResetTenantUserMfaAndRevokeSessions(): void
+    {
+        $cipher = self::getContainer()->get(SecretCipher::class);
+        $this->userA->enableMfa($cipher->encrypt('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'), [password_hash('ABCD-12345678', PASSWORD_ARGON2ID)]);
+        $session = new AuthSession($this->userA, hash('sha256', 'refresh-token'), 'Test browser', '127.0.0.1');
+        $this->entityManager->persist($session);
+        $this->entityManager->flush();
+
+        $this->client->request('POST', '/api/users/'.$this->userA->getId().'/mfa/disable', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'currentPassword' => 'StrongPassword123!',
+            'confirmation' => $this->userA->getEmail(),
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseIsSuccessful();
+        self::assertFalse($this->userA->isMfaEnabled());
+        self::assertFalse($session->isActive());
+    }
+
+    public function testAdministratorCannotResetForeignTenantMfa(): void
+    {
+        $cipher = self::getContainer()->get(SecretCipher::class);
+        $this->userB->enableMfa($cipher->encrypt('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'), [password_hash('ABCD-12345678', PASSWORD_ARGON2ID)]);
+        $this->entityManager->flush();
+
+        $this->client->request('POST', '/api/users/'.$this->userB->getId().'/mfa/disable', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'currentPassword' => 'StrongPassword123!',
+            'confirmation' => $this->userB->getEmail(),
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertTrue($this->userB->isMfaEnabled());
+    }
+
+    public function testMfaSetupSecretIsNeverCached(): void
+    {
+        $this->client->request('POST', '/api/me/mfa/setup', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([
+            'currentPassword' => 'StrongPassword123!',
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('no-store', (string) $this->client->getResponse()->headers->get('Cache-Control'));
+        self::assertSame('no-referrer', $this->client->getResponse()->headers->get('Referrer-Policy'));
     }
 
     public function testGoogleOauthConfigurationNeverExposesSecretAndCreatesConsentUrl(): void
@@ -571,8 +616,9 @@ final class TenantIsolationTest extends WebTestCase
         $this->client->request('GET', '/api/calendar/'.$token.'.ics');
         self::assertResponseIsSuccessful();
         $content = (string) $this->client->getResponse()->getContent();
-        self::assertStringContainsString('Risque : Sans risque lié', $content);
-        self::assertStringContainsString('Action\\nX-INJECTED:yes', $content);
+        $unfolded = str_replace("\r\n ", '', $content);
+        self::assertStringContainsString('Risque : Sans risque lié', $unfolded);
+        self::assertStringContainsString('Action\\nX-INJECTED:yes', $unfolded);
         self::assertStringNotContainsString("\r\nX-INJECTED:yes", $content);
         self::assertStringNotContainsString('Action B', $content);
     }

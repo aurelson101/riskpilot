@@ -464,9 +464,9 @@ function GovernanceDialog({
     Record<string, string | number | number[]>
   >({});
   const submit = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (kind === "policy")
-        return api.post("/risk-governance/policies", {
+        await api.post("/risk-governance/policies", {
           appetiteScore: 4,
           toleranceScore: 9,
           capacityScore: 16,
@@ -474,20 +474,21 @@ function GovernanceDialog({
           ...values,
           ownerId: values.ownerId || user?.id,
         });
-      if (kind === "acceptance")
-        return api.post(
+      else if (kind === "acceptance")
+        await api.post(
           `/risk-governance/risks/${values.riskId || selectedRisk}/acceptances`,
           values,
         );
-      if (kind === "campaign")
-        return api.post("/risk-governance/campaigns", {
+      else if (kind === "campaign")
+        await api.post("/risk-governance/campaigns", {
           ...values,
           status: "ACTIVE",
         });
-      return api.post(
-        `/risk-governance/reviews/${selectedReview}/complete`,
-        values,
-      );
+      else
+        await api.post(
+          `/risk-governance/reviews/${selectedReview}/complete`,
+          values,
+        );
     },
     onSuccess,
     onError,

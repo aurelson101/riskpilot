@@ -10,6 +10,7 @@ final readonly class OidcDiscoveryValidator
 {
     private const SAFE_SIGNING_ALGORITHMS = ['RS256', 'PS256', 'ES256'];
 
+    /** @param list<string> $allowedIssuers */
     public function __construct(private HttpClientInterface $httpClient, private array $allowedIssuers = [])
     {
     }
@@ -75,7 +76,10 @@ final readonly class OidcDiscoveryValidator
             'issuer' => $issuer,
             'authorizationCode' => true,
             'pkceS256' => in_array('S256', (array) ($metadata['code_challenge_methods_supported'] ?? []), true),
+            'singleLogout' => is_string($metadata['end_session_endpoint'] ?? null) && $this->validHttpsUrl($metadata['end_session_endpoint']),
+            'userinfo' => is_string($metadata['userinfo_endpoint'] ?? null) && $this->validHttpsUrl($metadata['userinfo_endpoint']),
             'signingAlgorithms' => $algorithms,
+            'activationReady' => false,
         ];
     }
 
@@ -89,7 +93,7 @@ final readonly class OidcDiscoveryValidator
         }
 
         if (in_array($provider, ['KEYCLOAK', 'AUTHENTIK'], true) && $this->validHttpsUrl($issuer) && !isset(parse_url($issuer)['query'])) {
-            $allowed = array_map(static fn ($value): string => is_string($value) ? rtrim(trim($value), '/') : '', $this->allowedIssuers);
+            $allowed = array_map(static fn (string $value): string => rtrim(trim($value), '/'), $this->allowedIssuers);
             $path = parse_url($issuer, PHP_URL_PATH);
             $expected = 'KEYCLOAK' === $provider ? '#/realms/[^/]+$#' : '#/application/o/[^/]+$#';
             if (is_string($path) && preg_match($expected, $path) && in_array($issuer, $allowed, true)) return;

@@ -85,6 +85,8 @@ final class OidcDiscoveryValidatorTest extends TestCase
             'scopes_supported' => ['openid', 'email'],
             'id_token_signing_alg_values_supported' => ['RS256'],
             'code_challenge_methods_supported' => ['S256'],
+            'userinfo_endpoint' => 'https://openidconnect.googleapis.com/v1/userinfo',
+            'end_session_endpoint' => 'https://accounts.google.com/logout',
         ], JSON_THROW_ON_ERROR));
         $validator = new OidcDiscoveryValidator(new MockHttpClient($response));
 
@@ -93,6 +95,9 @@ final class OidcDiscoveryValidatorTest extends TestCase
         self::assertTrue($result['validated']);
         self::assertTrue($result['authorizationCode']);
         self::assertTrue($result['pkceS256']);
+        self::assertTrue($result['userinfo']);
+        self::assertTrue($result['singleLogout']);
+        self::assertFalse($result['activationReady']);
         self::assertSame(['RS256'], $result['signingAlgorithms']);
     }
 
