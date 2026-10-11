@@ -28,6 +28,7 @@ FROM base AS production
 ENV APP_ENV=prod APP_DEBUG=0
 COPY . .
 RUN composer install --no-dev --classmap-authoritative --no-interaction --no-progress \
+    && chmod -R u=rwX,go=rX . \
     && mkdir -p var/cache var/log var/isms-documents \
     && chown -R www-data:www-data var
 USER www-data
