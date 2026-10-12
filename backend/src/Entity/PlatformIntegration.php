@@ -13,7 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 class PlatformIntegration
 {
     public const TYPES = ['OIDC', 'SAML', 'SCIM', 'DIRECTORY', 'API_KEY', 'WEBHOOK', 'CONNECTOR'];
-    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'ACTIVE_DIRECTORY', 'JIRA', 'SERVICENOW', 'GENERIC'];
+    public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'KEYCLOAK', 'AUTHENTIK', 'ACTIVE_DIRECTORY', 'JIRA', 'SERVICENOW', 'GENERIC'];
     public const SCOPES = ['risks:read', 'controls:read', 'actions:read', 'events:write', 'scim:write'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
@@ -39,7 +39,7 @@ class PlatformIntegration
             throw new \InvalidArgumentException('Type, fournisseur ou nom d’intégration invalide.');
         }
         $this->validateName($name);
-        if ($enabled && in_array($type, ['OIDC', 'SAML'], true)) {
+        if ($enabled && 'SAML' === $type) {
             throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
         }
         $this->validateConfiguration($type, $configuration);
@@ -95,7 +95,7 @@ class PlatformIntegration
 
     public function setEncryptedCredential(string $value): void
     {
-        if ('DIRECTORY' !== $this->type || '' === $value) {
+        if (!in_array($this->type, ['DIRECTORY', 'OIDC'], true) || '' === $value) {
             throw new \LogicException('Credential annuaire invalide.');
         }
         $this->encryptedCredential = $value;
@@ -124,7 +124,7 @@ class PlatformIntegration
 
     public function isCredentialConfigured(): bool
     {
-        return 'DIRECTORY' === $this->type ? null !== $this->encryptedCredential : null !== $this->secretHash;
+        return in_array($this->type, ['DIRECTORY', 'OIDC'], true) ? null !== $this->encryptedCredential : null !== $this->secretHash;
     }
 
     public function getCredentialExpiresAt(): ?\DateTimeImmutable
@@ -210,13 +210,16 @@ class PlatformIntegration
             throw new \InvalidArgumentException('Utilisez la rotation pour modifier la validité de la clé API.');
         }
         $this->validateName($name);
-        if ($enabled && in_array($this->type, ['OIDC', 'SAML'], true)) {
+        if ($enabled && 'SAML' === $this->type) {
             throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
         }
         if ($enabled && 'API_KEY' === $this->type && (!$this->isCredentialConfigured() || $this->isCredentialExpired())) {
             throw new \InvalidArgumentException('La clé API est révoquée ou expirée : effectuez une rotation avant de l’activer.');
         }
         $this->validateConfiguration($this->type, $configuration);
+        if ($enabled && 'OIDC' === $this->type && (!$this->isCredentialConfigured() || [] === ($configuration['accountMappings'] ?? []))) {
+            throw new \InvalidArgumentException('Le SSO exige un secret et au moins un compte associé.');
+        }
         $this->name = trim($name);
         $this->configuration = $configuration;
         $this->enabled = $enabled;
@@ -241,6 +244,29 @@ class PlatformIntegration
         }
         if ('OIDC' === $type && !$this->validHttpsUrl($configuration['issuer'])) {
             throw new \InvalidArgumentException('L’émetteur OIDC doit être une URL HTTPS valide.');
+        }
+        if ('OIDC' === $type) {
+            $clientId = $configuration['clientId'] ?? null;
+            $mappings = $configuration['accountMappings'] ?? null;
+            if (!is_string($clientId) || '' === trim($clientId) || strlen($clientId) > 512 || preg_match('/[\x00-\x20\x7f]/', $clientId)
+                || !is_array($mappings) || !array_is_list($mappings) || count($mappings) > 200) {
+                throw new \InvalidArgumentException('Identifiant client et associations de comptes OIDC requis.');
+            }
+            $subjects = [];
+            $users = [];
+            foreach ($mappings as $mapping) {
+                if (!is_array($mapping) || !is_int($mapping['userId'] ?? null) || $mapping['userId'] < 1
+                    || !is_string($mapping['subject'] ?? null) || '' === trim($mapping['subject']) || strlen($mapping['subject']) > 255
+                    || preg_match('/[\x00-\x20\x7f]/', $mapping['subject'])
+                    || in_array($mapping['subject'], $subjects, true) || in_array($mapping['userId'], $users, true)) {
+                    throw new \InvalidArgumentException('Chaque compte doit avoir un identifiant fournisseur unique et un utilisateur unique.');
+                }
+                $subjects[] = $mapping['subject'];
+                $users[] = $mapping['userId'];
+            }
+            if (isset($configuration['hostedDomain']) && (!is_string($configuration['hostedDomain']) || false === filter_var($configuration['hostedDomain'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME))) {
+                throw new \InvalidArgumentException('Le domaine Google Workspace est invalide.');
+            }
         }
         if ('API_KEY' === $type) {
             $scopes = $configuration['scopes'] ?? [];

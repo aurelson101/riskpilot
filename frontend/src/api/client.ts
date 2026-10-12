@@ -29,13 +29,14 @@ api.interceptors.request.use((config) => {
   (config as typeof config & { _sessionRevision?: number })._sessionRevision =
     sessionRevision;
   const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-  const publicAuthRequest = [
-    "/auth/login",
-    "/auth/refresh",
-    "/auth/logout",
-    "/auth/forgot-password",
-    "/auth/reset-password",
-  ].includes(url.split("?")[0]);
+  const publicAuthRequest =
+    [
+      "/auth/login",
+      "/auth/refresh",
+      "/auth/logout",
+      "/auth/forgot-password",
+      "/auth/reset-password",
+    ].includes(url.split("?")[0]) || url.startsWith("/auth/sso/");
   config.headers.delete("Authorization");
   if (token && !publicAuthRequest)
     config.headers.Authorization = `Bearer ${token}`;

@@ -43,7 +43,9 @@ function mockLoads() {
     data:
       url === "/v1/integrations"
         ? { items: [] }
-        : { provider: "CUSTOM", enabled: false, ready: false },
+        : url === "/users"
+          ? []
+          : { provider: "CUSTOM", enabled: false, ready: false },
   }));
 }
 
@@ -132,7 +134,10 @@ describe("IntegrationSettingsPage", () => {
           .closest("form")!,
       );
       await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-      for (const select of screen.getAllByRole("combobox")) {
+      const activeForm = screen
+        .getByRole("combobox", { name: "Usage" })
+        .closest("form")!;
+      for (const select of within(activeForm).getAllByRole("combobox")) {
         expect(select).toHaveAttribute("aria-disabled", "true");
         expect(select).not.toHaveAttribute("tabindex", "0");
       }
@@ -161,7 +166,9 @@ describe("IntegrationSettingsPage", () => {
         data:
           url === "/v1/integrations"
             ? { items }
-            : { provider: "CUSTOM", enabled: false, ready: false },
+            : url === "/users"
+              ? []
+              : { provider: "CUSTOM", enabled: false, ready: false },
       }));
       vi.spyOn(api, "post").mockResolvedValue({ data: { matchedEntries: 1 } });
       vi.spyOn(window, "confirm").mockReturnValue(true);

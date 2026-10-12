@@ -11,7 +11,9 @@ import {
   Typography,
 } from "@mui/material";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
 import { useForm } from "react-hook-form";
 import { Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -25,7 +27,7 @@ const schema = z.object({
 type LoginForm = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { token, login } = useAuth();
+  const { token, login, loginSso } = useAuth();
   const navigate = useNavigate();
   // The build flag keeps local demo images explicit, while the hostname
   // fallback prevents a stale/cached production build from hiding the public
@@ -33,8 +35,45 @@ export function LoginPage() {
   const isDemo =
     import.meta.env.VITE_DEMO_MODE === "true" ||
     window.location.hostname === "demo.riskpilot.site";
-  const [error, setError] = useState<string | null>(null);
+  const ssoStatus = new URLSearchParams(window.location.search).get("sso");
+  const [error, setError] = useState<string | null>(
+    ssoStatus === "error"
+      ? "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte."
+      : null,
+  );
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [ssoPending, setSsoPending] = useState(ssoStatus === "complete");
+  const ssoStarted = useRef(false);
+  const providers = useQuery({
+    queryKey: ["sso-providers"],
+    queryFn: async () =>
+      (
+        await api.get<{
+          items: { id: number; name: string; provider: string }[];
+        }>("/auth/sso/providers")
+      ).data.items,
+    retry: false,
+    enabled: !token,
+  });
+  useEffect(() => {
+    if (ssoStatus === "error") {
+      window.history.replaceState(null, "", "/login");
+    }
+    if (ssoStatus !== "complete" || ssoStarted.current || !loginSso) return;
+    ssoStarted.current = true;
+    window.history.replaceState(null, "", "/login");
+    void loginSso()
+      .then((needsMfa) => {
+        if (needsMfa) setMfaRequired(true);
+        else navigate("/");
+      })
+      .catch(() => {
+        setSsoPending(false);
+        setError(
+          "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.",
+        );
+      });
+  }, [ssoStatus, loginSso, navigate]);
   const {
     register,
     handleSubmit,
@@ -99,49 +138,110 @@ export function LoginPage() {
                 {error}
               </Alert>
             )}
-            <Stack
-              component="form"
-              spacing={2.5}
-              onSubmit={handleSubmit(onSubmit)}
-              noValidate
-            >
-              <TextField
-                label="Adresse email"
-                type="email"
-                autoComplete="email"
-                error={Boolean(errors.email)}
-                helperText={errors.email?.message}
-                {...register("email")}
-              />
-              <TextField
-                label="Mot de passe"
-                type="password"
-                autoComplete="current-password"
-                error={Boolean(errors.password)}
-                helperText={errors.password?.message}
-                {...register("password")}
-              />
-              {mfaRequired && (
-                <TextField
-                  label="Code MFA ou code de secours"
-                  autoComplete="one-time-code"
-                  autoFocus
-                  helperText="Saisissez le code à 6 chiffres de votre application d’authentification."
-                  {...register("mfaCode")}
-                />
-              )}
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={isSubmitting}
+            {ssoPending ? (
+              <Stack
+                component="form"
+                spacing={2}
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const input = event.currentTarget.elements.namedItem(
+                    "ssoMfa",
+                  ) as HTMLInputElement | null;
+                  try {
+                    const needsMfa = await loginSso?.(input?.value);
+                    if (!needsMfa) navigate("/");
+                    else setError("Code MFA ou code de secours invalide.");
+                  } catch {
+                    setError("Code MFA invalide ou session SSO expirée.");
+                  }
+                }}
               >
-                {isSubmitting ? "Connexion…" : "Se connecter"}
-              </Button>
-              <Button type="button" onClick={() => navigate("/reset-password")}>
-                Mot de passe oublié ?
-              </Button>
-            </Stack>
+                {mfaRequired ? (
+                  <>
+                    <TextField
+                      required
+                      name="ssoMfa"
+                      label="Code MFA ou code de secours"
+                      autoComplete="one-time-code"
+                      autoFocus
+                    />
+                    <Button type="submit" variant="contained">
+                      Valider le MFA
+                    </Button>
+                  </>
+                ) : (
+                  <Typography>Connexion SSO en cours…</Typography>
+                )}
+                <Button
+                  onClick={() => {
+                    setSsoPending(false);
+                    setMfaRequired(false);
+                    setError(null);
+                  }}
+                >
+                  Retour à la connexion
+                </Button>
+              </Stack>
+            ) : (
+              <Stack
+                component="form"
+                spacing={2.5}
+                onSubmit={handleSubmit(onSubmit)}
+                noValidate
+              >
+                <TextField
+                  label="Adresse email"
+                  type="email"
+                  autoComplete="email"
+                  error={Boolean(errors.email)}
+                  helperText={errors.email?.message}
+                  {...register("email")}
+                />
+                <TextField
+                  label="Mot de passe"
+                  type="password"
+                  autoComplete="current-password"
+                  error={Boolean(errors.password)}
+                  helperText={errors.password?.message}
+                  {...register("password")}
+                />
+                {mfaRequired && (
+                  <TextField
+                    label="Code MFA ou code de secours"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    helperText="Saisissez le code à 6 chiffres de votre application d’authentification."
+                    {...register("mfaCode")}
+                  />
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Connexion…" : "Se connecter"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => navigate("/reset-password")}
+                >
+                  Mot de passe oublié ?
+                </Button>
+              </Stack>
+            )}
+            {!ssoPending &&
+              providers.data?.map((provider) => (
+                <Button
+                  key={provider.id}
+                  fullWidth
+                  variant="outlined"
+                  sx={{ mt: 2 }}
+                  href={`/api/auth/sso/${provider.id}/start`}
+                >
+                  Se connecter avec {provider.name}
+                </Button>
+              ))}
           </CardContent>
         </Card>
         {isDemo && (

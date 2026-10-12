@@ -18,6 +18,24 @@ final readonly class OidcDiscoveryValidator
     /** @return array<string, mixed> */
     public function validate(string $provider, string $issuer): array
     {
+        $metadata = $this->discover($provider, $issuer);
+
+        return [
+            'validated' => true,
+            'provider' => strtoupper(trim($provider)),
+            'issuer' => $metadata['issuer'],
+            'authorizationCode' => true,
+            'pkceS256' => in_array('S256', $metadata['code_challenge_methods_supported'] ?? [], true),
+            'singleLogout' => is_string($metadata['end_session_endpoint'] ?? null) && $this->validHttpsUrl($metadata['end_session_endpoint']),
+            'userinfo' => is_string($metadata['userinfo_endpoint'] ?? null) && $this->validHttpsUrl($metadata['userinfo_endpoint']),
+            'signingAlgorithms' => array_values(array_intersect(self::SAFE_SIGNING_ALGORITHMS, $metadata['id_token_signing_alg_values_supported'])),
+            'activationReady' => false,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function discover(string $provider, string $issuer): array
+    {
         $provider = strtoupper(trim($provider));
         $issuer = rtrim(trim($issuer), '/');
         $this->assertKnownIssuer($provider, $issuer);
@@ -31,18 +49,26 @@ final readonly class OidcDiscoveryValidator
                 'verify_peer' => true,
                 'verify_host' => true,
                 'on_progress' => static function (int $downloaded, int $total): void {
-                    if ($downloaded > 262144 || $total > 262144) throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+                    if ($downloaded > 262144 || $total > 262144) {
+                        throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+                    }
                 },
             ]);
         } catch (\Throwable $e) {
             throw new \RuntimeException('Découverte OIDC inaccessible.', previous: $e);
         }
         try {
-            if (200 !== $response->getStatusCode()) throw new \RuntimeException('Statut OIDC invalide.');
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException('Statut OIDC invalide.');
+            }
             $content = $response->getContent(false);
-            if (strlen($content) > 262144) throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+            if (strlen($content) > 262144) {
+                throw new \RuntimeException('Configuration OIDC trop volumineuse.');
+            }
             $metadata = json_decode($content, true, 32, JSON_THROW_ON_ERROR);
-            if (!is_array($metadata) || array_is_list($metadata)) throw new \RuntimeException('Objet OIDC requis.');
+            if (!is_array($metadata) || array_is_list($metadata)) {
+                throw new \RuntimeException('Objet OIDC requis.');
+            }
         } catch (\Throwable $e) {
             throw new \RuntimeException('La configuration OIDC reçue est invalide.', previous: $e);
         }
@@ -51,7 +77,7 @@ final readonly class OidcDiscoveryValidator
             throw new \RuntimeException('L’émetteur annoncé par le fournisseur OIDC ne correspond pas à la configuration.');
         }
         foreach (['authorization_endpoint', 'token_endpoint', 'jwks_uri'] as $field) {
-            if (!is_string($metadata[$field] ?? null) || !$this->validHttpsUrl($metadata[$field])) {
+            if (!is_string($metadata[$field] ?? null) || !$this->validHttpsUrl($metadata[$field]) || !$this->trustedEndpoint($provider, $issuer, $metadata[$field])) {
                 throw new \RuntimeException('La configuration OIDC contient un endpoint non sécurisé.');
             }
         }
@@ -70,17 +96,21 @@ final readonly class OidcDiscoveryValidator
             throw new \RuntimeException('Aucun algorithme sûr de signature des jetons OIDC n’est annoncé.');
         }
 
-        return [
-            'validated' => true,
-            'provider' => $provider,
-            'issuer' => $issuer,
-            'authorizationCode' => true,
-            'pkceS256' => in_array('S256', (array) ($metadata['code_challenge_methods_supported'] ?? []), true),
-            'singleLogout' => is_string($metadata['end_session_endpoint'] ?? null) && $this->validHttpsUrl($metadata['end_session_endpoint']),
-            'userinfo' => is_string($metadata['userinfo_endpoint'] ?? null) && $this->validHttpsUrl($metadata['userinfo_endpoint']),
-            'signingAlgorithms' => $algorithms,
-            'activationReady' => false,
-        ];
+        return $metadata;
+    }
+
+    private function trustedEndpoint(string $provider, string $issuer, string $endpoint): bool
+    {
+        $host = parse_url($endpoint, PHP_URL_HOST);
+        $port = parse_url($endpoint, PHP_URL_PORT) ?? 443;
+        if ('GOOGLE_WORKSPACE' === $provider) {
+            return 443 === $port && in_array($host, ['accounts.google.com', 'oauth2.googleapis.com', 'www.googleapis.com'], true);
+        }
+        if ('MICROSOFT_ENTRA' === $provider) {
+            return 443 === $port && 'login.microsoftonline.com' === $host;
+        }
+
+        return $host === parse_url($issuer, PHP_URL_HOST) && $port === (parse_url($issuer, PHP_URL_PORT) ?? 443);
     }
 
     private function assertKnownIssuer(string $provider, string $issuer): void
@@ -92,12 +122,14 @@ final readonly class OidcDiscoveryValidator
             return;
         }
 
-        if (in_array($provider, ['KEYCLOAK', 'AUTHENTIK'], true) && $this->validHttpsUrl($issuer) && !isset(parse_url($issuer)['query'])) {
+        if (in_array($provider, ['KEYCLOAK', 'AUTHENTIK', 'GENERIC'], true) && $this->validHttpsUrl($issuer) && !isset(parse_url($issuer)['query'])) {
             $allowed = array_map(static fn (string $value): string => rtrim(trim($value), '/'), $this->allowedIssuers);
             $path = parse_url($issuer, PHP_URL_PATH);
             $expected = 'KEYCLOAK' === $provider ? '#/realms/[^/]+$#' : '#/application/o/[^/]+$#';
-            if (is_string($path) && preg_match($expected, $path) && in_array($issuer, $allowed, true)) return;
-            throw new \RuntimeException('Cet émetteur doit être autorisé par l’administrateur serveur dans OIDC_DIAGNOSTIC_ISSUERS, avec le chemin realm Keycloak ou application Authentik.');
+            if (in_array($issuer, $allowed, true) && ('GENERIC' === $provider || (is_string($path) && preg_match($expected, $path)))) {
+                return;
+            }
+            throw new \RuntimeException('Cet émetteur doit être autorisé par l’administrateur serveur dans OIDC_DIAGNOSTIC_ISSUERS. Keycloak et Authentik exigent le chemin realm ou application.');
         }
 
         throw new \RuntimeException('Utilisez l’émetteur officiel Google ou l’URL Entra ID avec l’identifiant UUID du tenant.');

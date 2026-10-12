@@ -75,11 +75,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
       token,
       user: profile.data,
       login,
+      loginSso: async (mfaCode?: string) => {
+        const { data, status } = await api.post<{
+          token?: string;
+          mfaRequired?: boolean;
+        }>("/auth/sso/complete", { mfaCode });
+        if (status === 202 || data.mfaRequired) return true;
+        if (!data.token) throw new Error("Jeton de connexion manquant");
+        endSession();
+        queryClient.clear();
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+        setToken(data.token);
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
+        return false;
+      },
       logout,
       profileUnavailable: profile.isError,
       retryProfile,
     }),
-    [token, profile.data, profile.isError, retryProfile, login, logout],
+    [
+      token,
+      profile.data,
+      profile.isError,
+      retryProfile,
+      login,
+      logout,
+      queryClient,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

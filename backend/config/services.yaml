@@ -51,7 +51,25 @@ services:
 
     App\Application\OidcDiscoveryValidator:
         arguments:
+            $httpClient: '@app.oidc_http_client'
             $allowedIssuers: '%env(json:default:oidc_diagnostic_issuers:OIDC_DIAGNOSTIC_ISSUERS)%'
+
+    app.oidc_http_client:
+        class: Symfony\Component\HttpClient\NoPrivateNetworkHttpClient
+        arguments: ['@http_client']
+
+    App\Application\OidcClient:
+        arguments:
+            $httpClient: '@app.oidc_http_client'
+
+    App\Application\OidcFlowStore:
+        arguments:
+            $redisUrl: '%env(REDIS_URL)%'
+
+    App\Controller\SsoController:
+        arguments:
+            $loginLimiter: '@limiter.login'
+            $appUrl: '%app.url%'
 
     App\Controller\EmailSettingsController:
         arguments:

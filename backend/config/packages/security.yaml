@@ -40,6 +40,7 @@ security:
     access_control:
         - { path: ^/api/health$, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/sso/(providers|complete|callback|[0-9]+/start)$, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/(refresh|logout|forgot-password|reset-password)$, roles: PUBLIC_ACCESS }
         - { path: ^/api/settings/email/oauth/.+/callback$, roles: PUBLIC_ACCESS }
         - { path: ^/api/public/documents/, roles: PUBLIC_ACCESS }

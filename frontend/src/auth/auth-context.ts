@@ -10,6 +10,7 @@ export interface AuthContextValue {
     mfaCode?: string,
   ) => Promise<boolean>;
   logout: () => void;
+  loginSso?: (mfaCode?: string) => Promise<boolean>;
   profileUnavailable?: boolean;
   retryProfile?: () => void;
 }

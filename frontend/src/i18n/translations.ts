@@ -1,6 +1,80 @@
 export type Locale = "fr" | "en";
 
 const pairs: Array<[fr: string, en: string]> = [
+  ["Connexion SSO", "SSO sign-in"],
+  ["Connexion SSO en cours…", "Signing in with SSO…"],
+  ["Se connecter avec", "Sign in with"],
+  ["Valider le MFA", "Verify MFA"],
+  ["Retour à la connexion", "Back to sign-in"],
+  ["Fournisseur SSO", "SSO provider"],
+  ["Identifiant client", "Client ID"],
+  ["Secret client", "Client secret"],
+  ["Autre fournisseur OIDC", "Other OIDC provider"],
+  ["Nom affiché à la connexion", "Name displayed at sign-in"],
+  ["URL de l’émetteur SSO", "SSO issuer URL"],
+  [
+    "URL de retour à enregistrer chez le fournisseur",
+    "Callback URL to register with the provider",
+  ],
+  [
+    "Domaine Google Workspace autorisé (facultatif)",
+    "Allowed Google Workspace domain (optional)",
+  ],
+  [
+    "Contrôlé sur la propriété hd du jeton Google.",
+    "Checked against the Google token hd claim.",
+  ],
+  ["Comptes autorisés", "Allowed accounts"],
+  ["Utilisateur RiskPilot", "RiskPilot user"],
+  ["Choisir un utilisateur", "Choose a user"],
+  ["Identifiant Microsoft (oid)", "Microsoft object ID (oid)"],
+  ["Identifiant OIDC (sub)", "OIDC subject ID (sub)"],
+  ["Associer un compte", "Link an account"],
+  ["Activer la connexion SSO", "Enable SSO sign-in"],
+  ["Enregistrer le SSO", "Save SSO"],
+  ["Nouvelle configuration", "New configuration"],
+  ["Configuration SSO enregistrée.", "SSO configuration saved."],
+  ["Configuration SSO impossible.", "Unable to configure SSO."],
+  [
+    "Suppression de la configuration SSO impossible.",
+    "Unable to delete the SSO configuration.",
+  ],
+  [
+    "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.",
+    "SSO sign-in failed. Check the configuration and your account mapping.",
+  ],
+  [
+    "Code MFA invalide ou session SSO expirée.",
+    "Invalid MFA code or expired SSO session.",
+  ],
+  [
+    "Connectez Microsoft, Google ou un fournisseur OIDC. Les comptes et les droits restent gérés dans RiskPilot ; le MFA RiskPilot reste obligatoire lorsqu’il est activé.",
+    "Connect Microsoft, Google or an OIDC provider. Accounts and permissions remain managed in RiskPilot; RiskPilot MFA is still required when enabled.",
+  ],
+  [
+    "Laissez vide pour conserver le secret chiffré.",
+    "Leave blank to keep the encrypted secret.",
+  ],
+  [
+    "Stocké chiffré et jamais renvoyé par l’API.",
+    "Stored encrypted and never returned by the API.",
+  ],
+  [
+    "Impossible de charger les configurations ou les utilisateurs.",
+    "Unable to load configurations or users.",
+  ],
+  [
+    "Remplacez les zéros par l’identifiant du tenant Entra ID. Application de type Web, mono-tenant.",
+    "Replace the zeros with the Entra ID tenant ID. Use a single-tenant Web application.",
+  ],
+  [
+    "Créez un client OAuth de type application Web dans Google Cloud.",
+    "Create a Web application OAuth client in Google Cloud.",
+  ],
+  [
+    "Autorisez cet émetteur dans OIDC_DIAGNOSTIC_ISSUERS côté serveur. Signature RS256 requise.",
+    "Allow this issuer in the server OIDC_DIAGNOSTIC_ISSUERS setting. RS256 signatures are required.",
+  ],
   ["Projets sécurité", "Security projects"],
   [
     "Préparez l’avis sécurité, le jalon de validation et la décision de mise en production.",

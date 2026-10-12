@@ -211,7 +211,7 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'OIDC', 'provider' => 'MICROSOFT_ENTRA', 'name' => 'Entra incomplet', 'configuration' => ['issuer' => 'https://login.microsoftonline.com/organizations/v2.0'], 'enabled' => false]);
         self::assertResponseStatusCodeSame(422);
         $unsupported = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertStringContainsString('pas encore raccordée', $unsupported['message']);
+        self::assertStringContainsString('Identifiant client', $unsupported['message']);
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', '');
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->jsonRequest('PUT', '/api/v1/integrations/'.$created['id'], ['name' => 'Vol']);

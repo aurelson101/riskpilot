@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Application;
 
 use App\Application\OidcDiscoveryValidator;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -22,6 +22,7 @@ final class OidcDiscoveryValidatorTest extends TestCase
             self::assertSame(0, $options['max_redirects']);
             self::assertSame(10.0, (float) $options['max_duration']);
             self::assertTrue($options['verify_peer']);
+
             return new MockResponse(json_encode($metadata, JSON_THROW_ON_ERROR));
         });
         $result = (new OidcDiscoveryValidator($http, [$issuer]))->validate($provider, $issuer);
@@ -57,6 +58,8 @@ final class OidcDiscoveryValidatorTest extends TestCase
         yield [['token_endpoint' => ['unexpected']]];
         yield [['token_endpoint' => 'https://user@accounts.google.com/token']];
         yield [['token_endpoint' => 'https://accounts.google.com/token#fragment']];
+        yield [['token_endpoint' => 'https://attacker.example/token']];
+        yield [['jwks_uri' => 'https://127.0.0.1/keys']];
         yield [['response_types_supported' => 'code']];
         yield [['scopes_supported' => [['openid']]]];
         yield [['id_token_signing_alg_values_supported' => ['none']]];
@@ -71,7 +74,9 @@ final class OidcDiscoveryValidatorTest extends TestCase
 
     private function metadata(string $issuer): array
     {
-        return ['issuer' => $issuer, 'authorization_endpoint' => 'https://sso.example.test/authorize', 'token_endpoint' => 'https://sso.example.test/token', 'jwks_uri' => 'https://sso.example.test/jwks', 'response_types_supported' => ['code'], 'scopes_supported' => ['openid'], 'id_token_signing_alg_values_supported' => ['RS256'], 'code_challenge_methods_supported' => ['S256']];
+        $origin = 'https://'.parse_url($issuer, PHP_URL_HOST);
+
+        return ['issuer' => $issuer, 'authorization_endpoint' => $origin.'/authorize', 'token_endpoint' => $origin.'/token', 'jwks_uri' => $origin.'/jwks', 'response_types_supported' => ['code'], 'scopes_supported' => ['openid'], 'id_token_signing_alg_values_supported' => ['RS256'], 'code_challenge_methods_supported' => ['S256']];
     }
 
     public function testItValidatesGoogleAuthorizationCodeDiscovery(): void

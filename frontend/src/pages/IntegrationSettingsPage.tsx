@@ -18,6 +18,7 @@ import {
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { SsoSettingsCard } from "../components/SsoSettingsCard";
 
 type Integration = {
   id: number;
@@ -66,7 +67,8 @@ type Form = {
   groupRole: string;
   caCertificate: string;
   directoryProvider: "ACTIVE_DIRECTORY" | "GENERIC";
-  oidcProvider: "GOOGLE_WORKSPACE" | "MICROSOFT_ENTRA" | "KEYCLOAK" | "AUTHENTIK";
+  oidcProvider:
+    "GOOGLE_WORKSPACE" | "MICROSOFT_ENTRA" | "KEYCLOAK" | "AUTHENTIK";
   issuer: string;
   enabled: boolean;
 };
@@ -214,7 +216,8 @@ export function IntegrationSettingsPage() {
     ["API_KEY", "DIRECTORY"].includes(item.type),
   );
   const legacy = integrations.data?.filter(
-    (item) => !["API_KEY", "DIRECTORY", "CONNECTOR"].includes(item.type),
+    (item) =>
+      !["API_KEY", "DIRECTORY", "CONNECTOR", "OIDC"].includes(item.type),
   );
 
   function submit(event: FormEvent) {
@@ -296,7 +299,9 @@ export function IntegrationSettingsPage() {
       {integrations.isError && (
         <Alert
           severity="error"
-          action={<Button onClick={() => integrations.refetch()}>Réessayer</Button>}
+          action={
+            <Button onClick={() => integrations.refetch()}>Réessayer</Button>
+          }
         >
           Impossible de charger les accès configurés.
         </Alert>
@@ -324,7 +329,8 @@ export function IntegrationSettingsPage() {
                   const version = secretVersion.current;
                   try {
                     await navigator.clipboard.writeText(secret);
-                    if (version === secretVersion.current) setSecretCopied(true);
+                    if (version === secretVersion.current)
+                      setSecretCopied(true);
                   } catch {
                     if (version !== secretVersion.current) return;
                     setSecretCopied(false);
@@ -379,10 +385,13 @@ export function IntegrationSettingsPage() {
         </CardContent>
       </Card>
 
+      <SsoSettingsCard />
+
       <Alert severity="info">
-        La découverte OIDC Google/Entra peut être vérifiée ici, ainsi que Keycloak/Authentik si l’émetteur est autorisé côté serveur. L’activation du
-        SSO OIDC/SAML et du provisioning SCIM reste masquée tant que le parcours
-        complet de connexion n’est pas disponible.
+        La découverte OIDC Google/Entra peut être vérifiée ici, ainsi que
+        Keycloak/Authentik si l’émetteur est autorisé côté serveur. L’activation
+        du SSO OIDC est disponible dans « Connexion SSO ». SAML et le
+        provisioning SCIM restent indisponibles.
       </Alert>
 
       <Card>
@@ -413,9 +422,7 @@ export function IntegrationSettingsPage() {
               }
             >
               <MenuItem value="API_KEY">Accès API RiskPilot</MenuItem>
-              <MenuItem value="DIRECTORY">
-                Diagnostic annuaire LDAPS
-              </MenuItem>
+              <MenuItem value="DIRECTORY">Diagnostic annuaire LDAPS</MenuItem>
               <MenuItem value="OIDC_DIAGNOSTIC">
                 Diagnostic SSO — découverte OIDC
               </MenuItem>
@@ -501,12 +508,30 @@ export function IntegrationSettingsPage() {
                   Ce diagnostic vérifie le chiffrement, le bind et la recherche.
                   Il n’active pas la connexion des utilisateurs.
                 </Alert>
-                <TextField select disabled={create.isPending} label="Type d’annuaire" value={form.directoryProvider} onChange={event => {
-                  const provider = event.target.value as Form["directoryProvider"];
-                  setForm({ ...form, directoryProvider: provider, userFilter: provider === "GENERIC" ? "(&(objectClass=inetOrgPerson)(uid={username}))" : initial.userFilter });
-                }}>
-                  <MenuItem value="ACTIVE_DIRECTORY">Microsoft Active Directory</MenuItem>
-                  <MenuItem value="GENERIC">OpenLDAP / annuaire LDAP compatible</MenuItem>
+                <TextField
+                  select
+                  disabled={create.isPending}
+                  label="Type d’annuaire"
+                  value={form.directoryProvider}
+                  onChange={(event) => {
+                    const provider = event.target
+                      .value as Form["directoryProvider"];
+                    setForm({
+                      ...form,
+                      directoryProvider: provider,
+                      userFilter:
+                        provider === "GENERIC"
+                          ? "(&(objectClass=inetOrgPerson)(uid={username}))"
+                          : initial.userFilter,
+                    });
+                  }}
+                >
+                  <MenuItem value="ACTIVE_DIRECTORY">
+                    Microsoft Active Directory
+                  </MenuItem>
+                  <MenuItem value="GENERIC">
+                    OpenLDAP / annuaire LDAP compatible
+                  </MenuItem>
                 </TextField>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
@@ -631,9 +656,11 @@ export function IntegrationSettingsPage() {
                       issuer:
                         provider === "GOOGLE_WORKSPACE"
                           ? "https://accounts.google.com"
-                          : provider === "MICROSOFT_ENTRA" ? "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0"
-                          : provider === "KEYCLOAK" ? "https://sso.example.com/realms/riskpilot"
-                          : "https://sso.example.com/application/o/riskpilot/",
+                          : provider === "MICROSOFT_ENTRA"
+                            ? "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0"
+                            : provider === "KEYCLOAK"
+                              ? "https://sso.example.com/realms/riskpilot"
+                              : "https://sso.example.com/application/o/riskpilot/",
                     });
                   }}
                 >
@@ -654,8 +681,9 @@ export function IntegrationSettingsPage() {
                   helperText={
                     form.oidcProvider === "MICROSOFT_ENTRA"
                       ? "Remplacez les zéros par l’identifiant UUID du tenant Entra ID."
-                      : form.oidcProvider === "GOOGLE_WORKSPACE" ? "Émetteur officiel Google, sans chemin supplémentaire."
-                      : "URL HTTPS du realm Keycloak ou de l’application Authentik (mode émetteur par application), à autoriser dans OIDC_DIAGNOSTIC_ISSUERS côté serveur."
+                      : form.oidcProvider === "GOOGLE_WORKSPACE"
+                        ? "Émetteur officiel Google, sans chemin supplémentaire."
+                        : "URL HTTPS du realm Keycloak ou de l’application Authentik (mode émetteur par application), à autoriser dans OIDC_DIAGNOSTIC_ISSUERS côté serveur."
                   }
                 />
               </Stack>
@@ -800,8 +828,8 @@ export function IntegrationSettingsPage() {
 
       {directoryResult && (
         <Alert severity="success">
-          LDAPS validé — {directoryResult.name} : {directoryResult.matchedEntries}
-          {" "}entrée(s) trouvée(s).
+          LDAPS validé — {directoryResult.name} :{" "}
+          {directoryResult.matchedEntries} entrée(s) trouvée(s).
         </Alert>
       )}
 
@@ -811,9 +839,9 @@ export function IntegrationSettingsPage() {
             oidcResult.pkceS256 && oidcResult.userinfo ? "success" : "warning"
           }
         >
-          Découverte OIDC compatible pour {oidcResult.issuer}. Le SSO RiskPilot
-          reste inactif tant que le parcours de connexion et l’association des
-          comptes ne sont pas raccordés. Authorization Code : oui · PKCE S256 :{" "}
+          Découverte OIDC compatible pour {oidcResult.issuer}. Configurez le
+          client et les comptes dans « Connexion SSO » pour activer la
+          connexion. Authorization Code : oui · PKCE S256 :{" "}
           {oidcResult.pkceS256 ? "oui" : "non"} · UserInfo :{" "}
           {oidcResult.userinfo ? "oui" : "non"} · déconnexion IdP :{" "}
           {oidcResult.singleLogout ? "oui" : "non"} · signatures :{" "}

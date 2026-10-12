@@ -10,6 +10,7 @@ use App\Application\OidcDiscoveryValidator;
 use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
+use App\Repository\UserRepository;
 use App\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/v1/integrations')] final readonly class PlatformIntegrationController
 {
-    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager, private SecretCipher $cipher, private DirectoryConnectionTester $directoryTester, private OidcDiscoveryValidator $oidcDiscoveryValidator)
+    public function __construct(private CurrentUser $currentUser, private PlatformIntegrationRepository $repository, private EntityManagerInterface $entityManager, private SecretCipher $cipher, private DirectoryConnectionTester $directoryTester, private OidcDiscoveryValidator $oidcDiscoveryValidator, private UserRepository $users)
     {
     }
 
@@ -55,7 +56,7 @@ use Symfony\Component\Routing\Attribute\Route;
         $actor = $this->admin();
         $data = $request->toArray();
         $type = strtoupper(trim((string) ($data['type'] ?? '')));
-        if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR'], true)) {
+        if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR', 'OIDC'], true)) {
             return $this->invalid('Cette intégration n’est pas encore raccordée à un parcours complet et ne peut pas être activée.');
         }
         try {
@@ -64,19 +65,26 @@ use Symfony\Component\Routing\Attribute\Route;
                 $days = $this->validityDays($data['expiresInDays'] ?? 90);
                 $configuration['expiresAt'] = (new \DateTimeImmutable())->modify('+'.$days.' days')->format(DATE_ATOM);
             }
-            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), $configuration, (bool) ($data['enabled'] ?? false));
+            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), $configuration, false);
             $plainSecret = null;
             if (in_array($item->getType(), ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
                 $item->setCredential($plainSecret);
             }
-            if ('DIRECTORY' === $item->getType()) {
+            if (in_array($item->getType(), ['DIRECTORY', 'OIDC'], true)) {
+                if (!is_string($data['credential'] ?? null) || strlen($data['credential']) > 4096) {
+                    throw new \InvalidArgumentException('Secret de connexion invalide.');
+                }
                 $password = (string) ($data['credential'] ?? '');
                 if ('' === $password) {
-                    throw new \InvalidArgumentException('Le mot de passe de bind est obligatoire.');
+                    throw new \InvalidArgumentException('Le secret de connexion est obligatoire.');
                 }
                 $item->setEncryptedCredential($this->cipher->encrypt($password));
             }
+            if ('OIDC' === $type) {
+                $this->validateSso($item, $configuration, (bool) ($data['enabled'] ?? false));
+            }
+            $item->update($item->getName(), $configuration, (bool) ($data['enabled'] ?? false));
             $this->entityManager->persist($item);
             $this->entityManager->flush();
 
@@ -157,7 +165,18 @@ use Symfony\Component\Routing\Attribute\Route;
         }
         $data = $request->toArray();
         try {
-            $item->update((string) ($data['name'] ?? $item->getName()), (array) ($data['configuration'] ?? $item->getConfiguration()), (bool) ($data['enabled'] ?? $item->isEnabled()));
+            $configuration = (array) ($data['configuration'] ?? $item->getConfiguration());
+            $enabled = (bool) ($data['enabled'] ?? $item->isEnabled());
+            if ('OIDC' === $item->getType()) {
+                $this->validateSso($item, $configuration, $enabled);
+                if (isset($data['credential']) && '' !== $data['credential']) {
+                    if (!is_string($data['credential']) || strlen($data['credential']) > 4096) {
+                        throw new \InvalidArgumentException('Secret client invalide.');
+                    }
+                    $item->setEncryptedCredential($this->cipher->encrypt($data['credential']));
+                }
+            }
+            $item->update((string) ($data['name'] ?? $item->getName()), $configuration, $enabled);
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
         }
@@ -219,6 +238,33 @@ use Symfony\Component\Routing\Attribute\Route;
         }
 
         return $actor;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private function validateSso(PlatformIntegration $item, array $configuration, bool $enabled): void
+    {
+        if (!is_array($configuration['accountMappings'] ?? null)) {
+            throw new \InvalidArgumentException('Associations de comptes OIDC requises.');
+        }
+        if (!in_array($item->getProvider(), ['MICROSOFT_ENTRA', 'GOOGLE_WORKSPACE', 'KEYCLOAK', 'AUTHENTIK', 'GENERIC'], true)) {
+            throw new \InvalidArgumentException('Fournisseur SSO non pris en charge.');
+        }
+        foreach ($configuration['accountMappings'] ?? [] as $mapping) {
+            $user = is_array($mapping) && is_int($mapping['userId'] ?? null) ? $this->users->find($mapping['userId']) : null;
+            if (!$user instanceof User || $user->getOrganization() !== $item->getOrganization()) {
+                throw new \InvalidArgumentException('Les comptes SSO doivent appartenir à votre organisation.');
+            }
+        }
+        if ($enabled) {
+            try {
+                $metadata = $this->oidcDiscoveryValidator->discover($item->getProvider(), (string) ($configuration['issuer'] ?? ''));
+                if (!in_array('RS256', $metadata['id_token_signing_alg_values_supported'], true)) {
+                    throw new \RuntimeException('Le SSO nécessite la signature RS256.');
+                }
+            } catch (\RuntimeException $error) {
+                throw new \InvalidArgumentException($error->getMessage(), previous: $error);
+            }
+        }
     }
 
     private function invalid(string $message): JsonResponse

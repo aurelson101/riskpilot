@@ -169,7 +169,7 @@ final readonly class AuthController
         return new JsonResponse(['message' => 'Votre mot de passe a été réinitialisé.']);
     }
 
-    private function createSessionResponse(User $user, Request $request): JsonResponse
+    public function createSessionResponse(User $user, Request $request): JsonResponse
     {
         $refreshToken = $this->randomToken();
         $session = new AuthSession(
@@ -210,7 +210,7 @@ final readonly class AuthController
         return $response;
     }
 
-    private function validateSecondFactor(User $user, string $code): bool
+    public function validateSecondFactor(User $user, string $code): bool
     {
         $secret = $user->getMfaSecret();
         if (null !== $secret && $this->totp->verify($this->cipher->decrypt($secret), $code)) {
