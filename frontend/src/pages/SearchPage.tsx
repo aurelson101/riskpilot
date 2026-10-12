@@ -164,13 +164,15 @@ export function SearchPage() {
         <TextField
           select
           label="Type de dossier"
-          SelectProps={{ displayEmpty: true }}
-          InputLabelProps={{ shrink: true }}
-          value={selectedType}
-          onChange={(event) => update({ type: event.target.value })}
+          value={selectedType || "ALL"}
+          onChange={(event) =>
+            update({
+              type: event.target.value === "ALL" ? "" : event.target.value,
+            })
+          }
           sx={{ minWidth: 180 }}
         >
-          <MenuItem value="">Tous les dossiers</MenuItem>
+          <MenuItem value="ALL">Tous les dossiers</MenuItem>
           {Object.entries(kinds).map(([key, label]) => (
             <MenuItem key={key} value={key}>
               {label[en ? 1 : 0]}

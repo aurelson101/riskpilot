@@ -60,6 +60,9 @@ describe("GRC search", () => {
     });
     fireEvent.keyDown(screen.getByLabelText("Rechercher"), { key: "Escape" });
     expect(screen.getByLabelText("Rechercher")).toHaveValue("");
+    fireEvent.mouseDown(screen.getByLabelText("Type de dossier"));
+    fireEvent.click(await screen.findByRole("option", { name: "Risques" }));
+    expect(screen.getByTestId("url")).toHaveTextContent("type=RISK");
   });
   it("restores URL filters, highlights matches and uses an internal native link", async () => {
     const get = vi.spyOn(api, "get").mockResolvedValue({ data: results });

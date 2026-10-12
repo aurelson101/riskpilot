@@ -492,6 +492,7 @@ export function ActionsPage() {
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
         gap={2}
       >
         <Stack>
@@ -508,6 +509,19 @@ export function ActionsPage() {
           value={view}
           onChange={(_, value) => value && setView(value)}
           aria-label="Mode d’affichage"
+          sx={{
+            width: { xs: "100%", sm: "auto" },
+            "& .MuiToggleButton-root": {
+              flex: { xs: 1, sm: "initial" },
+              minHeight: 44,
+              px: { xs: 1, sm: 1.5 },
+            },
+            "& .MuiToggleButton-root.Mui-selected": {
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              "&:hover": { bgcolor: "primary.dark" },
+            },
+          }}
         >
           <ToggleButton value="table">
             <TableRowsOutlined sx={{ mr: 1 }} />
