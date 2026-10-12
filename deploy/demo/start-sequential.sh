@@ -2,6 +2,18 @@
 set -eu
 
 cd /home/son/demo.riskpilot.site
+# Keep the last successful release after a host restart. Explicit candidate
+# or rollback images supplied by deploy-atomic.sh always take precedence.
+if [ -s .git/riskpilot-deployed-release ]; then
+    release=$(cat .git/riskpilot-deployed-release)
+    case "$release" in
+        *[!0-9a-f]*|'') echo "Invalid deployed RiskPilot release" >&2; exit 1 ;;
+    esac
+    [ "${#release}" -ge 7 ] && [ "${#release}" -le 40 ] || exit 1
+    export RISKPILOT_BACKEND_IMAGE=${RISKPILOT_BACKEND_IMAGE:-riskpilot-backend:$release}
+    export RISKPILOT_FRONTEND_IMAGE=${RISKPILOT_FRONTEND_IMAGE:-riskpilot-frontend:$release}
+    export RISKPILOT_DEMO_RESET_IMAGE=${RISKPILOT_DEMO_RESET_IMAGE:-riskpilot-demo-reset:$release}
+fi
 compose="docker compose -p riskpilot_demo -f compose.yaml -f compose.prod.yaml -f deploy/demo/compose.demo.yaml -f deploy/demo/compose.vps-1gb.yaml -f deploy/demo/compose.sequential.yaml"
 
 wait_healthy() {
