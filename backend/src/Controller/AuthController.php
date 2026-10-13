@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Application\OrganizationMailer;
 use App\Application\EmailTemplateRenderer;
+use App\Application\OrganizationMailer;
 use App\Entity\AuthSession;
 use App\Entity\PasswordResetToken;
 use App\Entity\User;
@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class AuthController
@@ -33,7 +33,7 @@ final readonly class AuthController
         private TotpService $totp,
         private SecretCipher $cipher,
         private EntityManagerInterface $entityManager,
-        private RateLimiterFactory $loginLimiter,
+        private RateLimiterFactoryInterface $loginLimiter,
         private AuthSessionRepository $sessions,
         private PasswordResetTokenRepository $passwordResetTokens,
         private OrganizationMailer $mailer,

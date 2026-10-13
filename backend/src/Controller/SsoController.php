@@ -15,12 +15,12 @@ use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class SsoController
 {
-    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactory $loginLimiter, private string $appUrl)
+    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
     {
     }
 
@@ -63,7 +63,7 @@ final readonly class SsoController
         try {
             $state = $request->query->get('state', '');
             $cookie = $request->cookies->get('riskpilot_sso_state', '');
-            if (!is_string($state) || !is_string($cookie) || '' === $state || !hash_equals($cookie, $state)) {
+            if ('' === $state || !hash_equals($cookie, $state)) {
                 throw new \RuntimeException('État SSO invalide.');
             }
             $flow = $this->flows->take($state);
@@ -71,7 +71,7 @@ final readonly class SsoController
             if (null !== $flow && 'access_denied' === $request->query->get('error')) {
                 return $this->redirect('cancelled');
             }
-            if (null === $flow || $request->query->has('error') || !is_string($code) || '' === $code || strlen($code) > 8192) {
+            if (null === $flow || $request->query->has('error') || '' === $code || strlen($code) > 8192) {
                 throw new \RuntimeException('Parcours SSO expiré.');
             }
             $integration = $this->integration($flow['integrationId']);

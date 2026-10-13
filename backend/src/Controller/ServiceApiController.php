@@ -16,7 +16,7 @@ use App\Repository\SecurityControlRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/v1/service')]
@@ -28,7 +28,7 @@ final readonly class ServiceApiController
         private SecurityControlRepository $controls,
         private ActionPlanRepository $actions,
         private EntityManagerInterface $entityManager,
-        private RateLimiterFactory $serviceApiLimiter,
+        private RateLimiterFactoryInterface $serviceApiLimiter,
     ) {
     }
 

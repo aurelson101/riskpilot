@@ -20,7 +20,7 @@ use App\Repository\ScopeRepository;
 use App\Repository\ThreatRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -31,7 +31,7 @@ final readonly class GlobalCopilotController
         private CurrentUser $currentUser,
         private AiSettingsRepository $settings,
         private AiCopilotClient $client,
-        private RateLimiterFactory $aiCopilotLimiter,
+        private RateLimiterFactoryInterface $aiCopilotLimiter,
         private ScopeRepository $scopes,
         private AssetRepository $assets,
         private ThreatRepository $threats,

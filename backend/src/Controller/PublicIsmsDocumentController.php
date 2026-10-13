@@ -11,12 +11,12 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class PublicIsmsDocumentController
 {
-    public function __construct(private IsmsDocumentShareRepository $shares, private IsmsDocumentStorage $storage, private EntityManagerInterface $entityManager, private RateLimiterFactory $shareLimiter)
+    public function __construct(private IsmsDocumentShareRepository $shares, private IsmsDocumentStorage $storage, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $shareLimiter)
     {
     }
 
