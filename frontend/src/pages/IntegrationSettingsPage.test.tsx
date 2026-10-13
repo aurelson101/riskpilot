@@ -13,6 +13,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { IntegrationSettingsPage } from "./IntegrationSettingsPage";
 
+vi.mock("../auth/useAuth", () => ({
+  useAuth: () => ({ user: { organization: { id: 1 } } }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

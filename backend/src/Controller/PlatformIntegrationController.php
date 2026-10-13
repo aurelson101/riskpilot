@@ -168,6 +168,13 @@ use Symfony\Component\Routing\Attribute\Route;
             $configuration = (array) ($data['configuration'] ?? $item->getConfiguration());
             $enabled = (bool) ($data['enabled'] ?? $item->isEnabled());
             if ('OIDC' === $item->getType()) {
+                $previous = $item->getConfiguration();
+                if (($configuration['issuer'] ?? null) !== ($previous['issuer'] ?? null)
+                    || ($configuration['clientId'] ?? null) !== ($previous['clientId'] ?? null)) {
+                    if (!is_string($data['credential'] ?? null) || '' === trim($data['credential'])) {
+                        throw new \InvalidArgumentException('L’émetteur ou l’identifiant client a changé. Saisissez le nouveau secret client.');
+                    }
+                }
                 $this->validateSso($item, $configuration, $enabled);
                 if (isset($data['credential']) && '' !== $data['credential']) {
                     if (!is_string($data['credential']) || strlen($data['credential']) > 4096) {

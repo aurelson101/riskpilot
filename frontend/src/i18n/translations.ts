@@ -3,6 +3,34 @@ export type Locale = "fr" | "en";
 const pairs: Array<[fr: string, en: string]> = [
   ["Connexion SSO", "SSO sign-in"],
   [
+    "Changer de fournisseur efface les identifiants et associations saisis.",
+    "Changing provider clears the entered credentials and account mappings.",
+  ],
+  [
+    "Vérifiez les comptes : utilisateur de votre organisation et identifiant fournisseur uniques.",
+    "Check the accounts: use unique users from your organization and unique provider IDs.",
+  ],
+  [
+    "Saisissez le secret client correspondant à cette configuration SSO.",
+    "Enter the client secret for this SSO configuration.",
+  ],
+  [
+    "Identité SSO modifiée : saisissez le nouveau secret client.",
+    "SSO identity changed: enter the new client secret.",
+  ],
+  [
+    "Compte de votre organisation ; les comptes désactivés ne peuvent pas se connecter.",
+    "Account from your organization; disabled accounts cannot sign in.",
+  ],
+  [
+    "Cet identifiant est déjà associé à un autre compte.",
+    "This provider ID is already linked to another account.",
+  ],
+  [
+    "L’émetteur ou l’identifiant client a changé. Saisissez le nouveau secret client.",
+    "The issuer or client ID has changed. Enter the new client secret.",
+  ],
+  [
     "Connexion SSO annulée. Vous pouvez réessayer ou utiliser votre mot de passe.",
     "SSO sign-in cancelled. You can retry or use your password.",
   ],

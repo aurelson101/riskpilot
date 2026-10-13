@@ -2,6 +2,8 @@
 
 Dans **Paramètres → Intégrations → Connexion SSO**, renseigner le fournisseur, le nom affiché sur l’écran de connexion, l’émetteur, l’identifiant client et le secret client. Le secret est chiffré avec la clé dérivée d’APP_SECRET et n’est jamais renvoyé par l’API. En modification, laisser le secret vide pour le conserver.
 
+Une modification d’émetteur ou d’identifiant client exige un nouveau secret, y compris pour une configuration inactive. Le changement de fournisseur dans une nouvelle fiche efface les identifiants et associations saisis. La sélection propose les comptes actifs de l’organisation ; les anciens comptes désactivés associés restent visibles pour être retirés. Les utilisateurs et identifiants fournisseur doivent être uniques dans une configuration.
+
 Enregistrer exactement l’URL `https://<domaine-riskpilot>/api/auth/sso/callback` chez le fournisseur. `APP_URL` doit correspondre au domaine public HTTPS. Les clients confidentiels utilisant `client_secret_post` ou `client_secret_basic` et la signature RS256 sont pris en charge.
 
 | Fournisseur | Configuration |

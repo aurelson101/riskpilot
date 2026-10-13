@@ -144,5 +144,16 @@ final class SsoControllerTest extends WebTestCase
         self::assertSame('TOO_MANY_SSO_ATTEMPTS', json_decode($client->getResponse()->getContent(), true)['code']);
         self::assertGreaterThan(0, (int) $client->getResponse()->headers->get('Retry-After'));
         self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control'));
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$container->get(JWTTokenManagerInterface::class)->create($admin));
+        foreach (['clientId' => 'different-client', 'issuer' => 'https://accounts.google.com/other'] as $field => $value) {
+            $changed = [...$configuration, $field => $value];
+            $client->jsonRequest('PUT', '/api/v1/integrations/'.$id, ['configuration' => $changed, 'enabled' => false]);
+            self::assertResponseStatusCodeSame(422);
+            self::assertStringContainsString('nouveau secret client', json_decode($client->getResponse()->getContent(), true)['message']);
+        }
+        $client->jsonRequest('PUT', '/api/v1/integrations/'.$id, ['configuration' => [...$configuration, 'clientId' => 'different-client'], 'credential' => 'test-only-new-secret', 'enabled' => false]);
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('test-only-new-secret', $client->getResponse()->getContent());
+        self::assertSame('different-client', json_decode($client->getResponse()->getContent(), true)['configuration']['clientId']);
     }
 }

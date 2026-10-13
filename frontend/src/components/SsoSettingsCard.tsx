@@ -14,6 +14,8 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import { api } from "../api/client";
+import type { User } from "../api/types";
+import { useAuth } from "../auth/useAuth";
 
 type Mapping = { userId: number; subject: string };
 type Configuration = {
@@ -58,6 +60,7 @@ const initial = {
 };
 
 export function SsoSettingsCard() {
+  const { user: actor } = useAuth();
   const cache = useQueryClient();
   const [form, setForm] = useState(initial);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -81,10 +84,45 @@ export function SsoSettingsCard() {
       (await api.get<{ items: Integration[] }>("/v1/integrations")).data.items,
   });
   const users = useQuery({
-    queryKey: ["sso-users"],
+    queryKey: ["sso-users", actor?.organization.id],
     queryFn: async () =>
-      (await api.get<{ id: number; email: string }[]>("/users")).data,
+      (
+        await api.get<Pick<User, "id" | "email" | "status" | "organization">[]>(
+          "/users",
+        )
+      ).data,
+    enabled: Boolean(actor?.organization.id),
   });
+  const organizationUsers =
+    users.data?.filter(
+      (user) => user.organization?.id === actor?.organization.id,
+    ) ?? [];
+  const editing = integrations.data?.find((item) => item.id === editingId);
+  const needsNewSecret =
+    editingId === null ||
+    Boolean(
+      editing &&
+      (editing.configuration.issuer !== form.issuer.trim() ||
+        editing.configuration.clientId !== form.clientId.trim()),
+    );
+  const duplicateSubject = (subject: string, index: number) =>
+    Boolean(subject.trim()) &&
+    form.accountMappings.some(
+      (mapping, i) => i !== index && mapping.subject.trim() === subject.trim(),
+    );
+  const invalidMappings = form.accountMappings.some(
+    (mapping, index) =>
+      !mapping.subject.trim() ||
+      !organizationUsers.some(
+        (user) =>
+          user.id === mapping.userId &&
+          (!form.enabled || user.status === "ACTIVE"),
+      ) ||
+      duplicateSubject(mapping.subject, index) ||
+      form.accountMappings.some(
+        (other, i) => i !== index && other.userId === mapping.userId,
+      ),
+  );
   const save = useMutation({
     mutationFn: async () => {
       const body = {
@@ -125,6 +163,18 @@ export function SsoSettingsCard() {
     event.preventDefault();
     setSaved(false);
     setError(null);
+    if (!users.isSuccess || invalidMappings) {
+      setError(
+        "Vérifiez les comptes : utilisateur de votre organisation et identifiant fournisseur uniques.",
+      );
+      return;
+    }
+    if (needsNewSecret && !form.credential.trim()) {
+      setError(
+        "Saisissez le secret client correspondant à cette configuration SSO.",
+      );
+      return;
+    }
     if (!save.isPending) save.mutate();
   }
 
@@ -208,11 +258,16 @@ export function SsoSettingsCard() {
                 label="Fournisseur SSO"
                 value={form.provider}
                 disabled={editingId !== null}
+                helperText="Changer de fournisseur efface les identifiants et associations saisis."
                 onChange={(e) =>
                   setForm({
                     ...form,
                     provider: e.target.value,
                     issuer: presets[e.target.value],
+                    clientId: "",
+                    credential: "",
+                    hostedDomain: "",
+                    enabled: false,
                     accountMappings: [],
                   })
                 }
@@ -244,7 +299,7 @@ export function SsoSettingsCard() {
                 autoComplete="off"
               />
               <TextField
-                required={editingId === null}
+                required={needsNewSecret}
                 type="password"
                 label="Secret client"
                 value={form.credential}
@@ -253,9 +308,11 @@ export function SsoSettingsCard() {
                 }
                 autoComplete="new-password"
                 helperText={
-                  editingId
+                  editingId && !needsNewSecret
                     ? "Laissez vide pour conserver le secret chiffré."
-                    : "Stocké chiffré et jamais renvoyé par l’API."
+                    : editingId
+                      ? "Identité SSO modifiée : saisissez le nouveau secret client."
+                      : "Stocké chiffré et jamais renvoyé par l’API."
                 }
               />
               <TextField
@@ -292,6 +349,7 @@ export function SsoSettingsCard() {
                     required
                     fullWidth
                     label="Utilisateur RiskPilot"
+                    helperText="Compte de votre organisation ; les comptes désactivés ne peuvent pas se connecter."
                     value={mapping.userId || ""}
                     onChange={(e) =>
                       setForm({
@@ -307,11 +365,28 @@ export function SsoSettingsCard() {
                     <MenuItem value="" disabled>
                       Choisir un utilisateur
                     </MenuItem>
-                    {users.data?.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.email}
-                      </MenuItem>
-                    ))}
+                    {organizationUsers
+                      .filter(
+                        (user) =>
+                          user.status === "ACTIVE" ||
+                          user.id === mapping.userId,
+                      )
+                      .map((user) => (
+                        <MenuItem
+                          key={user.id}
+                          value={user.id}
+                          disabled={
+                            user.status !== "ACTIVE" ||
+                            form.accountMappings.some(
+                              (other, i) =>
+                                i !== index && other.userId === user.id,
+                            )
+                          }
+                        >
+                          {user.email}
+                          {user.status !== "ACTIVE" ? " · Désactivé" : ""}
+                        </MenuItem>
+                      ))}
                   </TextField>
                   <TextField
                     required
@@ -322,6 +397,12 @@ export function SsoSettingsCard() {
                         : "Identifiant OIDC (sub)"
                     }
                     value={mapping.subject}
+                    error={duplicateSubject(mapping.subject, index)}
+                    helperText={
+                      duplicateSubject(mapping.subject, index)
+                        ? "Cet identifiant est déjà associé à un autre compte."
+                        : undefined
+                    }
                     onChange={(e) =>
                       setForm({
                         ...form,
@@ -349,6 +430,17 @@ export function SsoSettingsCard() {
                 </Stack>
               ))}
               <Button
+                disabled={
+                  !users.isSuccess ||
+                  !organizationUsers.some(
+                    (user) =>
+                      user.status === "ACTIVE" &&
+                      !form.accountMappings.some(
+                        (mapping) => mapping.userId === user.id,
+                      ),
+                  ) ||
+                  form.accountMappings.some((mapping) => !mapping.userId)
+                }
                 onClick={() =>
                   setForm({
                     ...form,
@@ -377,7 +469,7 @@ export function SsoSettingsCard() {
                 variant="contained"
                 disabled={
                   save.isPending ||
-                  users.isError ||
+                  !users.isSuccess ||
                   (form.enabled && !form.accountMappings.length)
                 }
               >
