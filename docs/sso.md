@@ -20,6 +20,8 @@ Le parcours vérifie state lié au navigateur, nonce, PKCE, signature JWKS, éme
 
 La déconnexion termine la session RiskPilot ; elle ne ferme pas la session chez le fournisseur d’identité. SAML, SCIM, les tenants Microsoft `common`/`organizations` et l’attribution automatique de rôles ne sont pas pris en charge. Les réglages SSO sont distincts de Gmail/Microsoft Graph pour les emails.
 
+Chaque ticket SSO autorise au maximum cinq codes MFA incorrects, indépendamment de l’adresse IP. Au-delà, le ticket est invalidé et il faut recommencer la connexion chez le fournisseur. Les erreurs MFA alimentent aussi le verrouillage temporaire du compte RiskPilot pour empêcher de contourner le plafond en ouvrant de nouveaux parcours. La limitation par IP reste appliquée et renvoie HTTP 429 avec `Retry-After` ; une origine incorrecte est refusée avec HTTP 403. L’écran empêche les doubles soumissions et distingue une annulation, un code incorrect et une session expirée.
+
 Les tests couvrent un fournisseur simulé avec des jetons signés, les refus de signature/claims, le MFA, le rejeu et l’isolation des comptes. Une recette réelle nécessite une application enregistrée et un compte de test chez chaque fournisseur ; une découverte réussie ne prouve pas à elle seule une connexion réelle.
 
 Références : [Microsoft — claims ID token](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference), [Google — OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect), [Authentik — OAuth2/OIDC](https://docs.goauthentik.io/add-secure-apps/providers/oauth2/).

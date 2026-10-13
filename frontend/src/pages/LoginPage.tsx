@@ -35,7 +35,9 @@ export function LoginPage() {
   const isDemo =
     import.meta.env.VITE_DEMO_MODE === "true" ||
     window.location.hostname === "demo.riskpilot.site";
-  const ssoStatus = new URLSearchParams(window.location.search).get("sso");
+  const [ssoStatus] = useState(() =>
+    new URLSearchParams(window.location.search).get("sso"),
+  );
   const [error, setError] = useState<string | null>(
     ssoStatus === "error"
       ? "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte."
@@ -44,6 +46,8 @@ export function LoginPage() {
   const [mfaRequired, setMfaRequired] = useState(false);
   const [ssoPending, setSsoPending] = useState(ssoStatus === "complete");
   const ssoStarted = useRef(false);
+  const ssoRequestPending = useRef(false);
+  const [ssoSubmitting, setSsoSubmitting] = useState(ssoStatus === "complete");
   const providers = useQuery({
     queryKey: ["sso-providers"],
     queryFn: async () =>
@@ -56,22 +60,30 @@ export function LoginPage() {
     enabled: !token,
   });
   useEffect(() => {
-    if (ssoStatus === "error") {
+    if (ssoStatus === "error" || ssoStatus === "cancelled") {
       window.history.replaceState(null, "", "/login");
     }
     if (ssoStatus !== "complete" || ssoStarted.current || !loginSso) return;
     ssoStarted.current = true;
+    ssoRequestPending.current = true;
     window.history.replaceState(null, "", "/login");
     void loginSso()
       .then((needsMfa) => {
         if (needsMfa) setMfaRequired(true);
         else navigate("/");
       })
-      .catch(() => {
+      .catch((reason) => {
         setSsoPending(false);
         setError(
-          "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.",
+          axios.isAxiosError<{ message?: string }>(reason)
+            ? (reason.response?.data?.message ??
+                "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.")
+            : "Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.",
         );
+      })
+      .finally(() => {
+        ssoRequestPending.current = false;
+        setSsoSubmitting(false);
       });
   }, [ssoStatus, loginSso, navigate]);
   const {
@@ -138,21 +150,51 @@ export function LoginPage() {
                 {error}
               </Alert>
             )}
+            {ssoStatus === "cancelled" && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Connexion SSO annulée. Vous pouvez réessayer ou utiliser votre
+                mot de passe.
+              </Alert>
+            )}
             {ssoPending ? (
               <Stack
                 component="form"
                 spacing={2}
                 onSubmit={async (event) => {
                   event.preventDefault();
+                  if (ssoRequestPending.current || !loginSso) return;
+                  ssoRequestPending.current = true;
+                  setSsoSubmitting(true);
+                  setError(null);
                   const input = event.currentTarget.elements.namedItem(
                     "ssoMfa",
                   ) as HTMLInputElement | null;
                   try {
-                    const needsMfa = await loginSso?.(input?.value);
+                    const needsMfa = await loginSso(input?.value);
                     if (!needsMfa) navigate("/");
                     else setError("Code MFA ou code de secours invalide.");
-                  } catch {
-                    setError("Code MFA invalide ou session SSO expirée.");
+                  } catch (reason) {
+                    if (
+                      axios.isAxiosError<{ code?: string; message?: string }>(
+                        reason,
+                      )
+                    ) {
+                      setError(
+                        reason.response?.data?.message ??
+                          "Code MFA invalide ou session SSO expirée.",
+                      );
+                      if (
+                        reason.response?.status === 401 &&
+                        reason.response.data?.code !== "INVALID_MFA_CODE"
+                      ) {
+                        setSsoPending(false);
+                        setMfaRequired(false);
+                      }
+                    } else
+                      setError("Le service est momentanément indisponible.");
+                  } finally {
+                    ssoRequestPending.current = false;
+                    setSsoSubmitting(false);
                   }
                 }}
               >
@@ -164,8 +206,13 @@ export function LoginPage() {
                       label="Code MFA ou code de secours"
                       autoComplete="one-time-code"
                       autoFocus
+                      disabled={ssoSubmitting}
                     />
-                    <Button type="submit" variant="contained">
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={ssoSubmitting}
+                    >
                       Valider le MFA
                     </Button>
                   </>
@@ -173,6 +220,7 @@ export function LoginPage() {
                   <Typography>Connexion SSO en cours…</Typography>
                 )}
                 <Button
+                  disabled={ssoSubmitting}
                   onClick={() => {
                     setSsoPending(false);
                     setMfaRequired(false);

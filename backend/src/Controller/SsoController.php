@@ -68,6 +68,9 @@ final readonly class SsoController
             }
             $flow = $this->flows->take($state);
             $code = $request->query->get('code', '');
+            if (null !== $flow && 'access_denied' === $request->query->get('error')) {
+                return $this->redirect('cancelled');
+            }
             if (null === $flow || $request->query->has('error') || !is_string($code) || '' === $code || strlen($code) > 8192) {
                 throw new \RuntimeException('Parcours SSO expiré.');
             }
@@ -103,9 +106,15 @@ final readonly class SsoController
             $origin = $request->headers->get('Origin');
             $parts = parse_url($this->appUrl);
             $expectedOrigin = $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
-            if ((null !== $origin && $origin !== $expectedOrigin)
-                || !$this->loginLimiter->create('sso-complete|'.($request->getClientIp() ?? 'unknown'))->consume()->isAccepted()) {
-                return new JsonResponse(['message' => 'Trop de tentatives ou origine non autorisée.'], 429);
+            if (null !== $origin && $origin !== $expectedOrigin) {
+                return new JsonResponse(['code' => 'SSO_ORIGIN_REJECTED', 'message' => 'Origine de connexion non autorisée.'], 403, ['Cache-Control' => 'no-store, private']);
+            }
+            $limit = $this->loginLimiter->create('sso-complete|'.($request->getClientIp() ?? 'unknown'))->consume();
+            if (!$limit->isAccepted()) {
+                return new JsonResponse(['code' => 'TOO_MANY_SSO_ATTEMPTS', 'message' => 'Trop de tentatives. Réessayez dans une minute.'], 429, [
+                    'Cache-Control' => 'no-store, private',
+                    'Retry-After' => (string) max(1, $limit->getRetryAfter()->getTimestamp() - time()),
+                ]);
             }
             $flow = $this->flows->take($ticket);
             if (null === $flow || !isset($flow['userId'])) {
@@ -120,8 +129,17 @@ final readonly class SsoController
             if ($user->isMfaEnabled()) {
                 $code = $request->toArray()['mfaCode'] ?? '';
                 if (!is_string($code) || strlen($code) > 128 || '' === trim($code) || !$this->auth->validateSecondFactor($user, trim($code))) {
+                    $missing = is_string($code) && '' === trim($code);
+                    if (!$missing) {
+                        $user->registerFailedLogin();
+                        $this->entityManager->flush();
+                        $flow['mfaAttempts'] = (int) ($flow['mfaAttempts'] ?? 0) + 1;
+                        if ($flow['mfaAttempts'] >= 5) {
+                            return $this->clearTicket(new JsonResponse(['code' => 'SSO_MFA_ATTEMPTS_EXCEEDED', 'message' => 'Trop de codes MFA incorrects. Recommencez la connexion SSO.'], 401));
+                        }
+                    }
                     $this->flows->put($ticket, $flow);
-                    $response = new JsonResponse(['mfaRequired' => true, 'message' => '' === $code ? 'Un code MFA est requis.' : 'Code MFA invalide.'], '' === $code ? 202 : 401);
+                    $response = new JsonResponse(['code' => $missing ? 'MFA_REQUIRED' : 'INVALID_MFA_CODE', 'mfaRequired' => true, 'message' => $missing ? 'Un code MFA est requis.' : 'Code MFA invalide.'], $missing ? 202 : 401);
                     $response->headers->set('Cache-Control', 'no-store, private');
 
                     return $response;
@@ -132,8 +150,14 @@ final readonly class SsoController
             $this->entityManager->flush();
             $response = $this->auth->createSessionResponse($user, $request);
         } catch (\Throwable) {
-            $response = new JsonResponse(['message' => 'Connexion SSO impossible. Vérifiez la configuration et l’association de votre compte.'], 401);
+            $response = new JsonResponse(['code' => 'SSO_SESSION_INVALID', 'message' => 'Session SSO expirée ou indisponible. Recommencez la connexion SSO.'], 401);
         }
+
+        return $this->clearTicket($response);
+    }
+
+    private function clearTicket(JsonResponse $response): JsonResponse
+    {
         $response->headers->clearCookie('riskpilot_sso_ticket', '/api/auth/sso', null, str_starts_with($this->appUrl, 'https://'), true, Cookie::SAMESITE_STRICT);
         $response->headers->set('Cache-Control', 'no-store, private');
 

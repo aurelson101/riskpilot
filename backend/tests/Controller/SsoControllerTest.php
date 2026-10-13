@@ -25,6 +25,11 @@ final class SsoControllerTest extends WebTestCase
         $client = self::createClient();
         $client->disableReboot();
         $container = self::getContainer();
+        foreach (['127.0.0.1', '192.0.2.1', '192.0.2.2', '192.0.2.3', '192.0.2.4', '192.0.2.5', '192.0.2.6', '192.0.2.90'] as $address) {
+            foreach (['sso-start|', 'sso-complete|'] as $prefix) {
+                $container->get('limiter.login')->create($prefix.$address)->reset();
+            }
+        }
         $manager = $container->get(EntityManagerInterface::class);
         $metadata = $manager->getMetadataFactory()->getAllMetadata();
         $tool = new SchemaTool($manager);
@@ -99,5 +104,45 @@ final class SsoControllerTest extends WebTestCase
         self::assertResponseRedirects('http://localhost:8080/login?sso=error');
         $client->request('GET', '/api/auth/sso/callback?state=forged&code=forged');
         self::assertResponseRedirects('http://localhost:8080/login?sso=error');
+
+        $client->request('GET', '/api/auth/sso/'.$id.'/start');
+        parse_str(parse_url($client->getResponse()->headers->get('Location'), PHP_URL_QUERY), $parameters);
+        $nonce = $parameters['nonce'];
+        $client->request('GET', '/api/auth/sso/callback?state='.$parameters['state'].'&code=test-code');
+        self::assertResponseRedirects('http://localhost:8080/login?sso=complete');
+        $client->setServerParameter('HTTP_ORIGIN', 'https://attacker.example.test');
+        $client->jsonRequest('POST', '/api/auth/sso/complete', []);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('SSO_ORIGIN_REJECTED', json_decode($client->getResponse()->getContent(), true)['code']);
+        self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control'));
+        $client->setServerParameter('HTTP_ORIGIN', 'http://localhost:8080');
+        for ($attempt = 1; $attempt <= 5; ++$attempt) {
+            // Changing IP must not reset the per-ticket failure budget.
+            $client->setServerParameter('REMOTE_ADDR', '192.0.2.'.$attempt);
+            $client->jsonRequest('POST', '/api/auth/sso/complete', ['mfaCode' => 'invalid']);
+            self::assertResponseStatusCodeSame(401);
+            $result = json_decode($client->getResponse()->getContent(), true);
+            self::assertSame($attempt < 5 ? 'INVALID_MFA_CODE' : 'SSO_MFA_ATTEMPTS_EXCEEDED', $result['code']);
+            self::assertArrayNotHasKey('token', $result);
+        }
+        $client->setServerParameter('REMOTE_ADDR', '192.0.2.6');
+        self::assertTrue($container->get(EntityManagerInterface::class)->find(User::class, $admin->getId())->isTemporarilyLocked());
+        $client->jsonRequest('POST', '/api/auth/sso/complete', ['mfaCode' => 'SSO-TEST-RECOVERY']);
+        self::assertResponseStatusCodeSame(401);
+        self::assertSame('SSO_SESSION_INVALID', json_decode($client->getResponse()->getContent(), true)['code']);
+
+        $client->request('GET', '/api/auth/sso/'.$id.'/start');
+        parse_str(parse_url($client->getResponse()->headers->get('Location'), PHP_URL_QUERY), $parameters);
+        $client->request('GET', '/api/auth/sso/callback?state='.$parameters['state'].'&error=access_denied');
+        self::assertResponseRedirects('http://localhost:8080/login?sso=cancelled');
+
+        $client->setServerParameter('REMOTE_ADDR', '192.0.2.90');
+        for ($attempt = 1; $attempt <= 6; ++$attempt) {
+            $client->jsonRequest('POST', '/api/auth/sso/complete', []);
+        }
+        self::assertResponseStatusCodeSame(429);
+        self::assertSame('TOO_MANY_SSO_ATTEMPTS', json_decode($client->getResponse()->getContent(), true)['code']);
+        self::assertGreaterThan(0, (int) $client->getResponse()->headers->get('Retry-After'));
+        self::assertStringContainsString('no-store', $client->getResponse()->headers->get('Cache-Control'));
     }
 }

@@ -2,6 +2,20 @@ export type Locale = "fr" | "en";
 
 const pairs: Array<[fr: string, en: string]> = [
   ["Connexion SSO", "SSO sign-in"],
+  [
+    "Connexion SSO annulée. Vous pouvez réessayer ou utiliser votre mot de passe.",
+    "SSO sign-in cancelled. You can retry or use your password.",
+  ],
+  [
+    "Session SSO expirée ou indisponible. Recommencez la connexion SSO.",
+    "SSO session expired or unavailable. Start SSO sign-in again.",
+  ],
+  [
+    "Trop de codes MFA incorrects. Recommencez la connexion SSO.",
+    "Too many incorrect MFA codes. Start SSO sign-in again.",
+  ],
+  ["Origine de connexion non autorisée.", "Sign-in origin not allowed."],
+  ["Code MFA invalide.", "Invalid MFA code."],
   ["Connexion SSO en cours…", "Signing in with SSO…"],
   ["Se connecter avec", "Sign in with"],
   ["Valider le MFA", "Verify MFA"],
