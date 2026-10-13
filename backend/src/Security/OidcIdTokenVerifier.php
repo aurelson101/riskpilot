@@ -41,7 +41,7 @@ final class OidcIdTokenVerifier
             || (isset($claims['azp']) && $clientId !== $claims['azp']) || (count($audience) > 1 && ($claims['azp'] ?? null) !== $clientId)
             || !is_string($claims['nonce'] ?? null) || !hash_equals($nonce, $claims['nonce'])
             || !is_string($claims['sub'] ?? null) || '' === $claims['sub'] || strlen($claims['sub']) > 255
-            || $claims['exp']->getTimestamp() <= $now || $claims['iat']->getTimestamp() > $now + 60
+            || $claims['exp']->getTimestamp() <= $now || $claims['iat']->getTimestamp() < $now - 600 || $claims['iat']->getTimestamp() > $now + 60
             || (isset($claims['nbf']) && (!$claims['nbf'] instanceof \DateTimeImmutable || $claims['nbf']->getTimestamp() > $now + 60))) {
             throw new \RuntimeException('Identité OIDC invalide ou expirée.');
         }

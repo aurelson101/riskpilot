@@ -19,16 +19,16 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 final class OidcClientTest extends TestCase
 {
     #[DataProvider('providers')]
-    public function testProviderIdentityWithPkceAndIssuer(string $provider, string $issuer, string $authMethod): void
+    public function testProviderIdentityWithPkceAndIssuer(string $provider, string $issuer, string $authMethod, ?array $advertisedAuthMethods = null): void
     {
         $tokens = new OidcTestTokens();
         $origin = 'https://'.parse_url($issuer, PHP_URL_HOST);
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use ($issuer, $origin, $authMethod, $tokens): MockResponse {
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use ($issuer, $origin, $authMethod, $advertisedAuthMethods, $tokens): MockResponse {
             if (str_contains($url, '.well-known')) {
                 return new MockResponse(json_encode([
                     'issuer' => $issuer, 'authorization_endpoint' => $origin.'/authorize', 'token_endpoint' => $origin.'/token', 'jwks_uri' => $origin.'/keys',
                     'response_types_supported' => ['code'], 'scopes_supported' => ['openid'], 'id_token_signing_alg_values_supported' => ['RS256'],
-                    'token_endpoint_auth_methods_supported' => [$authMethod],
+                    'token_endpoint_auth_methods_supported' => $advertisedAuthMethods ?? [$authMethod],
                 ], JSON_THROW_ON_ERROR));
             }
             if ('POST' === $method) {
@@ -69,5 +69,6 @@ final class OidcClientTest extends TestCase
         yield ['KEYCLOAK', 'https://sso.example.test/realms/riskpilot', 'client_secret_basic'];
         yield ['AUTHENTIK', 'https://sso.example.test/application/o/riskpilot/', 'client_secret_basic'];
         yield ['GENERIC', 'https://sso.example.test', 'client_secret_basic'];
+        yield 'basic preferred over post' => ['GENERIC', 'https://sso.example.test', 'client_secret_basic', ['client_secret_post', 'client_secret_basic']];
     }
 }

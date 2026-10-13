@@ -33,6 +33,7 @@ final class OidcIdTokenVerifierTest extends TestCase
         yield [['azp' => 'other-client'], []];
         yield [['nonce' => 'replayed-nonce'], []];
         yield [['exp' => time() - 60], []];
+        yield [['iat' => time() - 601], []];
         yield [['iat' => time() + 300], []];
         yield [['nbf' => time() + 300], []];
         yield [['sub' => ''], []];

@@ -42,11 +42,11 @@ final readonly class OidcClient
         $authMethods = $metadata['token_endpoint_auth_methods_supported'] ?? ['client_secret_basic'];
         $body = ['grant_type' => 'authorization_code', 'code' => $code, 'redirect_uri' => $redirectUri, 'code_verifier' => $flow['verifier']];
         $secret = $this->cipher->decrypt((string) $integration->getEncryptedCredential());
-        if (in_array('client_secret_post', $authMethods, true)) {
+        if (in_array('client_secret_basic', $authMethods, true)) {
+            $options = ['body' => $body, 'auth_basic' => [urlencode($configuration['clientId']), urlencode($secret)]];
+        } elseif (in_array('client_secret_post', $authMethods, true)) {
             $body += ['client_id' => $configuration['clientId'], 'client_secret' => $secret];
             $options = ['body' => $body];
-        } elseif (in_array('client_secret_basic', $authMethods, true)) {
-            $options = ['body' => $body, 'auth_basic' => [urlencode($configuration['clientId']), urlencode($secret)]];
         } else {
             throw new \RuntimeException('Authentification du client OIDC non prise en charge.');
         }
