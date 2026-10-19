@@ -7,9 +7,16 @@ export function csvDocument(rows: readonly (readonly unknown[])[]): string {
         row
           .map((value) => {
             let text = value == null ? "" : String(value);
+            let firstVisible = 0;
+            while (
+              firstVisible < text.length &&
+              (/\s/u.test(text[firstVisible]) ||
+                text.charCodeAt(firstVisible) <= 31)
+            )
+              ++firstVisible;
             if (
-              /^[\s\u0000-\u001f]*[=+@-]/.test(text) ||
-              /^[\t\r\n]/.test(text)
+              (firstVisible < text.length && "=+@-".includes(text[firstVisible])) ||
+              [9, 10, 13].includes(text.charCodeAt(0))
             )
               text = "'" + text;
             return '"' + text.replace(/"/g, '""') + '"';

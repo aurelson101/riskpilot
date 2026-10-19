@@ -159,7 +159,7 @@ export function GlobalCopilotDialog({
     content:
       "# Objet\n\nDéfinir le périmètre et les objectifs du SMSI.\n\n# Gouvernance\n\nRôles, responsabilités et instances de décision.\n\n# Gestion des risques\n\nMéthode, critères d’acceptation et plan de traitement.\n\n# Amélioration continue\n\nIndicateurs, audits, revues et actions correctives.",
   });
-  const [complianceAction, setComplianceAction] = useState({
+  const [complianceAction, setComplianceAction] = useState(() => ({
     title: "",
     description: "",
     complianceResultId: "",
@@ -167,7 +167,7 @@ export function GlobalCopilotDialog({
     priority: "MEDIUM",
     actionType: "ORGANIZATIONAL",
     dueDate: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
-  });
+  }));
   const canCreateRisk = user?.roles.some((role) =>
     ["ROLE_RISK_MANAGER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN"].includes(role),
   );

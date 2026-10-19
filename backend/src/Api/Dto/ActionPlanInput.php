@@ -40,20 +40,23 @@ final class ActionPlanInput
     public function validateCollections(ExecutionContextInterface $context): void
     {
         foreach (['frameworkIds', 'requirementIds', 'evidence', 'nonConformities'] as $field) {
-            if (!array_is_list($this->{$field})) {
+            $collection = self::untrusted($this->{$field});
+            if (!is_array($collection) || !array_is_list($collection)) {
                 $context->buildViolation('Une liste est attendue.')->atPath($field)->addViolation();
             }
         }
-        foreach ($this->nonConformities as $link) {
+        $nonConformities = self::untrusted($this->nonConformities);
+        foreach (is_array($nonConformities) ? $nonConformities : [] as $link) {
             if (!is_array($link) || count($link) !== 2 || !in_array($link['type'] ?? null, ['AUDIT_FINDING', 'COMPLIANCE_RESULT'], true) || !is_int($link['id'] ?? null) || $link['id'] < 1) {
                 $context->buildViolation('La non-conformité doit préciser un type et un identifiant positif.')->atPath('nonConformities')->addViolation();
                 break;
             }
         }
-        if (count($this->customFields) > 100) {
+        $customFields = self::untrusted($this->customFields);
+        if (!is_array($customFields) || count($customFields) > 100) {
             $context->buildViolation('Au maximum 100 champs personnalisés.')->atPath('customFields')->addViolation();
         }
-        foreach ($this->customFields as $key => $value) {
+        foreach (is_array($customFields) ? $customFields : [] as $key => $value) {
             if (!is_string($key) || '' === $key || strlen($key) > 120 || (!is_scalar($value) && null !== $value) || (is_string($value) && mb_strlen($value) > 10000) || (is_float($value) && !is_finite($value))) {
                 $context->buildViolation('Champ personnalisé invalide.')->atPath('customFields')->addViolation();
                 break;
@@ -67,5 +70,10 @@ final class ActionPlanInput
         if (null !== $this->completionDate && null !== $this->startDate && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $this->completionDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $this->startDate) && $this->completionDate < $this->startDate) {
             $context->buildViolation('La fin ne peut pas précéder le début.')->atPath('completionDate')->addViolation();
         }
+    }
+
+    private static function untrusted(mixed $value): mixed
+    {
+        return $value;
     }
 }

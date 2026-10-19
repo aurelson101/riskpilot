@@ -34,20 +34,50 @@ final readonly class IndicatorController
     public function create(Request $request): JsonResponse
     {
         $data = $request->toArray();
-        $code = trim((string) ($data['code'] ?? ''));
-        $name = trim((string) ($data['name'] ?? ''));
-        $kind = (string) ($data['kind'] ?? '');
-        $unit = trim((string) ($data['unit'] ?? ''));
-        $frequency = (string) ($data['frequency'] ?? '');
-        if ('' === $code || '' === $name || '' === $unit || !in_array($kind, Indicator::KINDS, true) || !in_array($frequency, Indicator::FREQUENCIES, true)) {
-            return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'Code, name, kind, unit and frequency are required.'], 422);
+        foreach (['code' => 80, 'name' => 180, 'kind' => 10, 'unit' => 40, 'frequency' => 20] as $field => $maxLength) {
+            if (!is_string($data[$field] ?? null) || '' === trim($data[$field]) || mb_strlen($data[$field]) > $maxLength) {
+                return $this->invalid('Code, name, kind, unit and frequency are required and must respect their size limits.');
+            }
+        }
+        foreach (['formula' => 10000, 'source' => 255] as $field => $maxLength) {
+            if (array_key_exists($field, $data) && null !== $data[$field] && (!is_string($data[$field]) || mb_strlen($data[$field]) > $maxLength)) {
+                return $this->invalid(sprintf('%s is invalid or too long.', $field));
+            }
+        }
+        if (array_key_exists('active', $data) && !is_bool($data['active'])) {
+            return $this->invalid('active must be a boolean.');
+        }
+        $targetValue = $data['target'] ?? null;
+        if (null !== $targetValue && !$this->validDecimal($targetValue)) {
+            return $this->invalid('target must be a finite decimal within the supported range.');
+        }
+        $thresholds = $data['thresholds'] ?? [];
+        if (!is_array($thresholds) || count($thresholds) > 100) {
+            return $this->invalid('thresholds must be an object containing at most 100 numeric values.');
+        }
+        $normalizedThresholds = [];
+        foreach ($thresholds as $key => $value) {
+            if (!is_string($key) || '' === trim($key) || mb_strlen($key) > 80 || (!is_int($value) && !is_float($value)) || (is_float($value) && !is_finite($value))) {
+                return $this->invalid('Each threshold must have a valid name and a finite numeric value.');
+            }
+            $normalizedThresholds[$key] = $value;
+        }
+        $code = trim($data['code']);
+        $name = trim($data['name']);
+        $kind = $data['kind'];
+        $unit = trim($data['unit']);
+        $frequency = $data['frequency'];
+        if (!in_array($kind, Indicator::KINDS, true) || !in_array($frequency, Indicator::FREQUENCIES, true)) {
+            return $this->invalid('kind or frequency is invalid.');
         }
         $organization = $this->currentUser->get()->getOrganization();
         if (null !== $this->indicators->findOneBy(['organization' => $organization, 'code' => $code])) {
             return new JsonResponse(['code' => 'DUPLICATE_CODE', 'message' => 'This indicator code already exists.'], 409);
         }
-        $target = isset($data['target']) && is_numeric($data['target']) ? number_format((float) $data['target'], 6, '.', '') : null;
-        $indicator = (new Indicator($organization, $code, $name, $kind, $unit, $frequency))->configure($data['formula'] ?? null, $data['source'] ?? null, $target, is_array($data['thresholds'] ?? null) ? $data['thresholds'] : [], (bool) ($data['active'] ?? true));
+        $target = null === $targetValue ? null : number_format((float) $targetValue, 6, '.', '');
+        $formula = is_string($data['formula'] ?? null) ? $data['formula'] : null;
+        $source = is_string($data['source'] ?? null) ? $data['source'] : null;
+        $indicator = (new Indicator($organization, $code, $name, $kind, $unit, $frequency))->configure($formula, $source, $target, $normalizedThresholds, $data['active'] ?? true);
         $this->entityManager->persist($indicator);
         $this->entityManager->flush();
 
@@ -75,24 +105,34 @@ final readonly class IndicatorController
             return $this->notFound();
         }
         $data = $request->toArray();
-        if (!isset($data['value']) || !is_numeric($data['value']) || empty($data['measuredAt']) || empty($data['idempotencyKey'])) {
-            return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'Value, measuredAt and idempotencyKey are required.'], 422);
+        if (!$this->validDecimal($data['value'] ?? null)
+            || !is_string($data['measuredAt'] ?? null) || '' === trim($data['measuredAt']) || mb_strlen($data['measuredAt']) > 64
+            || !is_string($data['idempotencyKey'] ?? null) || '' === trim($data['idempotencyKey']) || mb_strlen($data['idempotencyKey']) > 120) {
+            return $this->invalid('Value, measuredAt and idempotencyKey are invalid.');
         }
-        $key = trim((string) $data['idempotencyKey']);
+        foreach (['period' => 80, 'comment' => 10000, 'evidence' => 2048, 'source' => 255] as $field => $maxLength) {
+            if (array_key_exists($field, $data) && null !== $data[$field] && (!is_string($data[$field]) || mb_strlen($data[$field]) > $maxLength)) {
+                return $this->invalid(sprintf('%s is invalid or too long.', $field));
+            }
+        }
+        $key = trim($data['idempotencyKey']);
         $existing = $this->values->findOneBy(['indicator' => $indicator, 'idempotencyKey' => $key]);
         if (null !== $existing) {
             return new JsonResponse($this->serializeValue($existing));
         }
         try {
-            $measuredAt = new \DateTimeImmutable((string) $data['measuredAt']);
+            $measuredAt = new \DateTimeImmutable($data['measuredAt']);
         } catch (\Exception) {
             return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'measuredAt must be a valid ISO 8601 timestamp.'], 422);
         }
         $evidence = $data['evidence'] ?? null;
-        if (null !== $evidence && false === filter_var($evidence, FILTER_VALIDATE_URL)) {
-            return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => 'Evidence must be a valid URL.'], 422);
+        if (null !== $evidence && (!is_string($evidence) || false === filter_var($evidence, FILTER_VALIDATE_URL))) {
+            return $this->invalid('Evidence must be a valid URL.');
         }
-        $value = (new IndicatorValue($indicator, number_format((float) $data['value'], 6, '.', ''), $measuredAt, $key))->describe($data['period'] ?? null, $data['comment'] ?? null, $evidence, $data['source'] ?? null);
+        $period = is_string($data['period'] ?? null) ? $data['period'] : null;
+        $comment = is_string($data['comment'] ?? null) ? $data['comment'] : null;
+        $source = is_string($data['source'] ?? null) ? $data['source'] : null;
+        $value = (new IndicatorValue($indicator, number_format((float) $data['value'], 6, '.', ''), $measuredAt, $key))->describe($period, $comment, $evidence, $source);
         $this->entityManager->persist($value);
         $this->entityManager->flush();
 
@@ -149,6 +189,21 @@ final readonly class IndicatorController
     private function notFound(): JsonResponse
     {
         return new JsonResponse(['code' => 'NOT_FOUND', 'message' => 'Indicator not found.'], 404);
+    }
+
+    private function invalid(string $message): JsonResponse
+    {
+        return new JsonResponse(['code' => 'VALIDATION_ERROR', 'message' => $message], 422);
+    }
+
+    private function validDecimal(mixed $value): bool
+    {
+        if (null === $value || (!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
+            return false;
+        }
+        $number = (float) $value;
+
+        return is_finite($number) && abs($number) < 100000000000000;
     }
 
     /** @return array<string, mixed> */

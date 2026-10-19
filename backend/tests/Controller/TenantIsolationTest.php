@@ -334,6 +334,20 @@ final class TenantIsolationTest extends WebTestCase
         self::assertSame('no-referrer', $this->client->getResponse()->headers->get('Referrer-Policy'));
     }
 
+    public function testMalformedMfaFieldsAreRejectedWithoutServerErrors(): void
+    {
+        foreach ([
+            ['/api/me/mfa/setup', ['currentPassword' => []]],
+            ['/api/me/mfa/enable', ['currentPassword' => [], 'secret' => 'SECRET', 'code' => '123456']],
+            ['/api/me/mfa/enable', ['currentPassword' => 'StrongPassword123!', 'secret' => [], 'code' => '123456']],
+            ['/api/me/mfa/enable', ['currentPassword' => 'StrongPassword123!', 'secret' => 'SECRET', 'code' => []]],
+            ['/api/me/mfa/disable', ['currentPassword' => []]],
+        ] as [$uri, $payload]) {
+            $this->client->request('POST', $uri, server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($payload, JSON_THROW_ON_ERROR));
+            self::assertResponseStatusCodeSame(422);
+        }
+    }
+
     public function testGoogleOauthConfigurationNeverExposesSecretAndCreatesConsentUrl(): void
     {
         $this->client->request('PUT', '/api/settings/email', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode([

@@ -49,11 +49,14 @@ final readonly class MfaController
         if ($user->isMfaEnabled()) {
             return new JsonResponse(['code' => 'MFA_ALREADY_ENABLED', 'message' => 'Le MFA est déjà activé.'], JsonResponse::HTTP_CONFLICT);
         }
-        if (!$this->passwordHasher->isPasswordValid($user, (string) ($input['currentPassword'] ?? ''))) {
+        if (!is_string($input['currentPassword'] ?? null) || !is_string($input['secret'] ?? null) || !is_string($input['code'] ?? null)) {
+            return new JsonResponse(['code' => 'INVALID_MFA_REQUEST', 'message' => 'Les paramètres MFA sont invalides.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if (!$this->passwordHasher->isPasswordValid($user, $input['currentPassword'])) {
             return $this->invalidPassword();
         }
-        $secret = strtoupper(trim((string) ($input['secret'] ?? '')));
-        if (!$this->totp->verify($secret, (string) ($input['code'] ?? ''))) {
+        $secret = strtoupper(trim($input['secret']));
+        if (!$this->totp->verify($secret, $input['code'])) {
             return new JsonResponse(['code' => 'INVALID_MFA_CODE', 'message' => 'Le code à six chiffres est invalide.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
         }
         $codes = $this->totp->generateRecoveryCodes();
@@ -78,7 +81,9 @@ final readonly class MfaController
 
     private function validPassword(User $user, Request $request): bool
     {
-        return $this->passwordHasher->isPasswordValid($user, (string) ($request->toArray()['currentPassword'] ?? ''));
+        $password = $request->toArray()['currentPassword'] ?? null;
+
+        return is_string($password) && $this->passwordHasher->isPasswordValid($user, $password);
     }
 
     private function invalidPassword(): JsonResponse

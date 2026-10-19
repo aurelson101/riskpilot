@@ -20,7 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -78,6 +78,7 @@ type MaturityReport = {
   complete: boolean;
   updatedAt: string | null;
 };
+const emptyMaturityAssessments: Record<string, MaturityAssessment> = {};
 
 const domainLabels: Record<string, string> = {
   RISKS: "Risques",
@@ -120,8 +121,8 @@ export function AnnualReportsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [year, setYear] = useState(new Date().getFullYear());
-  const [maturityDraft, setMaturityDraft] = useState<
-    Record<string, MaturityAssessment>
+  const [maturityDrafts, setMaturityDrafts] = useState<
+    Record<number, Record<string, MaturityAssessment>>
   >({});
   const years = useQuery({
     queryKey: ["annual-report-years"],
@@ -143,6 +144,19 @@ export function AnnualReportsPage() {
     queryFn: async () =>
       (await api.get<MaturityReport>(`/annual-reports/${year}/maturity`)).data,
   });
+  const maturityDraft =
+    maturityDrafts[year] ??
+    maturity.data?.assessments ??
+    emptyMaturityAssessments;
+  const setMaturityDraft = (
+    update: (
+      current: Record<string, MaturityAssessment>,
+    ) => Record<string, MaturityAssessment>,
+  ) =>
+    setMaturityDrafts((current) => ({
+      ...current,
+      [year]: update(current[year] ?? maturity.data?.assessments ?? {}),
+    }));
   const generate = useMutation({
     mutationFn: async () =>
       (await api.post(`/annual-reports/${year}/generate`)).data,
@@ -184,10 +198,6 @@ export function AnnualReportsPage() {
       })),
     [maturityDraft],
   );
-
-  useEffect(() => {
-    if (maturity.data) setMaturityDraft(maturity.data.assessments);
-  }, [maturity.data]);
 
   const download = async (item: SavedReport, format: "json" | "pdf") => {
     const response = await api.get(

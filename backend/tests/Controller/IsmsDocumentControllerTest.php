@@ -221,6 +221,43 @@ final class IsmsDocumentControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(401);
     }
 
+    public function testMalformedDocumentFieldsAreRejectedWithoutServerErrors(): void
+    {
+        $this->authenticate($this->admin);
+        $valid = [
+            'title' => 'Politique de sécurité', 'category' => 'Politique', 'content' => 'Contenu contrôlé',
+            'status' => 'DRAFT', 'classification' => 'INTERNAL', 'visibility' => 'ORGANIZATION',
+            'versionComment' => 'Création', 'ownerId' => $this->admin->getId(),
+        ];
+        foreach (array_keys($valid) as $field) {
+            $this->json('POST', '/api/isms-documents', [...$valid, $field => []]);
+            self::assertResponseStatusCodeSame(422);
+        }
+
+        $this->json('POST', '/api/isms-documents', $valid);
+        self::assertResponseStatusCodeSame(201);
+        $documentId = $this->payload()['id'];
+
+        foreach (array_keys($valid) as $field) {
+            $this->json('PUT', '/api/isms-documents/'.$documentId, [...$valid, $field => []]);
+            self::assertResponseStatusCodeSame(422);
+        }
+
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/approve', ['nextReviewAt' => []]);
+        self::assertResponseStatusCodeSame(422);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => [], 'permission' => 'READ']);
+        self::assertResponseStatusCodeSame(422);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/acl', ['userId' => $this->viewer->getId(), 'permission' => []]);
+        self::assertResponseStatusCodeSame(422);
+
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/approve', ['nextReviewAt' => (new \DateTimeImmutable('+1 year'))->format('Y-m-d')]);
+        self::assertResponseIsSuccessful();
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/shares', ['password' => []]);
+        self::assertResponseStatusCodeSame(422);
+        $this->json('POST', '/api/isms-documents/'.$documentId.'/shares', ['expiresAt' => []]);
+        self::assertResponseStatusCodeSame(422);
+    }
+
     private function authenticate(User $user): void
     {
         $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$this->tokens->create($user));

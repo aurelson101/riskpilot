@@ -315,7 +315,16 @@ class PlatformIntegration
             $bindDn = trim((string) ($configuration['bindDn'] ?? ''));
             $userFilter = trim((string) ($configuration['userFilter'] ?? ''));
             $testUsername = trim((string) ($configuration['testUsername'] ?? 'riskpilot-validation'));
-            $groupMappings = (array) ($configuration['groupMappings'] ?? []);
+            $groupMappings = $configuration['groupMappings'] ?? null;
+            if (!is_array($groupMappings) || array_is_list($groupMappings)) {
+                throw new \InvalidArgumentException('Les groupes LDAPS doivent être associés explicitement à des rôles.');
+            }
+            foreach ($groupMappings as $groupDn => $role) {
+                if (!is_string($groupDn) || '' === trim($groupDn) || strlen($groupDn) > 1024
+                    || !is_string($role) || !in_array($role, [User::ROLE_VIEWER, User::ROLE_RISK_MANAGER, User::ROLE_ADMIN], true)) {
+                    throw new \InvalidArgumentException('Une association de groupe LDAPS est invalide.');
+                }
+            }
             $ca = trim((string) ($configuration['caCertificate'] ?? ''));
             $parts = parse_url($host);
             $validHost = is_array($parts)
@@ -328,7 +337,7 @@ class PlatformIntegration
                 && (!isset($parts['path']) || '' === $parts['path'])
                 && (!isset($parts['port']) || 636 === $parts['port']);
             $validUsername = '' !== $testUsername && 180 >= strlen($testUsername) && !preg_match('/[\x00-\x1F\x7F]/', $testUsername);
-            if (!$validHost || 636 !== $port || '' === $baseDn || '' === $bindDn || !str_contains($userFilter, '{username}') || !$validUsername || [] === $groupMappings || ('' !== $ca && (!str_contains($ca, 'BEGIN CERTIFICATE') || !str_contains($ca, 'END CERTIFICATE')))) {
+            if (!$validHost || 636 !== $port || '' === $baseDn || '' === $bindDn || !str_contains($userFilter, '{username}') || !$validUsername || ('' !== $ca && (!str_contains($ca, 'BEGIN CERTIFICATE') || !str_contains($ca, 'END CERTIFICATE')))) {
                 throw new \InvalidArgumentException('LDAPS exige ldaps://, port 636, base DN, bind DN, filtre utilisateur, groupes et une CA PEM valide si fournie.');
             }
         }

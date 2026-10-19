@@ -25,7 +25,7 @@ final readonly class AiSettingsController
         'GEMINI' => ['baseUrl' => 'https://generativelanguage.googleapis.com/v1beta', 'model' => 'gemini-2.5-flash'],
     ];
 
-    private const MISTRAL_MODELS = ['codestral-latest', 'mistral-large-latest'];
+    private const MISTRAL_MODELS = ['codestral-latest', 'mistral-large-latest', 'mistral-medium-latest', 'mistral-medium-3-5', 'mistral-small-latest', 'mistral-small-2603', 'ministral-14b-2512'];
 
     public function __construct(
         private Security $security,
@@ -49,27 +49,35 @@ final readonly class AiSettingsController
     {
         $user = $this->admin();
         $input = $request->toArray();
-        $provider = strtoupper(trim((string) ($input['provider'] ?? '')));
+        foreach (['provider', 'baseUrl', 'model', 'dataPolicy', 'systemPrompt', 'apiKey'] as $field) {
+            if (array_key_exists($field, $input) && !is_string($input[$field])) {
+                return $this->error('Les paramètres IA textuels sont invalides.');
+            }
+        }
+        if (array_key_exists('enabled', $input) && !is_bool($input['enabled'])) {
+            return $this->error('L’activation de l’IA doit être un booléen.');
+        }
+        $provider = strtoupper(trim($input['provider'] ?? ''));
         if (!in_array($provider, AiSettings::PROVIDERS, true)) {
             return $this->error('Le fournisseur IA sélectionné est invalide.');
         }
         $preset = self::PRESETS[$provider] ?? null;
-        $baseUrl = rtrim(trim((string) ($preset['baseUrl'] ?? $input['baseUrl'] ?? '')), '/');
-        $model = trim((string) ($input['model'] ?? $preset['model'] ?? ''));
-        $dataPolicy = strtoupper(trim((string) ($input['dataPolicy'] ?? 'MINIMAL')));
-        $systemPrompt = trim((string) ($input['systemPrompt'] ?? ''));
-        $enabled = (bool) ($input['enabled'] ?? false);
+        $baseUrl = rtrim(trim($preset['baseUrl'] ?? $input['baseUrl'] ?? ''), '/');
+        $model = trim($input['model'] ?? $preset['model'] ?? '');
+        $dataPolicy = strtoupper(trim($input['dataPolicy'] ?? 'MINIMAL'));
+        $systemPrompt = trim($input['systemPrompt'] ?? '');
+        $enabled = $input['enabled'] ?? false;
         if (!$this->validHttpsUrl($baseUrl) || '' === $model || mb_strlen($model) > 120 || !in_array($dataPolicy, AiSettings::DATA_POLICIES, true) || mb_strlen($systemPrompt) > 4000) {
             return $this->error('Vérifiez l’URL HTTPS, le modèle et la politique de données.');
         }
         if ('MISTRAL' === $provider && !in_array($model, self::MISTRAL_MODELS, true)) {
-            return $this->error('Sélectionnez un modèle Mistral pris en charge : Codestral ou Mistral Large.');
+            return $this->error('Sélectionnez un modèle Mistral pris en charge : '.implode(', ', self::MISTRAL_MODELS).'.');
         }
         if ($enabled && 'CUSTOM' === $provider) {
             return $this->error('Les endpoints personnalisés restent désactivés tant que leur sécurité réseau n’est pas validée.');
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new AiSettings($user->getOrganization());
-        $apiKey = trim((string) ($input['apiKey'] ?? ''));
+        $apiKey = trim($input['apiKey'] ?? '');
         if ('' !== $apiKey) {
             $settings->setEncryptedApiKey($this->cipher->encrypt($apiKey));
         }

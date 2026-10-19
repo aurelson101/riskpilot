@@ -56,6 +56,7 @@ services:
 
     app.oidc_http_client:
         class: Symfony\Component\HttpClient\NoPrivateNetworkHttpClient
+        autoconfigure: false
         arguments: ['@http_client']
 
     App\Application\OidcClient:

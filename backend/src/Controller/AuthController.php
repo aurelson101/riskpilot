@@ -47,13 +47,17 @@ final readonly class AuthController
     public function login(Request $request): JsonResponse
     {
         $input = $request->toArray();
-        $email = mb_strtolower(trim((string) ($input['email'] ?? '')));
+        if (!is_string($input['email'] ?? null) || !is_string($input['password'] ?? null)
+            || (array_key_exists('mfaCode', $input) && !is_string($input['mfaCode']))) {
+            return new JsonResponse(['code' => 'INVALID_CREDENTIALS', 'message' => 'Identifiants invalides.'], JsonResponse::HTTP_UNAUTHORIZED);
+        }
+        $email = mb_strtolower(trim($input['email']));
         $limiter = $this->loginLimiter->create(($request->getClientIp() ?? 'unknown').'|'.$email);
         $limit = $limiter->consume();
         if (!$limit->isAccepted()) {
             return new JsonResponse(['code' => 'TOO_MANY_LOGIN_ATTEMPTS', 'message' => 'Trop de tentatives. Réessayez dans une minute.'], JsonResponse::HTTP_TOO_MANY_REQUESTS);
         }
-        $password = (string) ($input['password'] ?? '');
+        $password = $input['password'];
         $user = $this->users->findOneBy(['email' => $email]);
         if ($user instanceof User && $user->isTemporarilyLocked()) {
             return new JsonResponse(['code' => 'ACCOUNT_TEMPORARILY_LOCKED', 'message' => 'Compte temporairement verrouillé après plusieurs échecs.'], JsonResponse::HTTP_TOO_MANY_REQUESTS);
@@ -68,7 +72,7 @@ final readonly class AuthController
         }
 
         if ($user->isMfaEnabled()) {
-            $code = trim((string) ($input['mfaCode'] ?? ''));
+            $code = trim($input['mfaCode'] ?? '');
             if ('' === $code) {
                 return new JsonResponse(['mfaRequired' => true, 'message' => 'Un code MFA est requis.'], JsonResponse::HTTP_ACCEPTED);
             }
@@ -118,7 +122,8 @@ final readonly class AuthController
     #[Route('/api/auth/forgot-password', methods: ['POST'])]
     public function forgotPassword(Request $request): JsonResponse
     {
-        $email = mb_strtolower(trim((string) ($request->toArray()['email'] ?? '')));
+        $input = $request->toArray();
+        $email = is_string($input['email'] ?? null) ? mb_strtolower(trim($input['email'])) : '';
         $limit = $this->loginLimiter->create('password-reset|'.($request->getClientIp() ?? 'unknown').'|'.$email)->consume();
         if (!$limit->isAccepted()) {
             return new JsonResponse(['code' => 'TOO_MANY_ATTEMPTS', 'message' => 'Trop de demandes. Réessayez plus tard.'], JsonResponse::HTTP_TOO_MANY_REQUESTS);
@@ -150,8 +155,11 @@ final readonly class AuthController
     public function resetPassword(Request $request): JsonResponse
     {
         $input = $request->toArray();
-        $rawToken = trim((string) ($input['token'] ?? ''));
-        $password = (string) ($input['password'] ?? '');
+        if (!is_string($input['token'] ?? null) || !is_string($input['password'] ?? null)) {
+            return new JsonResponse(['code' => 'INVALID_RESET_REQUEST', 'message' => 'La demande de réinitialisation est invalide.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        $rawToken = trim($input['token']);
+        $password = $input['password'];
         $reset = '' === $rawToken ? null : $this->passwordResetTokens->findByRawToken($rawToken);
         if (!$reset instanceof PasswordResetToken || !$reset->isValid()) {
             return new JsonResponse(['code' => 'INVALID_RESET_TOKEN', 'message' => 'Ce lien est invalide ou expiré.'], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);

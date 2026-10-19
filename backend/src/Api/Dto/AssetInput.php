@@ -25,8 +25,14 @@ final class AssetInput
     #[Assert\Callback]
     public function validateLists(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
-        if (!array_is_list($this->relatedAssetIds)) {
+        $relatedAssetIds = self::untrusted($this->relatedAssetIds);
+        if (!is_array($relatedAssetIds) || !array_is_list($relatedAssetIds)) {
             $context->buildViolation('Une liste est attendue.')->atPath('relatedAssetIds')->addViolation();
         }
+    }
+
+    private static function untrusted(mixed $value): mixed
+    {
+        return $value;
     }
 }

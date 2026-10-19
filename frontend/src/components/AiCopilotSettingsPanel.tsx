@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -44,8 +44,22 @@ const presets: Record<
 };
 
 const providerModels: Partial<Record<Provider, readonly string[]>> = {
-  MISTRAL: ["codestral-latest", "mistral-large-latest"],
-  OPENAI: ["gpt-5-mini"],
+  MISTRAL: [
+    "mistral-large-latest",
+    "mistral-medium-latest",
+    "mistral-medium-3-5",
+    "mistral-small-latest",
+    "mistral-small-2603",
+    "ministral-14b-2512",
+    "codestral-latest",
+  ],
+  OPENAI: [
+    "gpt-5-mini",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "gpt-6.1-sol",
+    "gpt-6-luna",
+  ],
   GEMINI: ["gemini-2.5-flash"],
 };
 
@@ -55,10 +69,9 @@ export function AiCopilotSettingsPanel() {
     queryKey: ["ai-settings"],
     queryFn: async () => (await api.get<AiSettings>("/settings/ai")).data,
   });
-  const [form, setForm] = useState<Form | null>(null);
-  useEffect(() => {
-    if (settings.data) setForm({ ...settings.data, apiKey: "" });
-  }, [settings.data]);
+  const [draft, setForm] = useState<Form | null>(null);
+  const form =
+    draft ?? (settings.data ? { ...settings.data, apiKey: "" } : null);
   const save = useMutation({
     mutationFn: async () =>
       (await api.put<AiSettings>("/settings/ai", form)).data,
@@ -71,12 +84,15 @@ export function AiCopilotSettingsPanel() {
     mutationFn: () => api.post<{ message: string }>("/settings/ai/test"),
   });
 
-  if (settings.isLoading || !form) return null;
   if (settings.isError) {
     return (
       <Alert severity="error">Impossible de charger la configuration IA.</Alert>
     );
   }
+  if (settings.isLoading || !form) return null;
+  const models = [
+    ...new Set([...(providerModels[form.provider] ?? []), form.model]),
+  ];
 
   return (
     <Card variant="outlined">
@@ -148,12 +164,13 @@ export function AiCopilotSettingsPanel() {
               fullWidth
               required
               label="Modèle"
+              helperText="Disponibilité selon votre compte et vos quotas fournisseur."
               value={form.model}
               onChange={(event) =>
                 setForm({ ...form, model: event.target.value })
               }
             >
-              {(providerModels[form.provider] ?? []).map((model) => (
+              {models.map((model) => (
                 <MenuItem key={model} value={model}>
                   {model}
                 </MenuItem>

@@ -7,30 +7,39 @@ namespace App\Application;
 final class XlsxExporter
 {
     /**
-     * @param list<list<int|float|string|null>> $rows
+     * @param array<array-key, mixed> $rows
      */
     public function render(string $title, string $organization, array $rows): string
     {
-        if ([] === $rows) {
+        if ([] === $rows || !array_is_list($rows) || !is_array($rows[0])) {
             throw new \InvalidArgumentException('An XLSX export requires a header row.');
         }
         $columns = count($rows[0]);
         if (0 === $columns || $columns > 16384 || count($rows) > 1048574) {
             throw new \InvalidArgumentException('Export exceeds worksheet dimensions.');
         }
+        $normalizedRows = [];
         foreach ($rows as $row) {
+            if (!is_array($row)) {
+                throw new \InvalidArgumentException('Export rows must be arrays.');
+            }
             if (!array_is_list($row) || count($row) !== $columns) {
                 throw new \InvalidArgumentException('Export rows must match the header columns.');
             }
+            $normalizedRow = [];
             foreach ($row as $value) {
-                if ((!is_scalar($value) && null !== $value) || is_bool($value) || (is_float($value) && !is_finite($value)) || (is_string($value) && !mb_check_encoding($value, 'UTF-8'))) {
+                if ((!is_int($value) && !is_float($value) && !is_string($value) && null !== $value)
+                    || (is_float($value) && !is_finite($value)) || (is_string($value) && !mb_check_encoding($value, 'UTF-8'))) {
                     throw new \InvalidArgumentException('Invalid export cell value.');
                 }
                 if (mb_strlen((string) $value) > 32767) {
                     throw new \InvalidArgumentException('Export cell exceeds the Excel text limit.');
                 }
+                $normalizedRow[] = $value;
             }
+            $normalizedRows[] = $normalizedRow;
         }
+        $rows = $normalizedRows;
 
         $path = tempnam(sys_get_temp_dir(), 'riskpilot-xlsx-');
         if (false === $path) {

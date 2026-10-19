@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../api/client";
 type Matrix = { permissions: string[]; roles: Record<string, string[]> };
 export function RbacSettingsPage() {
@@ -19,22 +19,26 @@ export function RbacSettingsPage() {
     queryKey: ["rbac-settings"],
     queryFn: async () => (await api.get<Matrix>("/settings/rbac")).data,
   });
-  const [roles, setRoles] = useState<Record<string, string[]>>({});
-  useEffect(() => {
-    if (query.data) setRoles(query.data.roles);
-  }, [query.data]);
+  const [roleOverrides, setRoleOverrides] = useState<Record<
+    string,
+    string[]
+  > | null>(null);
+  const roles = roleOverrides ?? query.data?.roles ?? {};
   const save = useMutation({
     mutationFn: () => api.put("/settings/rbac", { roles }),
     onSuccess: async () =>
       client.invalidateQueries({ queryKey: ["rbac-settings"] }),
   });
   const toggle = (role: string, permission: string) =>
-    setRoles((current) => ({
-      ...current,
-      [role]: current[role]?.includes(permission)
-        ? current[role].filter((item) => item !== permission)
-        : [...(current[role] ?? []), permission],
-    }));
+    setRoleOverrides((override) => {
+      const current = override ?? query.data?.roles ?? {};
+      return {
+        ...current,
+        [role]: current[role]?.includes(permission)
+          ? current[role].filter((item) => item !== permission)
+          : [...(current[role] ?? []), permission],
+      };
+    });
   if (query.isPending)
     return <CircularProgress aria-label="Chargement des permissions RBAC" />;
   if (query.isError)

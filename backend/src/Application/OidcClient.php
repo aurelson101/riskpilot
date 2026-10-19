@@ -71,7 +71,11 @@ final readonly class OidcClient
         return $claims['sub'];
     }
 
-    /** @param array<string, mixed> $options @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
     private function json(string $method, string $url, array $options = []): array
     {
         $response = $this->httpClient->request($method, $url, $options + [

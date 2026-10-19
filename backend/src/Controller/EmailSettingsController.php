@@ -186,7 +186,11 @@ final readonly class EmailSettingsController
     public function test(Request $request): JsonResponse
     {
         $user = $this->admin();
-        $recipient = mb_strtolower(trim((string) ($request->toArray()['recipient'] ?? '')));
+        $input = $request->toArray();
+        if (!is_string($input['recipient'] ?? null)) {
+            return $this->error('Le destinataire de test est invalide.');
+        }
+        $recipient = mb_strtolower(trim($input['recipient']));
         if (false === filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
             return $this->error('Le destinataire de test est invalide.');
         }

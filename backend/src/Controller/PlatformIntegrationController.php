@@ -55,17 +55,24 @@ use Symfony\Component\Routing\Attribute\Route;
     {
         $actor = $this->admin();
         $data = $request->toArray();
-        $type = strtoupper(trim((string) ($data['type'] ?? '')));
+        if (!is_string($data['type'] ?? null)
+            || (array_key_exists('provider', $data) && !is_string($data['provider']))
+            || !is_string($data['name'] ?? null)
+            || (array_key_exists('configuration', $data) && !is_array($data['configuration']))
+            || (array_key_exists('enabled', $data) && !is_bool($data['enabled']))) {
+            return $this->invalid('Type, fournisseur, nom, configuration ou état d’activation invalide.');
+        }
+        $type = strtoupper(trim($data['type']));
         if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR', 'OIDC'], true)) {
             return $this->invalid('Cette intégration n’est pas encore raccordée à un parcours complet et ne peut pas être activée.');
         }
         try {
-            $configuration = (array) ($data['configuration'] ?? []);
+            $configuration = $data['configuration'] ?? [];
             if ('API_KEY' === $type) {
                 $days = $this->validityDays($data['expiresInDays'] ?? 90);
                 $configuration['expiresAt'] = (new \DateTimeImmutable())->modify('+'.$days.' days')->format(DATE_ATOM);
             }
-            $item = new PlatformIntegration($actor->getOrganization(), $type, (string) ($data['provider'] ?? 'GENERIC'), (string) ($data['name'] ?? ''), $configuration, false);
+            $item = new PlatformIntegration($actor->getOrganization(), $type, $data['provider'] ?? 'GENERIC', $data['name'], $configuration, false);
             $plainSecret = null;
             if (in_array($item->getType(), ['API_KEY', 'WEBHOOK', 'CONNECTOR'], true)) {
                 $plainSecret = 'rp_'.strtolower($item->getType()).'_'.bin2hex(random_bytes(24));
@@ -75,16 +82,16 @@ use Symfony\Component\Routing\Attribute\Route;
                 if (!is_string($data['credential'] ?? null) || strlen($data['credential']) > 4096) {
                     throw new \InvalidArgumentException('Secret de connexion invalide.');
                 }
-                $password = (string) ($data['credential'] ?? '');
+                $password = $data['credential'];
                 if ('' === $password) {
                     throw new \InvalidArgumentException('Le secret de connexion est obligatoire.');
                 }
                 $item->setEncryptedCredential($this->cipher->encrypt($password));
             }
             if ('OIDC' === $type) {
-                $this->validateSso($item, $configuration, (bool) ($data['enabled'] ?? false));
+                $this->validateSso($item, $configuration, $data['enabled'] ?? false);
             }
-            $item->update($item->getName(), $configuration, (bool) ($data['enabled'] ?? false));
+            $item->update($item->getName(), $configuration, $data['enabled'] ?? false);
             $this->entityManager->persist($item);
             $this->entityManager->flush();
 
@@ -164,9 +171,15 @@ use Symfony\Component\Routing\Attribute\Route;
             return $this->notFound();
         }
         $data = $request->toArray();
+        if ((array_key_exists('configuration', $data) && !is_array($data['configuration']))
+            || (array_key_exists('enabled', $data) && !is_bool($data['enabled']))
+            || (array_key_exists('name', $data) && !is_string($data['name']))
+            || (array_key_exists('credential', $data) && !is_string($data['credential']))) {
+            return $this->invalid('Nom, configuration, état d’activation ou secret invalide.');
+        }
         try {
-            $configuration = (array) ($data['configuration'] ?? $item->getConfiguration());
-            $enabled = (bool) ($data['enabled'] ?? $item->isEnabled());
+            $configuration = $data['configuration'] ?? $item->getConfiguration();
+            $enabled = $data['enabled'] ?? $item->isEnabled();
             if ('OIDC' === $item->getType()) {
                 $previous = $item->getConfiguration();
                 if (($configuration['issuer'] ?? null) !== ($previous['issuer'] ?? null)
@@ -177,13 +190,13 @@ use Symfony\Component\Routing\Attribute\Route;
                 }
                 $this->validateSso($item, $configuration, $enabled);
                 if (isset($data['credential']) && '' !== $data['credential']) {
-                    if (!is_string($data['credential']) || strlen($data['credential']) > 4096) {
+                    if (strlen($data['credential']) > 4096) {
                         throw new \InvalidArgumentException('Secret client invalide.');
                     }
                     $item->setEncryptedCredential($this->cipher->encrypt($data['credential']));
                 }
             }
-            $item->update((string) ($data['name'] ?? $item->getName()), $configuration, $enabled);
+            $item->update($data['name'] ?? $item->getName(), $configuration, $enabled);
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
         }
@@ -211,8 +224,11 @@ use Symfony\Component\Routing\Attribute\Route;
     {
         $this->admin();
         $data = $request->toArray();
-        $users = (array) ($data['users'] ?? []);
-        $valid = array_values(array_filter($users, static fn ($user): bool => is_array($user) && false !== filter_var($user['email'] ?? null, FILTER_VALIDATE_EMAIL)));
+        if (!is_array($data['users'] ?? null) || !array_is_list($data['users'])) {
+            return $this->invalid('La prévisualisation SCIM attend une liste d’utilisateurs.');
+        }
+        $users = $data['users'];
+        $valid = array_values(array_filter($users, static fn ($user): bool => is_array($user) && is_string($user['email'] ?? null) && false !== filter_var($user['email'], FILTER_VALIDATE_EMAIL)));
 
         return new JsonResponse(['apiVersion' => '1', 'received' => count($users), 'valid' => count($valid), 'rejected' => count($users) - count($valid), 'dryRun' => true]);
     }
@@ -256,7 +272,7 @@ use Symfony\Component\Routing\Attribute\Route;
         if (!in_array($item->getProvider(), ['MICROSOFT_ENTRA', 'GOOGLE_WORKSPACE', 'KEYCLOAK', 'AUTHENTIK', 'GENERIC'], true)) {
             throw new \InvalidArgumentException('Fournisseur SSO non pris en charge.');
         }
-        foreach ($configuration['accountMappings'] ?? [] as $mapping) {
+        foreach ($configuration['accountMappings'] as $mapping) {
             $user = is_array($mapping) && is_int($mapping['userId'] ?? null) ? $this->users->find($mapping['userId']) : null;
             if (!$user instanceof User || $user->getOrganization() !== $item->getOrganization()) {
                 throw new \InvalidArgumentException('Les comptes SSO doivent appartenir à votre organisation.');

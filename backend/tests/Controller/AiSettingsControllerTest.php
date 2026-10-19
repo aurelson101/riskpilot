@@ -39,6 +39,17 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
+        $validInput = [
+            'provider' => 'OPENAI', 'baseUrl' => 'https://api.openai.com/v1', 'model' => 'gpt-5-mini',
+            'apiKey' => 'test-key', 'dataPolicy' => 'MINIMAL', 'systemPrompt' => '', 'enabled' => false,
+        ];
+        foreach (['provider', 'baseUrl', 'model', 'apiKey', 'dataPolicy', 'systemPrompt'] as $field) {
+            $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, $field => []]);
+            self::assertResponseStatusCodeSame(422);
+        }
+        $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'enabled' => 'false']);
+        self::assertResponseStatusCodeSame(422);
+
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'MISTRAL', 'model' => 'codestrale', 'apiKey' => 'test-key',
             'dataPolicy' => 'MINIMAL', 'enabled' => true,
@@ -46,6 +57,12 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
         $invalidModel = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertStringContainsString('modèle Mistral pris en charge', $invalidModel['message']);
+
+        foreach (['mistral-medium-latest', 'mistral-medium-3-5', 'mistral-small-latest', 'mistral-small-2603', 'ministral-14b-2512'] as $model) {
+            $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'provider' => 'MISTRAL', 'model' => $model]);
+            self::assertResponseIsSuccessful();
+            self::assertSame($model, json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['model']);
+        }
 
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'OPENAI', 'model' => 'gpt-5-mini', 'apiKey' => 'sk-test-not-a-real-key',

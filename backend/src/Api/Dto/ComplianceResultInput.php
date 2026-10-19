@@ -18,8 +18,14 @@ final class ComplianceResultInput
     #[Assert\Callback]
     public function validateLists(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
-        if (!array_is_list($this->evidence)) {
+        $evidence = self::untrusted($this->evidence);
+        if (!is_array($evidence) || !array_is_list($evidence)) {
             $context->buildViolation('Une liste est attendue.')->atPath('evidence')->addViolation();
         }
+    }
+
+    private static function untrusted(mixed $value): mixed
+    {
+        return $value;
     }
 }

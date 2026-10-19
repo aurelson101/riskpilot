@@ -18,7 +18,11 @@ final readonly class OidcFlowStore
         $this->redis()->setex($this->key($ticket), 300, json_encode($data, JSON_THROW_ON_ERROR));
     }
 
-    /** Atomically consume a flow or handoff ticket. @return array<string, mixed>|null */
+    /**
+     * Atomically consume a flow or handoff ticket.
+     *
+     * @return array<string, mixed>|null
+     */
     public function take(string $ticket): ?array
     {
         if (!preg_match('/^[a-f0-9]{64}$/D', $ticket)) {

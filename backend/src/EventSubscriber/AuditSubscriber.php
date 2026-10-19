@@ -7,6 +7,7 @@ namespace App\EventSubscriber;
 use App\Entity\AuditLog;
 use App\Entity\User;
 use App\Repository\AuditLogRepository;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -47,7 +48,9 @@ final readonly class AuditSubscriber
         $connection = $this->entityManager->getConnection();
         $connection->beginTransaction();
         try {
-            $connection->executeQuery('SELECT pg_advisory_xact_lock(:organization)', ['organization' => (int) $actor->getOrganization()->getId()]);
+            if ($connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
+                $connection->executeQuery('SELECT pg_advisory_xact_lock(:organization)', ['organization' => (int) $actor->getOrganization()->getId()]);
+            }
             $log->seal($this->logs->latestHashFor($actor), mb_substr($requestId, 0, 36));
             $this->entityManager->persist($log);
             $this->entityManager->flush();

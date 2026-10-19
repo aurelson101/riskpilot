@@ -86,6 +86,26 @@ final class GlobalCopilotControllerTest extends WebTestCase
         $manager->persist($settings);
         $manager->flush();
 
+        foreach ([
+            ['/api/copilot/grc-brief', ['objective' => [], 'consent' => true]],
+            ['/api/copilot/risk-draft', ['prompt' => [], 'consent' => true]],
+            ['/api/copilot/compliance-action-draft', ['prompt' => [], 'consent' => true]],
+        ] as [$path, $invalidPayload]) {
+            $client->jsonRequest('POST', $path, $invalidPayload);
+            self::assertResponseStatusCodeSame(422);
+        }
+
+        foreach ([
+            ['question' => [], 'consent' => true],
+            ['question' => 'Question valide', 'consent' => true, 'mode' => []],
+            ['question' => 'Question valide', 'consent' => true, 'currentPath' => []],
+            ['question' => 'Question valide', 'consent' => true, 'history' => 'invalid'],
+            ['question' => 'Question valide', 'consent' => true, 'history' => [['role' => 'user', 'content' => []]]],
+        ] as $payload) {
+            $client->jsonRequest('POST', '/api/copilot', $payload);
+            self::assertResponseStatusCodeSame(422);
+        }
+
         $client->jsonRequest('POST', '/api/copilot', ['question' => 'Aide-moi à créer un risque tiers', 'consent' => true]);
         self::assertResponseIsSuccessful();
         $answer = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

@@ -12,7 +12,11 @@ use Lcobucci\JWT\Token\Plain;
 
 final class OidcIdTokenVerifier
 {
-    /** @param array<string, mixed> $jwks @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $jwks
+     *
+     * @return array<string, mixed>
+     */
     public function verify(string $raw, array $jwks, string $issuer, string $clientId, string $nonce): array
     {
         if (strlen($raw) > 16384) {

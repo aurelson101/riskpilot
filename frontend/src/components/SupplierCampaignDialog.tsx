@@ -200,7 +200,12 @@ export function SupplierCampaignDialog({ thirdParty, onClose }: Props) {
     );
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!valid || !expiry || expiry.getTime() <= Date.now() || create.isPending)
+    if (
+      !valid ||
+      !expiry ||
+      expiry.getTime() <= new Date().getTime() ||
+      create.isPending
+    )
       return;
     create.mutate({
       reviewerId: Number(reviewerId),

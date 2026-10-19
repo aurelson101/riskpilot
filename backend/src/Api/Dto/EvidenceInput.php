@@ -25,9 +25,15 @@ final class EvidenceInput
     public function validateLists(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
         foreach (['requirementIds', 'controlIds', 'resultIds', 'actionIds'] as $field) {
-            if (!array_is_list($this->{$field})) {
+            $collection = self::untrusted($this->{$field});
+            if (!is_array($collection) || !array_is_list($collection)) {
                 $context->buildViolation('Une liste est attendue.')->atPath($field)->addViolation();
             }
         }
+    }
+
+    private static function untrusted(mixed $value): mixed
+    {
+        return $value;
     }
 }

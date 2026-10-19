@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
@@ -85,35 +85,33 @@ export function EmailSettingsPage() {
     queryKey: ["email-settings"],
     queryFn: async () => (await api.get<EmailSettings>("/settings/email")).data,
   });
-  const [form, setForm] = useState<Form>(empty);
+  const loadedForm: Form = query.data
+    ? { ...query.data, password: "", oauthClientSecret: "" }
+    : empty;
+  const [draft, setForm] = useState<Form | null>(null);
+  const form = draft ?? loadedForm;
   const [recipient, setRecipient] = useState("");
-  const [savedFingerprint, setSavedFingerprint] = useState("");
+  const [savedFingerprintOverride, setSavedFingerprint] = useState<
+    string | null
+  >(null);
+  const savedFingerprint = savedFingerprintOverride ?? fingerprint(loadedForm);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
-  } | null>(null);
+  } | null>(() => {
+    const result = new URLSearchParams(window.location.search).get("oauth");
+    if (!result) return null;
+    return {
+      type: result === "success" ? "success" : "error",
+      text:
+        result === "success"
+          ? "Compte OAuth connecté. Les notifications utiliseront désormais ce compte."
+          : "La connexion OAuth a échoué ou a expiré.",
+    };
+  });
   const [saving, setSaving] = useState(false);
   const oauth = oauthProviders.includes(form.provider);
-  useEffect(() => {
-    if (query.data) {
-      const loaded = { ...query.data, password: "", oauthClientSecret: "" };
-      setForm(loaded);
-      setSavedFingerprint(fingerprint(loaded));
-    }
-  }, [query.data]);
-  useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get("oauth");
-    if (result)
-      setMessage({
-        type: result === "success" ? "success" : "error",
-        text:
-          result === "success"
-            ? "Compte OAuth connecté. Les notifications utiliseront désormais ce compte."
-            : "La connexion OAuth a échoué ou a expiré.",
-      });
-  }, []);
-
   function selectProvider(provider: string) {
     const providerChanged = provider !== form.provider;
     const resetSecrets = providerChanged

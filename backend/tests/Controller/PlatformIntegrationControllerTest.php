@@ -50,6 +50,18 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($admin));
+        foreach ([
+            ['type' => [], 'name' => 'Invalid'],
+            ['type' => 'API_KEY', 'provider' => [], 'name' => 'Invalid'],
+            ['type' => 'API_KEY', 'name' => [], 'configuration' => ['scopes' => ['risks:read']]],
+            ['type' => 'API_KEY', 'name' => 'Invalid', 'configuration' => 'invalid'],
+            ['type' => 'API_KEY', 'name' => 'Invalid', 'configuration' => ['scopes' => ['risks:read']], 'enabled' => 'true'],
+            ['type' => 'API_KEY', 'name' => 'Invalid', 'configuration' => ['scopes' => ['risks:read']], 'expiresInDays' => []],
+            ['type' => 'DIRECTORY', 'name' => 'Invalid', 'credential' => [], 'configuration' => []],
+        ] as $invalidPayload) {
+            $client->jsonRequest('POST', '/api/v1/integrations', $invalidPayload);
+            self::assertResponseStatusCodeSame(422);
+        }
         foreach ([['provider' => ['GOOGLE_WORKSPACE'], 'issuer' => 'https://accounts.google.com'], ['provider' => 'GOOGLE_WORKSPACE', 'issuer' => ['invalid']], ['provider' => 'KEYCLOAK', 'issuer' => 'https://127.0.0.1/realms/riskpilot']] as $diagnostic) {
             $client->jsonRequest('POST', '/api/v1/integrations/oidc-discovery-test', $diagnostic);
             self::assertResponseStatusCodeSame(422);
@@ -84,6 +96,20 @@ final class PlatformIntegrationControllerTest extends WebTestCase
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'API_KEY', 'provider' => 'GENERIC', 'name' => 'Control reader', 'configuration' => ['scopes' => ['controls:read', 'actions:read']], 'enabled' => true]);
         self::assertResponseStatusCodeSame(201);
         $reader = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        foreach ([
+            ['name' => []],
+            ['configuration' => 'invalid'],
+            ['enabled' => 'false'],
+            ['credential' => []],
+        ] as $invalidPayload) {
+            $client->jsonRequest('PUT', '/api/v1/integrations/'.$reader['id'], $invalidPayload);
+            self::assertResponseStatusCodeSame(422);
+        }
+        $client->jsonRequest('POST', '/api/v1/integrations/scim/preview', ['users' => 'invalid']);
+        self::assertResponseStatusCodeSame(422);
+        $client->jsonRequest('POST', '/api/v1/integrations/scim/preview', ['users' => [['email' => []]]]);
+        self::assertResponseIsSuccessful();
+        self::assertSame(1, json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['rejected']);
         $client->setServerParameter('HTTP_X_RISKPILOT_KEY', $reader['secret']);
         $client->setServerParameter('HTTP_X_REQUEST_ID', 'integration-test-1234');
         $client->request('GET', '/api/v1/service/controls?limit=500&offset=-5&status=IMPLEMENTED');
@@ -208,6 +234,26 @@ final class PlatformIntegrationControllerTest extends WebTestCase
 
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'DIRECTORY', 'provider' => 'ACTIVE_DIRECTORY', 'name' => 'LDAP non chiffré', 'credential' => 'secret', 'configuration' => ['host' => 'ldap://ad.example.test', 'port' => 389]]);
         self::assertResponseStatusCodeSame(422);
+        foreach ([
+            ['CN=Risk Managers,DC=example,DC=test'],
+            ['CN=Risk Managers,DC=example,DC=test' => User::ROLE_SUPER_ADMIN],
+        ] as $groupMappings) {
+            $client->jsonRequest('POST', '/api/v1/integrations', [
+                'type' => 'DIRECTORY',
+                'provider' => 'ACTIVE_DIRECTORY',
+                'name' => 'Groupes invalides',
+                'credential' => 'secret',
+                'configuration' => [
+                    'host' => 'ldaps://ad.example.test',
+                    'port' => 636,
+                    'baseDn' => 'DC=example,DC=test',
+                    'bindDn' => 'CN=riskpilot,DC=example,DC=test',
+                    'userFilter' => '(sAMAccountName={username})',
+                    'groupMappings' => $groupMappings,
+                ],
+            ]);
+            self::assertResponseStatusCodeSame(422);
+        }
         $client->jsonRequest('POST', '/api/v1/integrations', ['type' => 'OIDC', 'provider' => 'MICROSOFT_ENTRA', 'name' => 'Entra incomplet', 'configuration' => ['issuer' => 'https://login.microsoftonline.com/organizations/v2.0'], 'enabled' => false]);
         self::assertResponseStatusCodeSame(422);
         $unsupported = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

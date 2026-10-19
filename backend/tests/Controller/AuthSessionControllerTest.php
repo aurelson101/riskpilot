@@ -117,6 +117,27 @@ final class AuthSessionControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    public function testMalformedAuthenticationFieldsAreRejectedWithoutServerErrors(): void
+    {
+        foreach ([
+            ['email' => [], 'password' => 'StrongPassword123!'],
+            ['email' => 'session@example.test', 'password' => []],
+            ['email' => 'session@example.test', 'password' => 'StrongPassword123!', 'mfaCode' => []],
+        ] as $credentials) {
+            $this->json('POST', '/api/auth/login', $credentials);
+            self::assertResponseStatusCodeSame(401);
+        }
+
+        $this->json('POST', '/api/auth/forgot-password', ['email' => []]);
+        self::assertResponseIsSuccessful();
+        self::assertSame(0, $this->entityManager->getRepository(PasswordResetToken::class)->count([]));
+
+        foreach ([['token' => [], 'password' => 'StrongPassword123!'], ['token' => 'token', 'password' => []]] as $payload) {
+            $this->json('POST', '/api/auth/reset-password', $payload);
+            self::assertResponseStatusCodeSame(422);
+        }
+    }
+
     /** @param array<string, mixed> $data */
     private function json(string $method, string $uri, array $data = []): void
     {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -26,10 +26,10 @@ export function ProfilePage() {
   const interfaceLocale = useInterfaceLocale();
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [locale, setLocale] = useState<"fr" | "en">("fr");
+  const [firstName, setFirstName] = useState(user?.firstName ?? "");
+  const [lastName, setLastName] = useState(user?.lastName ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [locale, setLocale] = useState<"fr" | "en">(user?.locale ?? "fr");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -64,25 +64,6 @@ export function ProfilePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
   });
 
-  useEffect(() => {
-    if (!user) return;
-    setFirstName(user.firstName);
-    setLastName(user.lastName);
-    setEmail(user.email);
-    setLocale(user.locale ?? "fr");
-  }, [user]);
-
-  useEffect(() => {
-    if (!mfaSetup) {
-      setMfaQrCode("");
-      return;
-    }
-    void QRCode.toDataURL(mfaSetup.provisioningUri, {
-      width: 220,
-      margin: 1,
-    }).then(setMfaQrCode);
-  }, [mfaSetup]);
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -115,7 +96,12 @@ export function ProfilePage() {
         secret: string;
         provisioningUri: string;
       }>("/me/mfa/setup", { currentPassword: mfaPassword });
+      const qrCode = await QRCode.toDataURL(data.provisioningUri, {
+        width: 220,
+        margin: 1,
+      });
       setMfaSetup(data);
+      setMfaQrCode(qrCode);
     } catch (caught) {
       setError(
         axios.isAxiosError<{ message?: string }>(caught)
@@ -138,6 +124,7 @@ export function ProfilePage() {
       );
       setRecoveryCodes(data.recoveryCodes);
       setMfaSetup(null);
+      setMfaQrCode("");
       setMfaCode("");
       setMfaPassword("");
       setMfaMessage("MFA activé. Conservez les codes de secours ci-dessous.");

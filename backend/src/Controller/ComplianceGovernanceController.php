@@ -233,8 +233,8 @@ final readonly class ComplianceGovernanceController
             || (isset($data['rationale']) && (!is_string($data['rationale']) || mb_strlen($data['rationale']) > 2000))) {
             return $this->invalid('Renseignez des identifiants positifs, un pourcentage entier, un booléen et une justification de 2000 caractères maximum.');
         }
-        $source = $this->requirements->find((int) ($data['sourceRequirementId'] ?? 0));
-        $target = $this->requirements->find((int) ($data['targetRequirementId'] ?? 0));
+        $source = $this->requirements->find($data['sourceRequirementId']);
+        $target = $this->requirements->find($data['targetRequirementId']);
         if (null === $source || null === $target) {
             return $this->invalid('Exigence source ou cible invalide.');
         }

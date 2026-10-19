@@ -35,18 +35,25 @@ final class RiskScenarioInput
     public function validateCollections(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
         foreach (['vulnerabilityIds', 'currentControlIds'] as $field) {
-            if (!array_is_list($this->{$field})) {
+            $collection = self::untrusted($this->{$field});
+            if (!is_array($collection) || !array_is_list($collection)) {
                 $context->buildViolation('Une liste est attendue.')->atPath($field)->addViolation();
             }
         }
-        if (count($this->methodData) > 100) {
+        $methodData = self::untrusted($this->methodData);
+        if (!is_array($methodData) || count($methodData) > 100) {
             $context->buildViolation('Au maximum 100 champs méthodologiques.')->atPath('methodData')->addViolation();
         }
-        foreach ($this->methodData as $key => $value) {
+        foreach (is_array($methodData) ? $methodData : [] as $key => $value) {
             if (!is_string($key) || '' === $key || strlen($key) > 120 || !is_string($value) || mb_strlen($value) > 5000) {
                 $context->buildViolation('Champ méthodologique invalide.')->atPath('methodData')->addViolation();
                 break;
             }
         }
+    }
+
+    private static function untrusted(mixed $value): mixed
+    {
+        return $value;
     }
 }

@@ -72,8 +72,9 @@ function PublicAssessmentForm({ token }: { token: string }) {
     const remaining = Date.parse(assessment.expiresAt) - Date.now();
     if (!Number.isFinite(remaining)) return;
     if (remaining <= 0) {
-      if (now < Date.parse(assessment.expiresAt)) setNow(Date.now());
-      return;
+      if (now >= Date.parse(assessment.expiresAt)) return;
+      const timer = window.setTimeout(() => setNow(Date.now()), 0);
+      return () => window.clearTimeout(timer);
     }
     const timer = window.setTimeout(
       () => setNow(Date.now()),

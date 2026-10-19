@@ -49,7 +49,7 @@ services:
           sleep 7200
           find /app/var/isms-documents -mindepth 1 -delete
           php bin/console doctrine:fixtures:load --no-interaction --purge-with-truncate
-          php -r '$$redis = new Redis(); $$redis->connect("redis", 6379); $$redis->flushDB();'
+          php -r '$$redis = new Redis(); $$redis->connect("redis", 6379); $$redis->multi(); $$redis->flushDB(); $$redis->xGroup("CREATE", "messages", "symfony", "0", true); $$redis->exec();'
           echo "Demo reset completed at $$(date -Iseconds)"
         done
     healthcheck:

@@ -63,11 +63,14 @@ final readonly class ComplianceCopilotController
             return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour le chatbot tant que leur sécurité réseau n’est pas validée.', 422);
         }
         $input = $request->toArray();
-        $question = trim((string) ($input['question'] ?? ''));
+        if (!is_string($input['question'] ?? null) || (array_key_exists('history', $input) && !is_array($input['history']))) {
+            return $this->error('INVALID_REQUEST', 'La question et l’historique doivent respecter le format attendu.', 422);
+        }
+        $question = trim($input['question']);
         if (true !== ($input['consent'] ?? false) || mb_strlen($question) < 3 || mb_strlen($question) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une question de 3 à 2 000 caractères sont obligatoires.', 422);
         }
-        $history = $this->history((array) ($input['history'] ?? []));
+        $history = $this->history($input['history'] ?? []);
         if (null === $history) {
             return $this->error('INVALID_HISTORY', 'L’historique est invalide ou dépasse huit messages.', 422);
         }
@@ -169,7 +172,10 @@ final readonly class ComplianceCopilotController
             if (!is_array($message) || !in_array($message['role'] ?? null, ['user', 'assistant'], true)) {
                 return null;
             }
-            $content = trim((string) ($message['content'] ?? ''));
+            if (!is_string($message['content'] ?? null)) {
+                return null;
+            }
+            $content = trim($message['content']);
             if ('' === $content || mb_strlen($content) > 2000) {
                 return null;
             }

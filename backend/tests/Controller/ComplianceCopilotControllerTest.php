@@ -68,6 +68,14 @@ final class ComplianceCopilotControllerTest extends WebTestCase
         $settings->setEncryptedApiKey(self::getContainer()->get(SecretCipher::class)->encrypt('provider-secret'));
         $manager->persist($settings);
         $manager->flush();
+        foreach ([
+            ['question' => [], 'consent' => true],
+            ['question' => 'Quelles preuves ?', 'history' => 'invalid', 'consent' => true],
+            ['question' => 'Quelles preuves ?', 'history' => [['role' => 'user', 'content' => []]], 'consent' => true],
+        ] as $invalidPayload) {
+            $client->jsonRequest('POST', '/api/compliance-results/'.$result->getId().'/copilot', $invalidPayload);
+            self::assertResponseStatusCodeSame(422);
+        }
         $client->jsonRequest('POST', '/api/compliance-results/'.$result->getId().'/copilot', ['question' => 'Quelles preuves ?', 'consent' => true]);
         self::assertResponseIsSuccessful();
         $answer = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

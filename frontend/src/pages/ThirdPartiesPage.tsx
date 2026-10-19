@@ -23,7 +23,7 @@ import {
   Typography,
 } from "@mui/material";
 import axios from "axios";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { downloadCsv } from "../api/csv";
 import { api } from "../api/client";
 import type { User } from "../api/types";
@@ -193,11 +193,8 @@ export function ThirdPartiesPage() {
   const [ownerFilter, setOwnerFilter] = useState("ALL");
   const [reviewFilter, setReviewFilter] = useState("ALL");
   const [sort, setSort] = useState("name");
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
-  useEffect(() => {
-    setPage(1);
-  }, [
+  const filterKey = JSON.stringify([
     search,
     criticalityFilter,
     statusFilter,
@@ -207,6 +204,10 @@ export function ThirdPartiesPage() {
     sort,
     pageSize,
   ]);
+  const [pagination, setPagination] = useState({ filterKey, page: 1 });
+  const page = pagination.filterKey === filterKey ? pagination.page : 1;
+  const setPage = (nextPage: number) =>
+    setPagination({ filterKey, page: nextPage });
   const [assessmentId, setAssessmentId] = useState<number | null>(null);
   const [campaignParty, setCampaignParty] = useState<ThirdParty | null>(null);
 

@@ -44,6 +44,8 @@ final class EmailSettingsValidationControllerTest extends WebTestCase
         self::assertStringNotContainsString('test-only-password', $client->getResponse()->getContent());
         $client->request('POST', '/api/settings/email/oauth/custom/authorize');
         self::assertResponseStatusCodeSame(422);
+        $client->jsonRequest('POST', '/api/settings/email/test', ['recipient' => []]);
+        self::assertResponseStatusCodeSame(422);
         $client->setServerParameter('HTTP_AUTHORIZATION', '');
         foreach (['', 'bad-state', str_repeat('a', 64).'\n'] as $state) {
             $client->request('GET', '/api/settings/email/oauth/microsoft_365/callback?state='.rawurlencode($state));

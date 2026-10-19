@@ -60,7 +60,7 @@ final readonly class DirectoryConnectionTester
                 'bind' => 'ok',
                 'search' => 'ok',
                 'matchedEntries' => (int) ($entries['count'] ?? 0),
-                'groupMappingCount' => count((array) ($configuration['groupMappings'] ?? [])),
+                'groupMappingCount' => count($configuration['groupMappings'] ?? []),
             ];
         } finally {
             if ($connection instanceof \LDAP\Connection) {
@@ -89,6 +89,7 @@ final readonly class DirectoryConnectionTester
         return $path;
     }
 
+    /** @param array<array-key, mixed>|false $entries */
     private static function requireUniqueEntry(array|false $entries): void
     {
         if (false === $entries || 1 !== ($entries['count'] ?? null)) {

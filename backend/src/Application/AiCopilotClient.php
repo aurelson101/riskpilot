@@ -158,20 +158,20 @@ PROMPT;
             }
         }
 
-        $title = trim((string) ($draft['title'] ?? ''));
-        $description = trim((string) ($draft['description'] ?? ''));
-        $rationale = trim((string) ($draft['rationale'] ?? ''));
+        $title = trim($draft['title']);
+        $description = trim($draft['description']);
+        $rationale = trim($draft['rationale']);
         $result = [
             'title' => mb_substr($title, 0, 180),
             'description' => mb_substr($description, 0, 5000),
-            'scopeId' => (int) ($draft['scopeId'] ?? 0),
-            'assetId' => (int) ($draft['assetId'] ?? 0),
-            'threatId' => (int) ($draft['threatId'] ?? 0),
-            'likelihood' => (int) ($draft['likelihood'] ?? 0),
-            'impact' => (int) ($draft['impact'] ?? 0),
+            'scopeId' => $draft['scopeId'],
+            'assetId' => $draft['assetId'],
+            'threatId' => $draft['threatId'],
+            'likelihood' => $draft['likelihood'],
+            'impact' => $draft['impact'],
             'rationale' => mb_substr($rationale, 0, 2000),
         ];
-        if ('' === $result['title'] || '' === $result['description'] || '' === $result['rationale'] || $result['likelihood'] < 1 || $result['likelihood'] > 5 || $result['impact'] < 1 || $result['impact'] > 5) {
+        if ('' === $result['title'] || '' === $result['description'] || '' === $result['rationale'] || $result['likelihood'] > 5 || $result['impact'] > 5) {
             throw new \RuntimeException('AI provider returned an incomplete risk draft.');
         }
 
@@ -219,18 +219,18 @@ PROMPT;
         }
 
         $result = [
-            'title' => mb_substr(trim((string) ($draft['title'] ?? '')), 0, 255),
-            'description' => mb_substr(trim((string) ($draft['description'] ?? '')), 0, 10000),
-            'complianceResultId' => (int) ($draft['complianceResultId'] ?? 0),
-            'priority' => (string) ($draft['priority'] ?? ''),
-            'actionType' => (string) ($draft['actionType'] ?? ''),
-            'dueInDays' => (int) ($draft['dueInDays'] ?? 0),
-            'rationale' => mb_substr(trim((string) ($draft['rationale'] ?? '')), 0, 2000),
+            'title' => mb_substr(trim($draft['title']), 0, 255),
+            'description' => mb_substr(trim($draft['description']), 0, 10000),
+            'complianceResultId' => $draft['complianceResultId'],
+            'priority' => $draft['priority'],
+            'actionType' => $draft['actionType'],
+            'dueInDays' => $draft['dueInDays'],
+            'rationale' => mb_substr(trim($draft['rationale']), 0, 2000),
         ];
         if ('' === $result['title'] || '' === $result['description'] || '' === $result['rationale']
             || !in_array($result['priority'], ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], true)
             || !in_array($result['actionType'], ['TECHNICAL', 'ORGANIZATIONAL', 'HUMAN', 'PHYSICAL', 'CONTRACTUAL', 'OTHER'], true)
-            || $result['dueInDays'] < 1 || $result['dueInDays'] > 365) {
+            || $result['dueInDays'] > 365) {
             throw new \RuntimeException('AI provider returned an incomplete compliance action draft.');
         }
 

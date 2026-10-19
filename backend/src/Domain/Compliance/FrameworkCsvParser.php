@@ -75,7 +75,7 @@ final class FrameworkCsvParser
                 if (isset($references[$key])) throw new \InvalidArgumentException('Enregistrement '.$line.' : référence en doublon.');
                 $references[$key] = count($rows);
                 $row = array_combine($headers, $values);
-                $row['status'] ??= 'ACTIVE';
+                if (count($headers) === count(self::HEADERS)) $row['status'] = 'ACTIVE';
                 if (!in_array($row['status'], Requirement::STATUSES, true)) throw new \InvalidArgumentException('Enregistrement '.$line.' : statut attendu ACTIVE, INACTIVE ou ARCHIVED.');
                 $rows[] = $row;
             }

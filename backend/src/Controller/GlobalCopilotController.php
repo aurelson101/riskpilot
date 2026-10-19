@@ -62,7 +62,10 @@ final readonly class GlobalCopilotController
             return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
         }
         $input = $request->toArray();
-        $objective = trim((string) ($input['objective'] ?? ''));
+        if (array_key_exists('objective', $input) && !is_string($input['objective'])) {
+            return $this->error('INVALID_REQUEST', 'L’objectif doit être un texte.', 422);
+        }
+        $objective = trim($input['objective'] ?? '');
         if (true !== ($input['consent'] ?? false) || mb_strlen($objective) > 1000) {
             return $this->error('INVALID_REQUEST', 'Le consentement est obligatoire et l’objectif est limité à 1 000 caractères.', 422);
         }
@@ -110,7 +113,10 @@ final readonly class GlobalCopilotController
             return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
         }
         $input = $request->toArray();
-        $prompt = trim((string) ($input['prompt'] ?? ''));
+        if (!is_string($input['prompt'] ?? null)) {
+            return $this->error('INVALID_REQUEST', 'La demande doit être un texte.', 422);
+        }
+        $prompt = trim($input['prompt']);
         if (true !== ($input['consent'] ?? false) || mb_strlen($prompt) < 10 || mb_strlen($prompt) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une demande de 10 à 2 000 caractères sont obligatoires.', 422);
         }
@@ -151,7 +157,10 @@ final readonly class GlobalCopilotController
             return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
         }
         $input = $request->toArray();
-        $prompt = trim((string) ($input['prompt'] ?? ''));
+        if (!is_string($input['prompt'] ?? null)) {
+            return $this->error('INVALID_REQUEST', 'La demande doit être un texte.', 422);
+        }
+        $prompt = trim($input['prompt']);
         if (true !== ($input['consent'] ?? false) || mb_strlen($prompt) < 10 || mb_strlen($prompt) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une demande de 10 à 2 000 caractères sont obligatoires.', 422);
         }
@@ -212,16 +221,22 @@ final readonly class GlobalCopilotController
             return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour le chatbot tant que leur sécurité réseau n’est pas validée.', 422);
         }
         $input = $request->toArray();
-        $question = trim((string) ($input['question'] ?? ''));
-        $mode = strtoupper(trim((string) ($input['mode'] ?? 'ASSIST')));
-        $currentPath = trim((string) ($input['currentPath'] ?? '/'));
+        if (!is_string($input['question'] ?? null)
+            || (array_key_exists('mode', $input) && !is_string($input['mode']))
+            || (array_key_exists('currentPath', $input) && !is_string($input['currentPath']))
+            || (array_key_exists('history', $input) && !is_array($input['history']))) {
+            return $this->error('INVALID_REQUEST', 'Les paramètres du copilote sont invalides.', 422);
+        }
+        $question = trim($input['question']);
+        $mode = strtoupper(trim($input['mode'] ?? 'ASSIST'));
+        $currentPath = trim($input['currentPath'] ?? '/');
         if (!in_array($mode, ['ASSIST', 'PILOT'], true) || mb_strlen($currentPath) > 200) {
             return $this->error('INVALID_MODE', 'Le mode ou le contexte de navigation est invalide.', 422);
         }
         if (true !== ($input['consent'] ?? false) || mb_strlen($question) < 3 || mb_strlen($question) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une question de 3 à 2 000 caractères sont obligatoires.', 422);
         }
-        $history = $this->history((array) ($input['history'] ?? []));
+        $history = $this->history($input['history'] ?? []);
         if (null === $history) {
             return $this->error('INVALID_HISTORY', 'L’historique est invalide ou dépasse huit messages.', 422);
         }
@@ -278,7 +293,10 @@ final readonly class GlobalCopilotController
             if (!is_array($message) || !in_array($message['role'] ?? null, ['user', 'assistant'], true)) {
                 return null;
             }
-            $content = trim((string) ($message['content'] ?? ''));
+            if (!is_string($message['content'] ?? null)) {
+                return null;
+            }
+            $content = trim($message['content']);
             if ('' === $content || mb_strlen($content) > 2000) {
                 return null;
             }

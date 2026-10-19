@@ -243,8 +243,11 @@ final readonly class IsmsDocumentController
             return $this->invalid('Un document vide ne peut pas être approuvé.');
         }
         $input = $this->input($request);
+        if (!is_string($input['nextReviewAt'] ?? null)) {
+            return $this->invalid('La date de prochaine revue est invalide.');
+        }
         try {
-            $nextReviewAt = new \DateTimeImmutable((string) ($input['nextReviewAt'] ?? ''));
+            $nextReviewAt = new \DateTimeImmutable($input['nextReviewAt']);
         } catch (\Exception) {
             return $this->invalid('La date de prochaine revue est invalide.');
         }
@@ -266,9 +269,12 @@ final readonly class IsmsDocumentController
             return $this->notFound();
         }
         $input = $this->input($request);
-        $userId = filter_var($input['userId'] ?? null, FILTER_VALIDATE_INT);
-        $permission = strtoupper((string) ($input['permission'] ?? ''));
-        $user = false === $userId ? null : $this->users->findOneBy(['id' => $userId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
+        if (!is_int($input['userId'] ?? null) || !is_string($input['permission'] ?? null)) {
+            return $this->invalid('Utilisateur ou permission ACL invalide.');
+        }
+        $userId = $input['userId'];
+        $permission = strtoupper($input['permission']);
+        $user = $this->users->findOneBy(['id' => $userId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
         if (!$user instanceof User || !in_array($permission, IsmsDocumentAcl::PERMISSIONS, true) || $user === $document->getOwner()) {
             return $this->invalid('Utilisateur ou permission ACL invalide.');
         }
@@ -314,11 +320,15 @@ final readonly class IsmsDocumentController
             return $this->invalid('Seul un document approuvé peut être partagé publiquement.');
         }
         $input = $this->input($request);
-        $password = trim((string) ($input['password'] ?? ''));
+        if ((array_key_exists('password', $input) && null !== $input['password'] && !is_string($input['password']))
+            || (array_key_exists('expiresAt', $input) && null !== $input['expiresAt'] && !is_string($input['expiresAt']))) {
+            return $this->invalid('Les paramètres du partage sont invalides.');
+        }
+        $password = is_string($input['password'] ?? null) ? trim($input['password']) : '';
         $expiresAt = null;
         if (isset($input['expiresAt']) && '' !== $input['expiresAt']) {
             try {
-                $expiresAt = new \DateTimeImmutable((string) $input['expiresAt']);
+                $expiresAt = new \DateTimeImmutable($input['expiresAt']);
             } catch (\Exception) {
                 return $this->invalid('Date d’expiration invalide.');
             } if ($expiresAt <= new \DateTimeImmutable()) {
@@ -379,18 +389,28 @@ final readonly class IsmsDocumentController
     /** @param array<string, mixed> $input */
     private function owner(array $input, User $actor): ?User
     {
-        $ownerId = filter_var($input['ownerId'] ?? $actor->getId(), FILTER_VALIDATE_INT);
+        $ownerId = $input['ownerId'] ?? $actor->getId();
 
-        return false === $ownerId ? null : $this->users->findOneBy(['id' => $ownerId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]);
+        return is_int($ownerId) ? $this->users->findOneBy(['id' => $ownerId, 'organization' => $actor->getOrganization(), 'status' => User::STATUS_ACTIVE]) : null;
     }
 
     /** @param array<string, mixed> $input */
     private function validate(array $input): ?JsonResponse
     {
-        if ('' === trim((string) ($input['title'] ?? '')) || mb_strlen((string) $input['title']) > 200 || '' === trim((string) ($input['category'] ?? '')) || mb_strlen((string) $input['category']) > 80) {
+        foreach (['title', 'category', 'content', 'status', 'classification', 'visibility', 'versionComment'] as $field) {
+            if (array_key_exists($field, $input) && !is_string($input[$field]) && !('versionComment' === $field && null === $input[$field])) {
+                return $this->invalid('Les champs du document doivent être des textes.');
+            }
+        }
+        if (array_key_exists('ownerId', $input) && !is_int($input['ownerId'])) {
+            return $this->invalid('Propriétaire invalide.');
+        }
+        if (!is_string($input['title'] ?? null) || !is_string($input['category'] ?? null)
+            || '' === trim($input['title']) || mb_strlen($input['title']) > 200
+            || '' === trim($input['category']) || mb_strlen($input['category']) > 80) {
             return $this->invalid('Un titre et une catégorie valides sont requis.');
         }
-        if (!in_array((string) ($input['status'] ?? 'DRAFT'), IsmsDocument::STATUSES, true) || !in_array((string) ($input['classification'] ?? 'INTERNAL'), IsmsDocument::CLASSIFICATIONS, true) || !in_array((string) ($input['visibility'] ?? IsmsDocument::VISIBILITY_ORGANIZATION), IsmsDocument::VISIBILITIES, true)) {
+        if (!in_array($input['status'] ?? 'DRAFT', IsmsDocument::STATUSES, true) || !in_array($input['classification'] ?? 'INTERNAL', IsmsDocument::CLASSIFICATIONS, true) || !in_array($input['visibility'] ?? IsmsDocument::VISIBILITY_ORGANIZATION, IsmsDocument::VISIBILITIES, true)) {
             return $this->invalid('Statut, classification ou visibilité invalide.');
         }
 
