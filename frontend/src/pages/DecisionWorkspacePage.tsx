@@ -848,7 +848,7 @@ export function DecisionWorkspacePage() {
                 <TextField
                   type="date"
                   label="Échéance"
-                  InputLabelProps={{ shrink: true }}
+                            slotProps={{ inputLabel: { shrink: true } }}
                   value={form.dueAt}
                   onChange={(event) =>
                     setForm({ ...form, dueAt: event.target.value })
@@ -1155,7 +1155,7 @@ export function DecisionWorkspacePage() {
                             fullWidth
                             type="date"
                             label="Du"
-                            InputLabelProps={{ shrink: true }}
+                            slotProps={{ inputLabel: { shrink: true } }}
                             value={String(period.from ?? "")}
                             onChange={(event) =>
                               updatePeriod("from", event.target.value)
@@ -1165,7 +1165,7 @@ export function DecisionWorkspacePage() {
                             fullWidth
                             type="date"
                             label="Au"
-                            InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                             value={String(period.until ?? "")}
                             onChange={(event) =>
                               updatePeriod("until", event.target.value)

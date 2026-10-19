@@ -575,7 +575,7 @@ export function OperationsPage() {
               <TextField
                 type="datetime-local"
                 label="Échéance"
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 value={form.dueAt}
                 onChange={(e) => setForm({ ...form, dueAt: e.target.value })}
               />
@@ -658,7 +658,7 @@ export function OperationsPage() {
                   <TextField
                     type="date"
                     label="Début"
-                    InputLabelProps={{ shrink: true }}
+                    slotProps={{ inputLabel: { shrink: true } }}
                     value={String(parsedDetails.startDate ?? "")}
                     onChange={(e) => setDetail("startDate", e.target.value)}
                   />
@@ -926,7 +926,7 @@ export function OperationsPage() {
               required
               type="datetime-local"
               label="Fin de délégation"
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
               value={delegation.until}
               onChange={(e) =>
                 setDelegation({ ...delegation, until: e.target.value })

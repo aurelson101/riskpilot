@@ -1151,7 +1151,7 @@ export function GlobalCopilotDialog({
                   fullWidth
                   type="date"
                   label="Échéance"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={complianceAction.dueDate}
                   onChange={(event) =>
                     setComplianceAction({

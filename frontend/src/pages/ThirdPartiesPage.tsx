@@ -1190,7 +1190,7 @@ export function ThirdPartiesPage() {
                   disabled={save.isPending}
                   label={english ? "Contract end" : "Fin du contrat"}
                   value={form.contractEndsAt}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
@@ -1204,7 +1204,7 @@ export function ThirdPartiesPage() {
                   disabled={save.isPending}
                   label={english ? "Next assessment" : "Prochaine évaluation"}
                   value={form.nextAssessmentAt}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,

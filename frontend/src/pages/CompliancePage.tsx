@@ -991,7 +991,7 @@ export function CompliancePage() {
                 required
                 type="date"
                 label="Date"
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 value={assessmentForm.assessmentDate}
                 onChange={(e) =>
                   setAssessmentForm({

@@ -236,7 +236,7 @@ export function IndicatorsPage() {
               required
               type="datetime-local"
               label="Measured at"
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
               value={measurement.measuredAt}
               onChange={(e) =>
                 setMeasurement({ ...measurement, measuredAt: e.target.value })

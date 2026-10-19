@@ -594,7 +594,7 @@ export function RisksPage() {
               <TextField
                 type="date"
                 label="Date de révision"
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 value={form.reviewDate ?? ""}
                 onChange={(e) => update("reviewDate", e.target.value || null)}
               />

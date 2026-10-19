@@ -1269,7 +1269,7 @@ export function ActionsPage() {
                   fullWidth
                   type="date"
                   label="Début"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.startDate ?? ""}
                   onChange={(e) => update("startDate", e.target.value || null)}
                 />
@@ -1278,7 +1278,7 @@ export function ActionsPage() {
                   fullWidth
                   type="date"
                   label="Échéance"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.dueDate}
                   onChange={(e) => update("dueDate", e.target.value)}
                 />
@@ -1286,7 +1286,7 @@ export function ActionsPage() {
                   fullWidth
                   type="date"
                   label="Achèvement"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.completionDate ?? ""}
                   onChange={(e) =>
                     update("completionDate", e.target.value || null)

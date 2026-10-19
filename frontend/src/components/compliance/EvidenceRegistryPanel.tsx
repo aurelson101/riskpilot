@@ -228,7 +228,7 @@ export function EvidenceRegistryPanel() {
                   fullWidth
                   type="date"
                   label="Valide à partir du"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.validFrom}
                   onChange={(e) =>
                     setForm({ ...form, validFrom: e.target.value })
@@ -238,7 +238,7 @@ export function EvidenceRegistryPanel() {
                   fullWidth
                   type="date"
                   label="Expire le"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.expiresAt}
                   onChange={(e) =>
                     setForm({ ...form, expiresAt: e.target.value })

@@ -601,7 +601,7 @@ function GovernanceDialog({
                   required
                   type="date"
                   label="Expiration"
-                  InputLabelProps={{ shrink: true }}
+                    slotProps={{ inputLabel: { shrink: true } }}
                   onChange={(event) => update("expiresAt", event.target.value)}
                 />
                 <TextField
@@ -632,7 +632,7 @@ function GovernanceDialog({
                     fullWidth
                     type="date"
                     label="Début"
-                    InputLabelProps={{ shrink: true }}
+                    slotProps={{ inputLabel: { shrink: true } }}
                     onChange={(event) => update("startsAt", event.target.value)}
                   />
                   <TextField
@@ -640,7 +640,7 @@ function GovernanceDialog({
                     fullWidth
                     type="date"
                     label="Échéance"
-                    InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                     onChange={(event) => update("dueAt", event.target.value)}
                   />
                 </Stack>
