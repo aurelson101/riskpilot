@@ -42,10 +42,34 @@ final class EmailSettingsValidationControllerTest extends WebTestCase
         $body = json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertTrue($body['passwordConfigured']);
         self::assertStringNotContainsString('test-only-password', $client->getResponse()->getContent());
+        foreach ([['host' => 'other.example.test'], ['username' => 'other-user'], ['provider' => 'SMTP2GO']] as $override) {
+            $client->jsonRequest('PUT', '/api/settings/email', [...$valid, 'password' => '', ...$override]);
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/settings/email');
+            $unchanged = json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame('smtp.example.test', $unchanged['host']);
+            self::assertSame('mail-user', $unchanged['username']);
+            self::assertSame('CUSTOM', $unchanged['provider']);
+        }
+        $client->jsonRequest('PUT', '/api/settings/email', [...$valid, 'password' => '', 'senderName' => 'Support']);
+        self::assertResponseIsSuccessful();
+        $client->jsonRequest('PUT', '/api/settings/email', [...$valid, 'host' => 'other.example.test', 'password' => 'replacement-test-only']);
+        self::assertResponseIsSuccessful();
         $client->request('POST', '/api/settings/email/oauth/custom/authorize');
         self::assertResponseStatusCodeSame(422);
         $client->jsonRequest('POST', '/api/settings/email/test', ['recipient' => []]);
         self::assertResponseStatusCodeSame(422);
+        $oauth = ['provider' => 'GOOGLE_WORKSPACE', 'oauthClientId' => 'google-client-test', 'oauthClientSecret' => 'oauth-test-only', 'senderName' => 'RiskPilot'];
+        $client->jsonRequest('PUT', '/api/settings/email', $oauth);
+        self::assertResponseIsSuccessful();
+        $client->jsonRequest('PUT', '/api/settings/email', [...$oauth, 'oauthClientSecret' => '', 'senderName' => 'Support']);
+        self::assertResponseIsSuccessful();
+        $client->jsonRequest('PUT', '/api/settings/email', [...$oauth, 'oauthClientId' => 'another-client', 'oauthClientSecret' => '']);
+        self::assertResponseStatusCodeSame(422);
+        $client->request('GET', '/api/settings/email');
+        self::assertSame('google-client-test', json_decode($client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR)['oauthClientId']);
+        $client->jsonRequest('PUT', '/api/settings/email', [...$oauth, 'oauthClientId' => 'another-client', 'oauthClientSecret' => 'replacement-test-only']);
+        self::assertResponseIsSuccessful();
         $client->setServerParameter('HTTP_AUTHORIZATION', '');
         foreach (['', 'bad-state', str_repeat('a', 64).'\n'] as $state) {
             $client->request('GET', '/api/settings/email/oauth/microsoft_365/callback?state='.rawurlencode($state));

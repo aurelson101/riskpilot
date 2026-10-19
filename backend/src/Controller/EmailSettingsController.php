@@ -102,6 +102,10 @@ final readonly class EmailSettingsController
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new EmailSettings($user->getOrganization());
         $password = (string) ($input['password'] ?? '');
+        if ('' === $password && null !== $settings->getEncryptedPassword()
+            && ($provider !== $settings->getProvider() || 0 !== strcasecmp($host, $settings->getHost()) || $username !== $settings->getUsername())) {
+            return $this->error('Saisissez le mot de passe SMTP pour changer de fournisseur, de serveur ou de compte.');
+        }
         if ('' !== $password) {
             $settings->setEncryptedPassword($this->cipher->encrypt($password));
         }
@@ -265,7 +269,7 @@ final readonly class EmailSettingsController
         $senderName = trim((string) ($input['senderName'] ?? 'RiskPilot'));
         $replyTo = isset($input['replyTo']) ? trim((string) $input['replyTo']) : null;
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new EmailSettings($user->getOrganization());
-        $clientSecretRequired = null === $settings->getEncryptedOauthClientSecret() || $settings->getProvider() !== $provider;
+        $clientSecretRequired = null === $settings->getEncryptedOauthClientSecret() || $settings->getProvider() !== $provider || $settings->getOauthClientId() !== $clientId;
         if ('' === $clientId || mb_strlen($clientId) > 255 || ('' === $clientSecret && $clientSecretRequired) || '' === $senderName || mb_strlen($senderName) > 180 || preg_match('/[\r\n]/', $senderName) || ('MICROSOFT_365' === $provider && !$this->validOauthTenant($tenant)) || (null !== $replyTo && '' !== $replyTo && false === filter_var($replyTo, FILTER_VALIDATE_EMAIL))) {
             return $this->error('Renseignez un client ID, un secret OAuth et une adresse de réponse valide.');
         }

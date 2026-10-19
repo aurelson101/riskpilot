@@ -40,8 +40,8 @@ final readonly class AuditSubscriber
             }
         }
         $segments = array_values(array_filter(explode('/', $request->getPathInfo())));
-        $changesAfter = $request->attributes->get('_audit_after', []);
-        $changesBefore = $request->attributes->get('_audit_before', []);
+        $changesAfter = $this->redact($request->attributes->get('_audit_after', []));
+        $changesBefore = $this->redact($request->attributes->get('_audit_before', []));
         $newValues = [] === $changesAfter ? $payload : ['request' => $payload, 'entities' => $changesAfter];
         $log = new AuditLog($actor->getOrganization(), $actor, $request->getMethod(), $segments[1] ?? 'api', isset($segments[2]) && ctype_digit($segments[2]) ? $segments[2] : null, $newValues, $request->getClientIp(), $request->headers->get('User-Agent'), [] === $changesBefore ? null : $changesBefore);
         $requestId = (string) ($request->headers->get('X-Request-ID') ?: bin2hex(random_bytes(16)));
@@ -70,8 +70,8 @@ final readonly class AuditSubscriber
     private function redact(array $values): array
     {
         foreach ($values as $key => $value) {
-            $normalizedKey = mb_strtolower((string) $key);
-            if (str_contains($normalizedKey, 'password') || str_contains($normalizedKey, 'token') || str_contains($normalizedKey, 'secret') || str_contains($normalizedKey, 'authorization') || str_contains($normalizedKey, 'credential') || in_array($normalizedKey, ['question', 'history', 'prompt', 'objective'], true)) {
+            $normalizedKey = str_replace(['_', '-'], '', mb_strtolower((string) $key));
+            if (str_contains($normalizedKey, 'apikey') || str_contains($normalizedKey, 'password') || str_contains($normalizedKey, 'token') || str_contains($normalizedKey, 'secret') || str_contains($normalizedKey, 'authorization') || str_contains($normalizedKey, 'credential') || in_array($normalizedKey, ['question', 'history', 'prompt', 'objective'], true)) {
                 $values[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $values[$key] = $this->redact($value);

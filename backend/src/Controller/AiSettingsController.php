@@ -57,6 +57,10 @@ final readonly class AiSettingsController
         if (array_key_exists('enabled', $input) && !is_bool($input['enabled'])) {
             return $this->error('L’activation de l’IA doit être un booléen.');
         }
+        $apiKey = trim($input['apiKey'] ?? '');
+        if (strlen($input['apiKey'] ?? '') > 4096 || preg_match('/[\x00-\x20\x7F]/', $apiKey)) {
+            return $this->error('La clé API est invalide : au maximum 4 096 caractères, sans espace ni caractère de contrôle.');
+        }
         $provider = strtoupper(trim($input['provider'] ?? ''));
         if (!in_array($provider, AiSettings::PROVIDERS, true)) {
             return $this->error('Le fournisseur IA sélectionné est invalide.');
@@ -77,7 +81,6 @@ final readonly class AiSettingsController
             return $this->error('Les endpoints personnalisés restent désactivés tant que leur sécurité réseau n’est pas validée.');
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new AiSettings($user->getOrganization());
-        $apiKey = trim($input['apiKey'] ?? '');
         if ('' === $apiKey && null !== $settings->getEncryptedApiKey()
             && ($provider !== $settings->getProvider() || $baseUrl !== $settings->getBaseUrl())) {
             return $this->error('Saisissez une nouvelle clé API pour changer de fournisseur ou d’URL.');

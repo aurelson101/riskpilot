@@ -143,7 +143,10 @@ export function AiCopilotSettingsPanel() {
           )}
           {save.isError && (
             <Alert severity="error">
-              Échec de l’enregistrement de la configuration IA.
+              {axios.isAxiosError<{ message?: string }>(save.error)
+                ? (save.error.response?.data?.message ??
+                  "Échec de l’enregistrement de la configuration IA.")
+                : "Échec de l’enregistrement de la configuration IA."}
             </Alert>
           )}
           {test.isSuccess && configurationSaved && (

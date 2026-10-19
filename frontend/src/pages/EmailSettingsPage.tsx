@@ -111,6 +111,7 @@ export function EmailSettingsPage() {
     };
   });
   const [saving, setSaving] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(false);
   const oauth = oauthProviders.includes(form.provider);
   function selectProvider(provider: string) {
     const providerChanged = provider !== form.provider;
@@ -165,6 +166,7 @@ export function EmailSettingsPage() {
   }
   async function connectOauth() {
     setMessage(null);
+    setOauthBusy(true);
     try {
       const { data } = await api.post<{ authorizationUrl: string }>(
         `/settings/email/oauth/${form.provider.toLowerCase()}/authorize`,
@@ -177,20 +179,45 @@ export function EmailSettingsPage() {
           ? (caught.response?.data?.message ?? "Connexion OAuth impossible.")
           : "Connexion OAuth impossible.",
       });
+    } finally {
+      setOauthBusy(false);
     }
   }
   async function disconnectOauth() {
-    await api.post("/settings/email/oauth/disconnect");
-    const disconnected = {
-      ...form,
-      oauthConnected: false,
-      connectedEmail: null,
-      enabled: false,
-      ready: false,
-    };
-    setForm(disconnected);
-    setSavedFingerprint(fingerprint(disconnected));
-    setMessage({ type: "success", text: "Compte OAuth déconnecté." });
+    setMessage(null);
+    setOauthBusy(true);
+    try {
+      await api.post("/settings/email/oauth/disconnect");
+      const disconnected = {
+        ...form,
+        oauthConnected: false,
+        connectedEmail: null,
+        enabled: false,
+        ready: false,
+      };
+      setForm((current) =>
+        current
+          ? {
+              ...current,
+              oauthConnected: false,
+              connectedEmail: null,
+              enabled: false,
+              ready: false,
+            }
+          : disconnected,
+      );
+      setSavedFingerprint(fingerprint(disconnected));
+      setMessage({ type: "success", text: "Compte OAuth déconnecté." });
+    } catch (caught) {
+      setMessage({
+        type: "error",
+        text: axios.isAxiosError<{ message?: string }>(caught)
+          ? (caught.response?.data?.message ?? "Déconnexion OAuth impossible.")
+          : "Déconnexion OAuth impossible.",
+      });
+    } finally {
+      setOauthBusy(false);
+    }
   }
   async function sendTest() {
     setMessage(null);
@@ -335,7 +362,11 @@ export function EmailSettingsPage() {
                     Compte connecté : {form.connectedEmail}
                   </Alert>
                 )}
-                <Button type="submit" variant="contained" disabled={saving}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={saving || testing || oauthBusy}
+                >
                   {saving
                     ? "Enregistrement…"
                     : "Enregistrer les identifiants OAuth"}
@@ -344,6 +375,9 @@ export function EmailSettingsPage() {
                   variant="outlined"
                   onClick={connectOauth}
                   disabled={
+                    saving ||
+                    testing ||
+                    oauthBusy ||
                     dirty ||
                     (!form.oauthClientSecretConfigured &&
                       !form.oauthClientSecret)
@@ -354,7 +388,11 @@ export function EmailSettingsPage() {
                     : "Connecter le compte"}
                 </Button>
                 {form.oauthConnected && (
-                  <Button color="error" onClick={disconnectOauth}>
+                  <Button
+                    color="error"
+                    onClick={disconnectOauth}
+                    disabled={dirty || saving || testing || oauthBusy}
+                  >
                     Déconnecter
                   </Button>
                 )}
@@ -460,7 +498,11 @@ export function EmailSettingsPage() {
                     tester la messagerie.
                   </Alert>
                 )}
-                <Button type="submit" variant="contained" disabled={saving}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={saving || testing || oauthBusy}
+                >
                   {saving ? "Enregistrement…" : "Enregistrer"}
                 </Button>
               </>
@@ -486,6 +528,8 @@ export function EmailSettingsPage() {
               variant="outlined"
               onClick={sendTest}
               disabled={
+                saving ||
+                oauthBusy ||
                 dirty ||
                 testing ||
                 !recipient ||

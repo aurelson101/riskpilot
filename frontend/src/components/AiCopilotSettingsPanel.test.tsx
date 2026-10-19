@@ -39,6 +39,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("shows the validation message returned when an AI key is rejected", async () => {
+  showPanel();
+  vi.spyOn(api, "put").mockRejectedValue({
+    isAxiosError: true,
+    response: { data: { message: "La clé API est invalide." } },
+  });
+  const save = await screen.findByRole("button", {
+    name: "Enregistrer la configuration IA",
+  });
+  fireEvent.submit(save.closest("form")!);
+  expect(
+    await screen.findByText("La clé API est invalide."),
+  ).toBeInTheDocument();
+});
+
 it("clears a previous generation result after saving a different model", async () => {
   showPanel();
   vi.spyOn(api, "post").mockResolvedValue({ data: { message: "OK" } });

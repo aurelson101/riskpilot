@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\AiSettings;
+use App\Entity\AuditLog;
 use App\Entity\Organization;
 use App\Entity\User;
 use App\Security\SecretCipher;
@@ -49,6 +50,10 @@ final class AiSettingsControllerTest extends WebTestCase
         }
         $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'enabled' => 'false']);
         self::assertResponseStatusCodeSame(422);
+        foreach ([str_repeat('x', 4097), 'key with spaces', "key\nwith-newline", "key\0with-null"] as $apiKey) {
+            $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'apiKey' => $apiKey]);
+            self::assertResponseStatusCodeSame(422);
+        }
 
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'MISTRAL', 'model' => 'codestrale', 'apiKey' => 'test-key',
@@ -67,12 +72,24 @@ final class AiSettingsControllerTest extends WebTestCase
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'OPENAI', 'model' => 'gpt-5-mini', 'apiKey' => 'sk-test-not-a-real-key',
             'dataPolicy' => 'MINIMAL', 'systemPrompt' => 'Toujours citer les sources.', 'enabled' => true,
+            'metadata' => ['api_key' => 'nested-test-only', 'X-API-Key' => 'header-test-only'],
         ]);
         self::assertResponseIsSuccessful();
         $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertTrue($payload['apiKeyConfigured']);
         self::assertArrayNotHasKey('apiKey', $payload);
         self::assertSame('https://api.openai.com/v1', $payload['baseUrl']);
+        $audit = $manager->getRepository(AuditLog::class)->findOneBy([], ['id' => 'DESC']);
+        self::assertInstanceOf(AuditLog::class, $audit);
+        $values = $audit->getNewValues();
+        $requestValues = $values['request'] ?? $values;
+        self::assertSame('[REDACTED]', $requestValues['apiKey']);
+        self::assertSame('[REDACTED]', $requestValues['metadata']['api_key']);
+        self::assertSame('[REDACTED]', $requestValues['metadata']['X-API-Key']);
+        self::assertSame('OPENAI', $requestValues['provider']);
+        self::assertContains('[REDACTED]', array_column($values['entities'], 'encryptedApiKey'));
+        self::assertContains('[REDACTED]', array_column($audit->getOldValues(), 'encryptedApiKey'));
+        self::assertTrue($audit->verify($audit->getPreviousHash()));
 
         foreach ([
             ['MISTRAL', 'mistral-small-latest', true],
