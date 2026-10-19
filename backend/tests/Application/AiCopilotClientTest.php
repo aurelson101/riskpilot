@@ -93,6 +93,37 @@ final class AiCopilotClientTest extends TestCase
         self::assertSame('Help', $body['contents'][0]['parts'][0]['text']);
     }
 
+    public function testGeminiJoinsAnswerPartsAndExcludesThoughtSummaries(): void
+    {
+        $http = new MockHttpClient(new MockResponse(json_encode(['candidates' => [['content' => ['parts' => [
+            ['thought' => true, 'text' => 'Internal summary'],
+            ['text' => 'Conseil'],
+            ['functionCall' => ['name' => 'ignored']],
+            ['thought' => 'true', 'text' => 'Invalid thought flag'],
+            ['thought' => false, 'text' => ' final [1].'],
+        ]]]]], JSON_THROW_ON_ERROR)));
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new AiSettings(new Organization('Tenant'));
+        $settings->configure('GEMINI', 'https://generativelanguage.googleapis.com/v1beta', 'gemini-test', 'MINIMAL', '', true);
+        $settings->setEncryptedApiKey($cipher->encrypt('test-only-key'));
+
+        self::assertSame('Conseil final [1].', (new AiCopilotClient($http, $cipher))->ask($settings, [], 'Help', [], 'fr', 'test-user'));
+    }
+
+    public function testGeminiRejectsAResponseContainingOnlyThoughtSummaries(): void
+    {
+        $http = new MockHttpClient(new MockResponse(json_encode(['candidates' => [['content' => ['parts' => [
+            ['thought' => true, 'text' => 'Internal summary'],
+        ]]]]], JSON_THROW_ON_ERROR)));
+        $cipher = new SecretCipher('test-secret-at-least-32-characters-long');
+        $settings = new AiSettings(new Organization('Tenant'));
+        $settings->configure('GEMINI', 'https://generativelanguage.googleapis.com/v1beta', 'gemini-test', 'MINIMAL', '', true);
+        $settings->setEncryptedApiKey($cipher->encrypt('test-only-key'));
+
+        $this->expectException(\RuntimeException::class);
+        (new AiCopilotClient($http, $cipher))->ask($settings, [], 'Help', [], 'fr', 'test-user');
+    }
+
     public function testRiskDraftParsesAConstrainedStructuredResponse(): void
     {
         $http = new MockHttpClient(new MockResponse(json_encode(['output_text' => <<<'JSON'

@@ -378,9 +378,18 @@ PROMPT;
             throw new \RuntimeException('AI provider rejected the request.');
         }
         $payload = $response->toArray(false);
-        $answer = $payload['candidates'][0]['content']['parts'][0]['text'] ?? null;
+        $parts = $payload['candidates'][0]['content']['parts'] ?? null;
+        if (!is_array($parts) || !array_is_list($parts)) {
+            throw new \RuntimeException('AI provider returned an invalid answer.');
+        }
+        $texts = [];
+        foreach ($parts as $part) {
+            if (is_array($part) && false === ($part['thought'] ?? false) && is_string($part['text'] ?? null)) {
+                $texts[] = $part['text'];
+            }
+        }
 
-        return $this->validatedAnswer($answer);
+        return $this->validatedAnswer(implode('', $texts));
     }
 
     /** @param array<string, scalar|array<array-key, scalar|null>|null> $context */

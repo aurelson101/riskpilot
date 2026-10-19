@@ -75,21 +75,43 @@ it("requires saving a changed model before testing generation", async () => {
   expect(testButton).toBeDisabled();
 });
 
-it("discards an entered key when switching providers and disables activation", async () => {
+it.each(["Mistral AI", "Google Gemini", "Endpoint compatible"])(
+  "discards an entered key when switching to %s and disables activation",
+  async (provider) => {
+    showPanel();
+    const key = await screen.findByLabelText(
+      "Nouvelle clé API (vide pour conserver)",
+    );
+    fireEvent.change(key, { target: { value: "test-only-key" } });
+    fireEvent.mouseDown(
+      screen.getByRole("combobox", { name: "Fournisseur IA" }),
+    );
+    fireEvent.click(await screen.findByRole("option", { name: provider }));
+    expect(screen.getByLabelText("Clé API", { exact: false })).toHaveValue("");
+    expect(
+      screen.getByRole("switch", {
+        name: "Activer le copilote IA pour l’organisation",
+      }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("button", { name: "Tester la génération IA" }),
+    ).toBeDisabled();
+  },
+);
+
+it("offers Gemini models while keeping generation disabled for unsaved changes", async () => {
   showPanel();
-  const key = await screen.findByLabelText(
-    "Nouvelle clé API (vide pour conserver)",
-  );
-  fireEvent.change(key, { target: { value: "test-only-key" } });
+  await screen.findByRole("button", { name: "Tester la génération IA" });
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Fournisseur IA" }));
-  fireEvent.click(await screen.findByRole("option", { name: "Mistral AI" }));
-  expect(screen.getByLabelText("Clé API", { exact: false })).toHaveValue("");
+  fireEvent.click(await screen.findByRole("option", { name: "Google Gemini" }));
+  expect(screen.getByRole("combobox", { name: "Modèle" })).toHaveTextContent(
+    "gemini-3.5-flash-lite",
+  );
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Modèle" }));
   expect(
-    screen.getByRole("switch", {
-      name: "Activer le copilote IA pour l’organisation",
-    }),
-  ).not.toBeChecked();
+    await screen.findByRole("option", { name: "gemini-3.8-flash" }),
+  ).toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Tester la génération IA" }),
-  ).toBeDisabled();
+    screen.getByRole("option", { name: "gemini-2.5-pro" }),
+  ).toBeInTheDocument();
 });

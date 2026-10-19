@@ -74,9 +74,15 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertArrayNotHasKey('apiKey', $payload);
         self::assertSame('https://api.openai.com/v1', $payload['baseUrl']);
 
-        foreach ([true, false] as $enabled) {
+        foreach ([
+            ['MISTRAL', 'mistral-small-latest', true],
+            ['MISTRAL', 'mistral-small-latest', false],
+            ['GEMINI', 'gemini-3.5-flash-lite', true],
+            ['GEMINI', 'gemini-3.5-flash-lite', false],
+            ['CUSTOM', 'local-model', false],
+        ] as [$provider, $model, $enabled]) {
             $client->jsonRequest('PUT', '/api/settings/ai', [
-                'provider' => 'MISTRAL', 'model' => 'mistral-small-latest',
+                'provider' => $provider, 'model' => $model, 'baseUrl' => 'https://custom.example.test/v1',
                 'dataPolicy' => 'MINIMAL', 'enabled' => $enabled,
             ]);
             self::assertResponseStatusCodeSame(422);
@@ -101,6 +107,17 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertInstanceOf(AiSettings::class, $stored);
         self::assertNotSame('sk-test-not-a-real-key', $stored->getEncryptedApiKey());
         self::assertSame('sk-test-not-a-real-key', self::getContainer()->get(SecretCipher::class)->decrypt((string) $stored->getEncryptedApiKey()));
+
+        $client->jsonRequest('PUT', '/api/settings/ai', ['provider' => 'GEMINI', 'apiKey' => 'gemini-test-only', 'enabled' => true]);
+        self::assertResponseIsSuccessful();
+        $gemini = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('gemini-3.5-flash-lite', $gemini['model']);
+        self::assertTrue($gemini['apiKeyConfigured']);
+        self::assertArrayNotHasKey('apiKey', $gemini);
+        foreach (['OPENAI', 'MISTRAL'] as $provider) {
+            $client->jsonRequest('PUT', '/api/settings/ai', ['provider' => $provider, 'enabled' => true]);
+            self::assertResponseStatusCodeSame(422);
+        }
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($otherAdmin));
         $client->request('GET', '/api/settings/ai');

@@ -22,7 +22,7 @@ final readonly class AiSettingsController
     private const PRESETS = [
         'MISTRAL' => ['baseUrl' => 'https://api.mistral.ai/v1', 'model' => 'mistral-large-latest'],
         'OPENAI' => ['baseUrl' => 'https://api.openai.com/v1', 'model' => 'gpt-5-mini'],
-        'GEMINI' => ['baseUrl' => 'https://generativelanguage.googleapis.com/v1beta', 'model' => 'gemini-2.5-flash'],
+        'GEMINI' => ['baseUrl' => 'https://generativelanguage.googleapis.com/v1beta', 'model' => 'gemini-3.5-flash-lite'],
     ];
 
     private const MISTRAL_MODELS = ['codestral-latest', 'mistral-large-latest', 'mistral-medium-latest', 'mistral-medium-3-5', 'mistral-small-latest', 'mistral-small-2603', 'ministral-14b-2512'];

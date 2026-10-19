@@ -39,7 +39,7 @@ const presets: Record<
   OPENAI: { baseUrl: "https://api.openai.com/v1", model: "gpt-5-mini" },
   GEMINI: {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash-lite",
   },
 };
 
@@ -60,7 +60,14 @@ const providerModels: Partial<Record<Provider, readonly string[]>> = {
     "gpt-6.1-sol",
     "gpt-6-luna",
   ],
-  GEMINI: ["gemini-2.5-flash"],
+  GEMINI: [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+  ],
 };
 
 export function AiCopilotSettingsPanel() {
