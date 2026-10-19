@@ -74,6 +74,21 @@ final class AiSettingsControllerTest extends WebTestCase
         self::assertArrayNotHasKey('apiKey', $payload);
         self::assertSame('https://api.openai.com/v1', $payload['baseUrl']);
 
+        foreach ([true, false] as $enabled) {
+            $client->jsonRequest('PUT', '/api/settings/ai', [
+                'provider' => 'MISTRAL', 'model' => 'mistral-small-latest',
+                'dataPolicy' => 'MINIMAL', 'enabled' => $enabled,
+            ]);
+            self::assertResponseStatusCodeSame(422);
+            $client->request('GET', '/api/settings/ai');
+            self::assertResponseIsSuccessful();
+            self::assertSame('OPENAI', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['provider']);
+        }
+        $client->jsonRequest('PUT', '/api/settings/ai', [
+            'provider' => 'OPENAI', 'model' => 'gpt-4.1-mini', 'enabled' => true,
+        ]);
+        self::assertResponseIsSuccessful();
+
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'CUSTOM', 'baseUrl' => 'https://127.0.0.1/internal', 'model' => 'local-model',
             'apiKey' => 'custom-test-key', 'dataPolicy' => 'MINIMAL', 'enabled' => true,

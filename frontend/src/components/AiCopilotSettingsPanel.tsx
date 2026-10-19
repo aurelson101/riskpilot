@@ -76,6 +76,7 @@ export function AiCopilotSettingsPanel() {
     mutationFn: async () =>
       (await api.put<AiSettings>("/settings/ai", form)).data,
     onSuccess: async (data) => {
+      test.reset();
       setForm({ ...data, apiKey: "" });
       await cache.invalidateQueries({ queryKey: ["ai-settings"] });
     },
@@ -90,6 +91,18 @@ export function AiCopilotSettingsPanel() {
     );
   }
   if (settings.isLoading || !form) return null;
+  const configurationSaved =
+    form.apiKey === "" &&
+    (
+      [
+        "provider",
+        "baseUrl",
+        "model",
+        "dataPolicy",
+        "systemPrompt",
+        "enabled",
+      ] as const
+    ).every((field) => form[field] === settings.data?.[field]);
   const models = [
     ...new Set([...(providerModels[form.provider] ?? []), form.model]),
   ];
@@ -118,7 +131,7 @@ export function AiCopilotSettingsPanel() {
             La clé est chiffrée et n’est jamais réaffichée. Utilisez une clé
             dédiée à RiskPilot avec quotas et restrictions côté fournisseur.
           </Alert>
-          {save.isSuccess && (
+          {save.isSuccess && configurationSaved && (
             <Alert severity="success">Configuration IA enregistrée.</Alert>
           )}
           {save.isError && (
@@ -126,12 +139,12 @@ export function AiCopilotSettingsPanel() {
               Échec de l’enregistrement de la configuration IA.
             </Alert>
           )}
-          {test.isSuccess && (
+          {test.isSuccess && configurationSaved && (
             <Alert severity="success">
               Connexion et génération IA validées.
             </Alert>
           )}
-          {test.isError && (
+          {test.isError && configurationSaved && (
             <Alert severity="error">
               {axios.isAxiosError<{ message?: string }>(test.error)
                 ? (test.error.response?.data?.message ??
@@ -147,9 +160,15 @@ export function AiCopilotSettingsPanel() {
               value={form.provider}
               onChange={(event) => {
                 const provider = event.target.value as Provider;
+                test.reset();
                 setForm({
                   ...form,
                   provider,
+                  apiKey: "",
+                  apiKeyConfigured:
+                    provider === settings.data?.provider &&
+                    settings.data.apiKeyConfigured,
+                  enabled: false,
                   ...(provider === "CUSTOM" ? {} : presets[provider]),
                 });
               }}
@@ -248,6 +267,8 @@ export function AiCopilotSettingsPanel() {
               variant="outlined"
               disabled={
                 !form.apiKeyConfigured ||
+                !configurationSaved ||
+                save.isPending ||
                 form.provider === "CUSTOM" ||
                 test.isPending
               }
@@ -255,9 +276,10 @@ export function AiCopilotSettingsPanel() {
             >
               Tester la génération IA
             </Button>
-            {!form.apiKeyConfigured && (
+            {(!form.apiKeyConfigured || !configurationSaved) && (
               <Typography variant="caption" color="text.secondary">
-                Enregistrez d’abord la clé, puis lancez le test de génération.
+                Enregistrez la configuration avant de lancer le test de
+                génération.
               </Typography>
             )}
           </Stack>

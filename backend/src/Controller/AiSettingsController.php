@@ -78,6 +78,10 @@ final readonly class AiSettingsController
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new AiSettings($user->getOrganization());
         $apiKey = trim($input['apiKey'] ?? '');
+        if ('' === $apiKey && null !== $settings->getEncryptedApiKey()
+            && ($provider !== $settings->getProvider() || $baseUrl !== $settings->getBaseUrl())) {
+            return $this->error('Saisissez une nouvelle clé API pour changer de fournisseur ou d’URL.');
+        }
         if ('' !== $apiKey) {
             $settings->setEncryptedApiKey($this->cipher->encrypt($apiKey));
         }
