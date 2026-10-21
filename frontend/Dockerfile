@@ -18,7 +18,7 @@ ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 ENV NODE_OPTIONS=--max-old-space-size=512
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS production
+FROM nginxinc/nginx-unprivileged:1.30.6-alpine AS production
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 USER nginx

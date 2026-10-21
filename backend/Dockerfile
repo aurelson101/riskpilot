@@ -1,6 +1,9 @@
-FROM php:8.4-fpm-alpine AS base
+ARG PHP_IMAGE=php:8.4.27-fpm-alpine
+FROM ${PHP_IMAGE} AS base
 
 ARG PHP_BUILD_JOBS=1
+
+RUN php -r 'if (PHP_VERSION_ID < 80427 || PHP_VERSION_ID >= 80500) { fwrite(STDERR, "PHP 8.4.27+ (8.4 branch) required\n"); exit(1); }'
 
 RUN apk add --no-cache fcgi git icu-libs libpq libxml2 libzip oniguruma libldap \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libpq-dev libxml2-dev libzip-dev oniguruma-dev openldap-dev \
