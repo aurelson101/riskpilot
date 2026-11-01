@@ -7,80 +7,32 @@ namespace App\Domain\Compliance;
 use App\Entity\Framework;
 use App\Entity\Requirement;
 
+/**
+ * Packs de démarrage : identifiants officiels et intitulés reformulés, sans texte normatif protégé.
+ * Les données sont dans Catalog/<clé>.php ; une exigence peut déclarer une référence parente en 4e position.
+ */
 final class StarterFrameworkCatalog
 {
-    /** @var array<string, array{name: string, version: string, publisher: string, description: string, requirements: list<array{string, string, string}>}> */
-    private const PACKS = [
-        'rgpd' => [
-            'name' => 'RGPD', 'version' => '2016/679', 'publisher' => 'Union européenne',
-            'description' => 'Pack de pilotage fondé sur le règlement public. Il ne constitue pas un avis juridique.',
-            'requirements' => [
-                ['ART-5', 'Principes relatifs au traitement des données', 'Principes'],
-                ['ART-6', 'Licéité et base juridique des traitements', 'Licéité'],
-                ['ART-12-14', 'Information transparente des personnes', 'Transparence'],
-                ['ART-15-22', 'Gestion des droits des personnes', 'Droits'],
-                ['ART-24', 'Responsabilité du responsable de traitement', 'Gouvernance'],
-                ['ART-25', 'Protection des données dès la conception et par défaut', 'Conception'],
-                ['ART-28', 'Encadrement des sous-traitants', 'Tiers'],
-                ['ART-30', 'Registre des activités de traitement', 'Registre'],
-                ['ART-32', 'Sécurité du traitement', 'Sécurité'],
-                ['ART-33-34', 'Gestion et notification des violations', 'Incidents'],
-                ['ART-35', 'Analyse d’impact relative à la protection des données', 'AIPD'],
-            ],
-        ],
-        'nis2' => [
-            'name' => 'NIS2', 'version' => '2022/2555', 'publisher' => 'Union européenne',
-            'description' => 'Pack de préparation fondé sur la directive publique, à adapter à sa transposition nationale et à son périmètre d’assujettissement.',
-            'requirements' => [
-                ['ART-20', 'Responsabilité des organes de direction', 'Gouvernance'],
-                ['ART-21.2-A', 'Politiques d’analyse des risques et de sécurité', 'Risques'],
-                ['ART-21.2-B', 'Gestion des incidents', 'Incidents'],
-                ['ART-21.2-C', 'Continuité, sauvegardes et gestion de crise', 'Résilience'],
-                ['ART-21.2-D', 'Sécurité de la chaîne d’approvisionnement', 'Tiers'],
-                ['ART-21.2-E', 'Sécurité des acquisitions, développements et vulnérabilités', 'Cycle de vie'],
-                ['ART-21.2-F', 'Évaluation de l’efficacité des mesures', 'Assurance'],
-                ['ART-21.2-G', 'Hygiène cyber et formation', 'Sensibilisation'],
-                ['ART-21.2-H-J', 'Cryptographie, ressources humaines, accès et MFA', 'Protection'],
-                ['ART-23', 'Notification des incidents significatifs', 'Notification'],
-            ],
-        ],
-        'iso27001' => [
-            'name' => 'ISO/IEC 27001', 'version' => '2022', 'publisher' => 'ISO/IEC',
-            'description' => 'Pack métadonnées de préparation au SMSI. Aucun texte protégé de la norme n’est reproduit ; une copie sous licence reste nécessaire.',
-            'requirements' => [
-                ['CLAUSE-4', 'Contexte et périmètre du SMSI', 'SMSI'],
-                ['CLAUSE-5', 'Leadership et responsabilités', 'SMSI'],
-                ['CLAUSE-6', 'Planification et traitement des risques', 'SMSI'],
-                ['CLAUSE-7', 'Ressources, compétences et documentation', 'SMSI'],
-                ['CLAUSE-8', 'Fonctionnement opérationnel du SMSI', 'SMSI'],
-                ['CLAUSE-9', 'Évaluation des performances', 'SMSI'],
-                ['CLAUSE-10', 'Amélioration continue', 'SMSI'],
-                ['ANNEX-A', 'Catalogue des mesures à sélectionner sous licence', 'Mesures'],
-            ],
-        ],
-        'ebios-rm' => [
-            'name' => 'EBIOS Risk Manager', 'version' => '2018', 'publisher' => 'ANSSI',
-            'description' => 'Pack méthodologique de démarrage basé sur les ateliers du guide public EBIOS Risk Manager.',
-            'requirements' => [
-                ['ATELIER-1', 'Socle de sécurité et événements redoutés', 'Ateliers'],
-                ['ATELIER-2', 'Sources de risque', 'Ateliers'],
-                ['ATELIER-3', 'Scénarios stratégiques', 'Ateliers'],
-                ['ATELIER-4', 'Scénarios opérationnels', 'Ateliers'],
-                ['ATELIER-5', 'Traitement du risque', 'Ateliers'],
-            ],
-        ],
-    ];
+    /** L'ordre est stable : les jeux de démonstration et les index de packs en dépendent. */
+    private const KEYS = ['rgpd', 'nis2', 'iso27001', 'ebios-rm', 'iso42001', 'tisax'];
+
+    /** @var array<string, array{name: string, version: string, publisher: string, description: string, requirements: list<array{0: string, 1: string, 2: string, 3?: string}>}> */
+    private array $definitions = [];
 
     /** @return list<string> */
     public function keys(): array
     {
-        return array_keys(self::PACKS);
+        return self::KEYS;
     }
 
-    /** @return array{name: string, version: string, publisher: string, description: string, requirements: list<array{string, string, string}>} */
+    /** @return array{name: string, version: string, publisher: string, description: string, requirements: list<array{0: string, 1: string, 2: string, 3?: string}>} */
     public function definition(string $key): array
     {
-        return self::PACKS[$key] ?? throw new \InvalidArgumentException(sprintf('Pack de conformité inconnu : %s.', $key));
+        if (!in_array($key, self::KEYS, true)) {
+            throw new \InvalidArgumentException(sprintf('Pack de conformité inconnu : %s.', $key));
+        }
+
+        return $this->definitions[$key] ??= require __DIR__.'/Catalog/'.$key.'.php';
     }
 
     /** @return array{Framework, list<Requirement>} */
@@ -90,11 +42,44 @@ final class StarterFrameworkCatalog
         $framework = (new Framework($definition['name'], $definition['version']))
             ->setPublisher($definition['publisher'])
             ->setDescription($definition['description']);
-        $requirements = array_map(
-            static fn (array $item): Requirement => new Requirement($framework, $item[0], $item[1], $item[2]),
-            $definition['requirements'],
-        );
+        $requirements = $this->requirementsFor($framework, $definition['requirements']);
 
         return [$framework, $requirements];
+    }
+
+    /**
+     * Ajoute à un référentiel déjà installé les exigences du pack qui lui manquent, sans modifier celles qui existent.
+     *
+     * @param array<string, Requirement> $existing exigences actuelles indexées par référence
+     *
+     * @return list<Requirement> exigences nouvellement créées (à persister)
+     */
+    public function missingRequirements(string $key, Framework $framework, array $existing): array
+    {
+        $definition = $this->definition($key);
+        $missing = array_values(array_filter($definition['requirements'], static fn (array $item): bool => !isset($existing[$item[0]])));
+
+        return $this->requirementsFor($framework, $missing, $existing);
+    }
+
+    /**
+     * @param list<array{0: string, 1: string, 2: string, 3?: string}> $items
+     * @param array<string, Requirement>                               $known exigences déjà présentes, utilisables comme parents
+     *
+     * @return list<Requirement>
+     */
+    private function requirementsFor(Framework $framework, array $items, array $known = []): array
+    {
+        $created = [];
+        foreach ($items as $item) {
+            $created[$item[0]] = new Requirement($framework, $item[0], $item[1], $item[2]);
+        }
+        foreach ($items as $item) {
+            if (isset($item[3])) {
+                $created[$item[0]]->setParentRequirement($created[$item[3]] ?? $known[$item[3]] ?? null);
+            }
+        }
+
+        return array_values($created);
     }
 }

@@ -213,9 +213,13 @@ et tenant-scoped ; aucun payload ne choisit l'organisation.
 - `GET|POST /api/frameworks` et `GET|PUT /api/frameworks/{id}` ;
 - `GET|POST /api/frameworks/{id}/requirements` et `PUT /api/requirements/{id}` ;
 
-Les packs RGPD, NIS2, ISO/IEC 27001:2022 et EBIOS Risk Manager peuvent être
-installés avec `php bin/console app:compliance:install-starter-packs`. La
-commande est idempotente sur le couple nom/version. Sources de référence :
+Les packs RGPD, NIS2, ISO/IEC 27001:2022 (126 exigences : clauses et 93 mesures),
+ISO/IEC 42001:2023 (73 exigences : clauses et 38 mesures), TISAX / VDA ISA 6
+(structure des chapitres) et EBIOS Risk Manager peuvent être installés avec
+`php bin/console app:compliance:install-starter-packs`. La commande est
+idempotente : elle crée les référentiels absents et ajoute à ceux déjà installés
+les exigences manquantes, identifiées par leur référence, sans modifier les
+existantes. Les données sont dans `backend/src/Domain/Compliance/Catalog/`. Sources de référence :
 [RGPD 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj),
 [directive NIS2 2022/2555](https://eur-lex.europa.eu/eli/dir/2022/2555/oj),
 [guide EBIOS Risk Manager](https://www.ssi.gouv.fr/guide/la-methode-ebios-risk-manager-le-guide/)

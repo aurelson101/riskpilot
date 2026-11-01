@@ -25,6 +25,9 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            # Données pures (tableaux), sans classe : elles ne doivent pas être scannées comme des services.
+            - '../src/Domain/Compliance/Catalog/'
 
     App\Security\SecretCipher:
         arguments:

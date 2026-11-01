@@ -6,13 +6,14 @@ namespace App\Command;
 
 use App\Domain\Compliance\StarterFrameworkCatalog;
 use App\Entity\Framework;
+use App\Entity\Requirement;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'app:compliance:install-starter-packs', description: 'Installe les packs RGPD, NIS2, ISO 27001 et EBIOS RM sans reproduire de contenu protégé.')]
+#[AsCommand(name: 'app:compliance:install-starter-packs', description: 'Installe ou complète les packs RGPD, NIS2, ISO 27001, EBIOS RM, ISO 42001 et TISAX sans reproduire de contenu protégé.')]
 final class InstallComplianceStarterPacksCommand extends Command
 {
     public function __construct(private readonly StarterFrameworkCatalog $catalog, private readonly EntityManagerInterface $entityManager)
@@ -23,10 +24,26 @@ final class InstallComplianceStarterPacksCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $installed = 0;
+        $completed = 0;
         foreach ($this->catalog->keys() as $key) {
             $definition = $this->catalog->definition($key);
-            if ($this->entityManager->getRepository(Framework::class)->findOneBy(['name' => $definition['name'], 'version' => $definition['version']]) instanceof Framework) {
-                $output->writeln(sprintf('<comment>%s %s déjà installé.</comment>', $definition['name'], $definition['version']));
+            $framework = $this->entityManager->getRepository(Framework::class)->findOneBy(['name' => $definition['name'], 'version' => $definition['version']]);
+            if ($framework instanceof Framework) {
+                $existing = [];
+                // Lecture en base plutôt que la collection du référentiel, qui peut être périmée dans un même processus.
+                foreach ($this->entityManager->getRepository(Requirement::class)->findBy(['framework' => $framework]) as $requirement) {
+                    $existing[$requirement->getReference()] = $requirement;
+                }
+                $missing = $this->catalog->missingRequirements($key, $framework, $existing);
+                foreach ($missing as $requirement) {
+                    $this->entityManager->persist($requirement);
+                }
+                if ([] === $missing) {
+                    $output->writeln(sprintf('<comment>%s %s déjà à jour.</comment>', $definition['name'], $definition['version']));
+                } else {
+                    ++$completed;
+                    $output->writeln(sprintf('<info>%s %s complété (%d exigence(s) ajoutée(s)).</info>', $definition['name'], $definition['version'], count($missing)));
+                }
                 continue;
             }
             [$framework, $requirements] = $this->catalog->instantiate($key);
@@ -38,7 +55,7 @@ final class InstallComplianceStarterPacksCommand extends Command
             $output->writeln(sprintf('<info>%s %s installé (%d exigences).</info>', $definition['name'], $definition['version'], count($requirements)));
         }
         $this->entityManager->flush();
-        $output->writeln(sprintf('<info>%d pack(s) installé(s).</info>', $installed));
+        $output->writeln(sprintf('<info>%d pack(s) installé(s), %d complété(s).</info>', $installed, $completed));
 
         return Command::SUCCESS;
     }

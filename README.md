@@ -145,11 +145,18 @@ Le scheduler publie la boîte d’envoi avec `php bin/console app:notifications:
 
 Le module conformité inclut les déclarations d’applicabilité ISO 27001 versionnées. Une version approuvée est immuable et sa révision crée une nouvelle version en conservant les liens exigences–contrôles–risques–actions–preuves. L’approbateur administrateur doit être distinct du responsable. Chaque SoA est exportable en CSV UTF-8. Les tests de contrôles consignent conception ou efficacité opérationnelle, procédure, fréquence, testeur, échantillon, résultat, preuves et prochaine revue. Les correspondances entre exigences permettent de consulter des preuves multinormes provenant du même tenant et du même périmètre, hors évaluations archivées. L'API expose direction, auteur, date, justification et couverture ; une création identique réutilise la correspondance existante, une configuration différente retourne un conflit. Ce rapprochement ne copie pas de preuve et ne modifie aucun score de conformité.
 
-Des packs de démarrage gouvernés sont fournis pour le RGPD, NIS2,
-ISO/IEC 27001:2022 et EBIOS Risk Manager. Ils s’installent de façon idempotente
-avec `php bin/console app:compliance:install-starter-packs`. Les packs RGPD et
-NIS2 renvoient aux textes publics européens ; le pack ISO contient uniquement
-des métadonnées et exige une copie licenciée de la norme. Ils constituent une
+Des packs de démarrage gouvernés sont fournis pour le RGPD, NIS2 (article 21
+détaillé point par point et calendrier de notification de l’article 23),
+ISO/IEC 27001:2022 (sous-clauses 4 à 10 et les 93 mesures de l’annexe A),
+ISO/IEC 42001:2023 (clauses 4 à 10 et les 38 mesures de l’annexe A), TISAX / VDA
+ISA 6 (structure des chapitres) et EBIOS Risk Manager. Ils s’installent de façon
+idempotente avec `php bin/console app:compliance:install-starter-packs`, qui
+complète aussi un référentiel déjà installé en ajoutant les exigences manquantes
+sans modifier les existantes. Les packs RGPD et NIS2 renvoient aux textes publics
+européens ; les packs ISO et TISAX contiennent les identifiants officiels avec
+des intitulés reformulés, sans texte normatif, et exigent une copie licenciée de
+la norme ou du catalogue. Pour TISAX, les questions de contrôle et critères de
+maturité du catalogue VDA ISA se chargent avec l’import CSV. Ils constituent une
 base de pilotage à adapter au périmètre et ne valent ni certification ni avis
 juridique.
 
