@@ -57,6 +57,19 @@ Les endpoints utilisateurs appliquent le tenant de l’utilisateur authentifié 
 
 La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le rôle Risk Manager ou un rôle supérieur. Les relations vers un parent, un responsable, un périmètre ou un actif sont résolues exclusivement dans l’organisation courante.
 
+## NIS2, TISAX et gouvernance de l'IA
+
+- `GET /api/nis2/overview` : classification de l'entité, incidents avec leurs trois échéances (`EARLY_WARNING`, `NOTIFICATION`, `FINAL_REPORT` ; statuts `DONE`, `PENDING`, `DUE_SOON`, `OVERDUE`, `NOT_APPLICABLE`) et fournisseurs critiques ;
+- `PUT /api/nis2/entity` (administrateur) : `type` (`ESSENTIAL`, `IMPORTANT`, `NOT_IN_SCOPE`), `sector`, `authority` ;
+- `GET /api/nis2/incidents/{id}/report` : trame de notification au format Markdown ;
+- `POST|PUT /api/resilience/incidents` acceptent `category` (`SECURITY`, `AI`, `PRIVACY`, `OTHER`), `significant`, `earlyWarningAt` et `finalReportAt` ; un incident significatif impose la notification réglementaire, le rapport final suppose la notification, et la clôture exige les trois déclarations ;
+- `POST|PUT /api/compliance-assessments` acceptent `tisaxLevel` (`AL2`, `AL3`), `tisaxObjectives`, `siteScope` et `participantId` (conservés si absents d'une mise à jour) ; `PUT /api/compliance-results/{id}` accepte `targetMaturity` (0 à 5) ;
+- `GET /api/compliance-assessments/{id}/tisax` : synthèse par module, écarts bloquants et exigences incomplètes ; `GET …/tisax.xlsx` : export Excel ;
+- `GET|POST /api/ai-governance/systems`, `PUT …/systems/{id}` : registre des systèmes d'IA (niveau de risque `MINIMAL`, `LIMITED`, `HIGH`, `PROHIBITED` ; un système interdit ne peut être actif, un système à haut risque actif exige une supervision humaine) ;
+- `GET|POST /api/ai-governance/systems/{id}/impact-assessments`, `PUT …/impact-assessments/{id}`, `POST …/submit` et `POST …/approve` (administrateur distinct de l'auteur) ; une évaluation approuvée est immuable ;
+- `GET /api/ai-governance/overview` et `GET …/mandatory-documents` ;
+- les éléments de pilotage `/api/executive-governance/records` acceptent les types `CONTEXT_ISSUE`, `INTERESTED_PARTY`, `COMPETENCE_RECORD` et `AWARENESS_CAMPAIGN`, et une `MANAGEMENT_REVIEW` n'est approuvée qu'avec les entrées 9.3.2 (`previousActions`, `contextChanges`, `auditResults`, `nonconformities`, `monitoringResults`, `interestedPartyFeedback`, `riskResults`, `improvementOpportunities`).
+
 ## Copilote IA et brouillon de risque
 
 `PUT /api/settings/ai` n'accepte que les fournisseurs `MISTRAL`, `OPENAI` et

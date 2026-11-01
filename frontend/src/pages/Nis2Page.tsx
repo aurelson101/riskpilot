@@ -17,6 +17,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { Nis2OperationsPanel } from "../components/nis2/Nis2OperationsPanel";
 import type {
   ComplianceAssessment,
   ComplianceResult,
@@ -88,9 +89,13 @@ export function Nis2Page() {
     );
   if (!nis2)
     return (
-      <Alert severity="info">
-        Installez le pack de démarrage NIS2 pour activer cette vue.
-      </Alert>
+      <Stack spacing={3}>
+        <Alert severity="info">
+          Installez le pack de démarrage NIS2 pour activer le suivi des
+          exigences.
+        </Alert>
+        <Nis2OperationsPanel />
+      </Stack>
     );
   return (
     <Stack spacing={3}>
@@ -102,6 +107,7 @@ export function Nis2Page() {
           Pilotage dédié des exigences, écarts, preuves et remédiations
         </Typography>
       </div>
+      <Nis2OperationsPanel />
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         {[
           [

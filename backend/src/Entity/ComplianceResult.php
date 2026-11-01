@@ -19,6 +19,7 @@ class ComplianceResult
     #[ORM\ManyToOne(inversedBy: 'results')] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private ComplianceAssessment $assessment;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')] private Requirement $requirement;
     #[ORM\Column] private int $maturityLevel = 0;
+    #[ORM\Column(nullable: true)] private ?int $targetMaturity = null;
     #[ORM\Column(length: 30)] private string $complianceStatus = 'NOT_ASSESSED';
     #[ORM\Column(type: 'text', nullable: true)] private ?string $comment = null;
     /** @var list<string> */ #[ORM\Column(type: 'json')] private array $evidence = [];
@@ -36,6 +37,21 @@ class ComplianceResult
     public function getActions(): Collection
     {
         return $this->actions;
+    }
+
+    public function getTargetMaturity(): ?int
+    {
+        return $this->targetMaturity;
+    }
+
+    public function setTargetMaturity(?int $value): self
+    {
+        if (null !== $value && ($value < 0 || $value > 5)) {
+            throw new \InvalidArgumentException('La maturité cible doit être comprise entre 0 et 5.');
+        }
+        $this->targetMaturity = $value;
+
+        return $this;
     }
 
     public function getId(): ?int

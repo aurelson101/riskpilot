@@ -39,6 +39,15 @@ class Organization
     #[ORM\Column(type: 'json')]
     private array $rolePermissions = [];
 
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $nis2EntityType = null;
+
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $nis2Sector = null;
+
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $nis2Authority = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -49,12 +58,41 @@ class Organization
     #[ORM\OneToMany(targetEntity: User::class, mappedBy: 'organization')]
     private Collection $users;
 
+    public const NIS2_ENTITY_TYPES = ['ESSENTIAL', 'IMPORTANT', 'NOT_IN_SCOPE'];
+
     public function __construct(string $name)
     {
         $this->name = $name;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
         $this->users = new ArrayCollection();
+    }
+
+    public function getNis2EntityType(): ?string
+    {
+        return $this->nis2EntityType;
+    }
+
+    public function getNis2Sector(): ?string
+    {
+        return $this->nis2Sector;
+    }
+
+    public function getNis2Authority(): ?string
+    {
+        return $this->nis2Authority;
+    }
+
+    public function configureNis2(?string $entityType, ?string $sector, ?string $authority): void
+    {
+        if (null !== $entityType && !in_array($entityType, self::NIS2_ENTITY_TYPES, true)) {
+            throw new \InvalidArgumentException('Type d’entité NIS2 invalide.');
+        }
+        $clean = static fn (?string $value, int $max): ?string => null === $value || '' === trim($value) ? null : mb_substr(trim($value), 0, $max);
+        $this->nis2EntityType = $entityType;
+        $this->nis2Sector = $clean($sector, 120);
+        $this->nis2Authority = $clean($authority, 180);
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int

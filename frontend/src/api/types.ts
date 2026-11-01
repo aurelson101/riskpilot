@@ -241,6 +241,12 @@ export interface ComplianceAssessment {
   status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "ARCHIVED";
   globalScore: number;
   resultCount: number;
+  tisax?: {
+    level: "AL2" | "AL3" | null;
+    objectives: string[];
+    siteScope: string | null;
+    participantId: string | null;
+  };
 }
 
 export interface ComplianceResult {
@@ -248,6 +254,7 @@ export interface ComplianceResult {
   assessmentId: number;
   requirement: Requirement;
   maturityLevel: number;
+  targetMaturity?: number | null;
   complianceStatus:
     | "COMPLIANT"
     | "PARTIAL"

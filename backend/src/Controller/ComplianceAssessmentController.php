@@ -99,6 +99,9 @@ final readonly class ComplianceAssessmentController
         if (null !== $input->remediationActionId && null === $action) {
             return new JsonResponse(['code' => 'INVALID_ACTION', 'message' => 'Action corrective invalide.'], 422);
         }
+        if (array_key_exists('targetMaturity', $request->toArray())) {
+            $result->setTargetMaturity($input->targetMaturity);
+        }
         $result->setMaturityLevel($input->maturityLevel)->setComplianceStatus($input->complianceStatus)->setComment($input->comment)->setEvidence($input->evidence)->setRemediationAction($action);
         $result->getAssessment()->recalculateScore();
         $this->entityManager->flush();
@@ -126,6 +129,13 @@ final readonly class ComplianceAssessmentController
             return new JsonResponse(['code' => 'FRAMEWORK_IMMUTABLE', 'message' => 'Le référentiel ne peut pas être remplacé après le lancement.'], 422);
         }
         $item->setScope($scope)->setAssessor($assessor)->setAssessmentDate(new \DateTimeImmutable((string) $input->assessmentDate))->setStatus($input->status);
+        try {
+            if ([] !== array_intersect(['tisaxLevel', 'tisaxObjectives', 'siteScope', 'participantId'], array_keys($request->toArray()))) {
+                $item->configureTisax($input->tisaxLevel, $input->tisaxObjectives, $input->siteScope, '' === (string) $input->participantId ? null : $input->participantId);
+            }
+        } catch (\InvalidArgumentException $exception) {
+            return new JsonResponse(['code' => 'INVALID_TISAX', 'message' => $exception->getMessage()], 422);
+        }
         $this->entityManager->persist($item);
         if ($created) {
             foreach ($this->requirements->findBy(['framework' => $framework, 'status' => 'ACTIVE']) as $requirement) {

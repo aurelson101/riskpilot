@@ -54,6 +54,8 @@ import { ComplianceCopilotDialog } from "../components/compliance/ComplianceCopi
 import { EvidenceRegistryPanel } from "../components/compliance/EvidenceRegistryPanel";
 import { buildComplianceSummary } from "./complianceSummary";
 import { FrameworkImportDialog } from "../components/compliance/FrameworkImportDialog";
+import { TisaxPanel } from "../components/compliance/TisaxPanel";
+import { isTisaxAssessment } from "../components/compliance/tisax";
 
 const complianceLabels: Record<ComplianceResult["complianceStatus"], string> = {
   COMPLIANT: "Conforme",
@@ -193,6 +195,7 @@ export function CompliancePage() {
 
       return api.put(`/compliance-results/${result.id}`, {
         maturityLevel: current.maturityLevel,
+        targetMaturity: current.targetMaturity ?? null,
         complianceStatus: current.complianceStatus,
         comment: current.comment,
         evidence: current.evidence,
@@ -540,6 +543,14 @@ export function CompliancePage() {
                       </Stack>
                     )}
                   </Stack>
+                  {selectedAssessmentRecord &&
+                    isTisaxAssessment(selectedAssessmentRecord) && (
+                      <TisaxPanel
+                        key={selectedAssessmentRecord.id}
+                        assessment={selectedAssessmentRecord}
+                        canEdit={Boolean(canEditSelected) && !assessmentIsLocked}
+                      />
+                    )}
                   {exportError && (
                     <Alert severity="error">
                       L’export de conformité n’a pas pu être généré.
@@ -853,6 +864,30 @@ export function CompliancePage() {
                               ))}
                             </Select>
                           </FormControl>
+                          {selectedAssessmentRecord &&
+                            isTisaxAssessment(selectedAssessmentRecord) && (
+                              <FormControl size="small">
+                                <Select
+                                  aria-label={`Maturité cible ${result.requirement.reference}`}
+                                  value={result.targetMaturity ?? 3}
+                                  disabled={!canEditSelected || assessmentIsLocked}
+                                  onChange={(event) =>
+                                    updateResult.mutate({
+                                      result,
+                                      patch: {
+                                        targetMaturity: Number(event.target.value),
+                                      },
+                                    })
+                                  }
+                                >
+                                  {[0, 1, 2, 3, 4, 5].map((level) => (
+                                    <MenuItem key={level} value={level}>
+                                      Cible {level}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            )}
                           <FormControl size="small">
                             <Select
                               aria-label={`Conformité ${result.requirement.reference}`}

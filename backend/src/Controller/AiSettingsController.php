@@ -43,6 +43,7 @@ final readonly class AiSettingsController
         private AiCopilotClient $copilot,
         private AiInteractionRepository $interactions,
         private RateLimiterFactoryInterface $aiSettingsTestLimiter,
+        private \App\Application\AiSystemRegistry $registry,
     ) {
     }
 
@@ -115,6 +116,7 @@ final readonly class AiSettingsController
         $settings->configure($provider, $baseUrl, $model, $dataPolicy, $systemPrompt, $enabled);
         $settings->setLimits($input['monthlyTokenBudget'] ?? $settings->getMonthlyTokenBudget(), $input['dailyCallLimit'] ?? $settings->getDailyCallLimit());
         $this->entityManager->persist($settings);
+        $this->registry->syncCopilot($settings, $user);
         $this->entityManager->flush();
 
         return new JsonResponse($this->serialize($settings));

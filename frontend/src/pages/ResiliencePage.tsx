@@ -48,6 +48,10 @@ type Incident = {
   evidence: string[];
   regulatoryNotificationRequired: boolean;
   notifiedAt: string | null;
+  category: string;
+  significant: boolean;
+  earlyWarningAt: string | null;
+  finalReportAt: string | null;
   lessonsLearned: string | null;
   assetIds: number[];
   thirdPartyIds: number[];
@@ -144,6 +148,10 @@ export function ResiliencePage() {
     evidence: "",
     regulatoryNotificationRequired: false,
     notifiedAt: "",
+    category: "SECURITY",
+    significant: false,
+    earlyWarningAt: "",
+    finalReportAt: "",
     lessonsLearned: "",
   });
   const [processForm, setProcessForm] = useState({
@@ -188,6 +196,8 @@ export function ResiliencePage() {
           },
           evidence: split(incidentForm.evidence),
           notifiedAt: incidentForm.notifiedAt || null,
+          earlyWarningAt: incidentForm.earlyWarningAt || null,
+          finalReportAt: incidentForm.finalReportAt || null,
           lessonsLearned: incidentForm.lessonsLearned || null,
           assetIds: selectedIncident?.assetIds ?? [],
           thirdPartyIds: selectedIncident?.thirdPartyIds ?? [],
@@ -256,6 +266,10 @@ export function ResiliencePage() {
             evidence: item.evidence.join(", "),
             regulatoryNotificationRequired: item.regulatoryNotificationRequired,
             notifiedAt: dateTimeLocal(item.notifiedAt),
+            category: item.category ?? "SECURITY",
+            significant: item.significant ?? false,
+            earlyWarningAt: dateTimeLocal(item.earlyWarningAt),
+            finalReportAt: dateTimeLocal(item.finalReportAt),
             lessonsLearned: item.lessonsLearned ?? "",
           }
         : {
@@ -270,6 +284,10 @@ export function ResiliencePage() {
             evidence: "",
             regulatoryNotificationRequired: false,
             notifiedAt: "",
+            category: "SECURITY",
+            significant: false,
+            earlyWarningAt: "",
+            finalReportAt: "",
             lessonsLearned: "",
           },
     );
@@ -701,6 +719,64 @@ export function ResiliencePage() {
                     })
                   }
                 />
+                <TextField
+                  select
+                  label="Catégorie d’incident"
+                  value={incidentForm.category}
+                  onChange={(e) =>
+                    setIncidentForm({ ...incidentForm, category: e.target.value })
+                  }
+                >
+                  <MenuItem value="SECURITY">Sécurité de l’information</MenuItem>
+                  <MenuItem value="AI">Système d’IA</MenuItem>
+                  <MenuItem value="PRIVACY">Données personnelles</MenuItem>
+                  <MenuItem value="OTHER">Autre</MenuItem>
+                </TextField>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={incidentForm.significant}
+                      onChange={(e) =>
+                        setIncidentForm({
+                          ...incidentForm,
+                          significant: e.target.checked,
+                          regulatoryNotificationRequired:
+                            e.target.checked ||
+                            incidentForm.regulatoryNotificationRequired,
+                        })
+                      }
+                    />
+                  }
+                  label="Incident significatif (NIS2, article 23)"
+                />
+                {incidentForm.significant && (
+                  <>
+                    <TextField
+                      type="datetime-local"
+                      label="Alerte précoce déposée le (sous 24 h)"
+                      value={incidentForm.earlyWarningAt}
+                      onChange={(e) =>
+                        setIncidentForm({
+                          ...incidentForm,
+                          earlyWarningAt: e.target.value,
+                        })
+                      }
+                      slotProps={{ inputLabel: { shrink: true } }}
+                    />
+                    <TextField
+                      type="datetime-local"
+                      label="Rapport final déposé le (un mois après la notification)"
+                      value={incidentForm.finalReportAt}
+                      onChange={(e) =>
+                        setIncidentForm({
+                          ...incidentForm,
+                          finalReportAt: e.target.value,
+                        })
+                      }
+                      slotProps={{ inputLabel: { shrink: true } }}
+                    />
+                  </>
+                )}
                 <FormControlLabel
                   control={
                     <Switch

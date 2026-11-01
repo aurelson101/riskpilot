@@ -14,6 +14,7 @@ class SecurityIncident
 {
     public const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
     public const STATUSES = ['DETECTED', 'QUALIFIED', 'CONTAINED', 'ERADICATED', 'RECOVERED', 'CLOSED'];
+    public const CATEGORIES = ['SECURITY', 'AI', 'PRIVACY', 'OTHER'];
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')] private User $owner;
@@ -28,6 +29,10 @@ class SecurityIncident
     /** @var list<string> */ #[ORM\Column(type: 'json')] private array $evidence = [];
     #[ORM\Column] private bool $regulatoryNotificationRequired = false;
     #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $notifiedAt = null;
+    #[ORM\Column(length: 20, options: ['default' => 'SECURITY'])] private string $category = 'SECURITY';
+    #[ORM\Column(options: ['default' => false])] private bool $significant = false;
+    #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $earlyWarningAt = null;
+    #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $finalReportAt = null;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $lessonsLearned = null;
     /** @var Collection<int, Asset> */ #[ORM\ManyToMany(targetEntity: Asset::class)] #[ORM\JoinTable(name: 'incident_assets')] private Collection $assets;
     /** @var Collection<int, ThirdParty> */ #[ORM\ManyToMany(targetEntity: ThirdParty::class)] #[ORM\JoinTable(name: 'incident_third_parties')] private Collection $thirdParties;
@@ -123,6 +128,64 @@ class SecurityIncident
     public function getNotifiedAt(): ?\DateTimeImmutable
     {
         return $this->notifiedAt;
+    }
+
+    public function getCategory(): string
+    {
+        return $this->category;
+    }
+
+    public function isSignificant(): bool
+    {
+        return $this->significant;
+    }
+
+    public function getEarlyWarningAt(): ?\DateTimeImmutable
+    {
+        return $this->earlyWarningAt;
+    }
+
+    public function getFinalReportAt(): ?\DateTimeImmutable
+    {
+        return $this->finalReportAt;
+    }
+
+    /**
+     * Renseigne la qualification NIS2 : incident significatif et dates de dépôt des déclarations.
+     * Un incident significatif impose la notification réglementaire et ne peut être clos sans les trois déclarations.
+     */
+    public function configureNis2(string $category, bool $significant, ?\DateTimeImmutable $earlyWarningAt, ?\DateTimeImmutable $finalReportAt, User $actor): void
+    {
+        if (!in_array($category, self::CATEGORIES, true)) {
+            throw new \InvalidArgumentException('Catégorie d’incident invalide.');
+        }
+        foreach ([$earlyWarningAt, $this->notifiedAt, $finalReportAt] as $date) {
+            if (null !== $date && $date < $this->detectedAt) {
+                throw new \InvalidArgumentException('Une déclaration ne peut pas précéder la détection de l’incident.');
+            }
+        }
+        if (null !== $finalReportAt && null === $this->notifiedAt) {
+            throw new \InvalidArgumentException('Le rapport final suppose que la notification a été déposée.');
+        }
+        if ($significant && 'CLOSED' === $this->status && (null === $earlyWarningAt || null === $this->notifiedAt || null === $finalReportAt)) {
+            throw new \InvalidArgumentException('Un incident significatif ne peut être clos sans alerte précoce, notification et rapport final.');
+        }
+        if ($significant && !$this->significant) {
+            $this->addTimelineEvent('Incident qualifié de significatif (NIS2)', $actor);
+        }
+        if (null !== $earlyWarningAt && null === $this->earlyWarningAt) {
+            $this->addTimelineEvent('Alerte précoce déposée', $actor);
+        }
+        if (null !== $finalReportAt && null === $this->finalReportAt) {
+            $this->addTimelineEvent('Rapport final déposé', $actor);
+        }
+        $this->category = $category;
+        $this->significant = $significant;
+        $this->earlyWarningAt = $earlyWarningAt;
+        $this->finalReportAt = $finalReportAt;
+        if ($significant) {
+            $this->regulatoryNotificationRequired = true;
+        }
     }
 
     public function getLessonsLearned(): ?string

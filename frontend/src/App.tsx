@@ -235,6 +235,11 @@ const EbiosPage = lazy(() =>
 const Nis2Page = lazy(() =>
   import("./pages/Nis2Page").then((module) => ({ default: module.Nis2Page })),
 );
+const AiGovernancePage = lazy(() =>
+  import("./pages/AiGovernancePage").then((module) => ({
+    default: module.AiGovernancePage,
+  })),
+);
 const RbacSettingsPage = lazy(() =>
   import("./pages/RbacSettingsPage").then((module) => ({
     default: module.RbacSettingsPage,
@@ -459,6 +464,7 @@ function Layout() {
   const complianceActive = [
     "/compliance",
     "/nis2",
+    "/ai-governance",
     "/regulatory",
     "/third-parties",
     "/resilience",
@@ -534,6 +540,7 @@ function Layout() {
     "/threats": "Menaces",
     "/compliance": "Conformité",
     "/nis2": "Conformité NIS2",
+    "/ai-governance": "Gouvernance de l’IA",
     "/security-controls": "Mesures de sécurité",
     "/third-parties": "Tiers et fournisseurs",
     "/resilience": "Incidents et continuité",
@@ -762,6 +769,12 @@ function Layout() {
               path="/nis2"
               label="Tableau de bord NIS2"
               icon={<ShieldOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/ai-governance"
+              label="Gouvernance de l’IA"
+              icon={<SmartToyOutlined fontSize="small" />}
             />
             <NavItem
               nested
@@ -1094,6 +1107,7 @@ export default function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="compliance" element={<CompliancePage />} />
                 <Route path="nis2" element={<Nis2Page />} />
+                <Route path="ai-governance" element={<AiGovernancePage />} />
                 <Route path="third-parties" element={<ThirdPartiesPage />} />
                 <Route path="resilience" element={<ResiliencePage />} />
                 <Route path="regulatory" element={<RegulatoryPage />} />

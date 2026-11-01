@@ -46,6 +46,7 @@ final readonly class ResilienceController
         } try {
             $incident = new SecurityIncident($this->currentUser->get()->getOrganization(), $owner, (string) ($data['title'] ?? ''), (string) ($data['description'] ?? ''), (string) ($data['severity'] ?? ''), new \DateTimeImmutable((string) ($data['detectedAt'] ?? 'now')));
             $incident->addTimelineEvent('Incident déclaré', $this->currentUser->get());
+            $this->applyNis2($incident, $data, $this->currentUser->get());
             $this->entityManager->persist($incident);
             $this->entityManager->flush();
         } catch (\InvalidArgumentException $exception) {
@@ -76,6 +77,7 @@ final readonly class ResilienceController
         } try {
             $incident->revise((string) ($data['title'] ?? $incident->getTitle()), (string) ($data['description'] ?? $incident->getDescription()), (string) ($data['severity'] ?? $incident->getSeverity()), $owner);
             $incident->update((string) ($data['status'] ?? 'DETECTED'), (array) ($data['impacts'] ?? []), $this->strings((array) ($data['evidence'] ?? [])), (bool) ($data['regulatoryNotificationRequired'] ?? false), empty($data['notifiedAt']) ? null : new \DateTimeImmutable((string) $data['notifiedAt']), isset($data['lessonsLearned']) ? (string) $data['lessonsLearned'] : null, $assets, $thirdParties, $risks, $actions);
+            $this->applyNis2($incident, $data, $actor);
             $this->entityManager->flush();
         } catch (\InvalidArgumentException $exception) {
             return $this->invalid($exception->getMessage());
@@ -197,10 +199,31 @@ final readonly class ResilienceController
         return new JsonResponse($this->processResponse($process));
     }
 
+    /** @param array<string, mixed> $data */
+    private function applyNis2(SecurityIncident $incident, array $data, User $actor): void
+    {
+        if ([] === array_intersect(['category', 'significant', 'earlyWarningAt', 'finalReportAt'], array_keys($data))) {
+            // Sans qualification dans la requête, un incident déjà significatif doit encore respecter ses règles de clôture.
+            if ($incident->isSignificant()) {
+                $incident->configureNis2($incident->getCategory(), true, $incident->getEarlyWarningAt(), $incident->getFinalReportAt(), $actor);
+            }
+
+            return;
+        }
+        $date = static fn (mixed $value): ?\DateTimeImmutable => empty($value) ? null : new \DateTimeImmutable((string) $value);
+        $incident->configureNis2(
+            (string) ($data['category'] ?? $incident->getCategory()),
+            array_key_exists('significant', $data) ? (bool) $data['significant'] : $incident->isSignificant(),
+            array_key_exists('earlyWarningAt', $data) ? $date($data['earlyWarningAt']) : $incident->getEarlyWarningAt(),
+            array_key_exists('finalReportAt', $data) ? $date($data['finalReportAt']) : $incident->getFinalReportAt(),
+            $actor,
+        );
+    }
+
     /** @return array<string, mixed> */
     private function incidentResponse(SecurityIncident $item): array
     {
-        return ['id' => $item->getId(), 'title' => $item->getTitle(), 'description' => $item->getDescription(), 'severity' => $item->getSeverity(), 'status' => $item->getStatus(), 'owner' => $this->user($item->getOwner()), 'detectedAt' => $item->getDetectedAt()->format(DATE_ATOM), 'closedAt' => $item->getClosedAt()?->format(DATE_ATOM), 'impacts' => $item->getImpacts(), 'timeline' => $item->getTimeline(), 'evidence' => $item->getEvidence(), 'regulatoryNotificationRequired' => $item->isRegulatoryNotificationRequired(), 'notifiedAt' => $item->getNotifiedAt()?->format(DATE_ATOM), 'lessonsLearned' => $item->getLessonsLearned(), 'assetIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getAssets()->toArray()), 'thirdPartyIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getThirdParties()->toArray()), 'riskIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getRisks()->toArray()), 'actionIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getActions()->toArray())];
+        return ['category' => $item->getCategory(), 'significant' => $item->isSignificant(), 'earlyWarningAt' => $item->getEarlyWarningAt()?->format(DATE_ATOM), 'finalReportAt' => $item->getFinalReportAt()?->format(DATE_ATOM), 'id' => $item->getId(), 'title' => $item->getTitle(), 'description' => $item->getDescription(), 'severity' => $item->getSeverity(), 'status' => $item->getStatus(), 'owner' => $this->user($item->getOwner()), 'detectedAt' => $item->getDetectedAt()->format(DATE_ATOM), 'closedAt' => $item->getClosedAt()?->format(DATE_ATOM), 'impacts' => $item->getImpacts(), 'timeline' => $item->getTimeline(), 'evidence' => $item->getEvidence(), 'regulatoryNotificationRequired' => $item->isRegulatoryNotificationRequired(), 'notifiedAt' => $item->getNotifiedAt()?->format(DATE_ATOM), 'lessonsLearned' => $item->getLessonsLearned(), 'assetIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getAssets()->toArray()), 'thirdPartyIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getThirdParties()->toArray()), 'riskIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getRisks()->toArray()), 'actionIds' => array_map(static fn ($value): ?int => $value->getId(), $item->getActions()->toArray())];
     }
 
     /** @return array<string, mixed> */

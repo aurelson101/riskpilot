@@ -11,6 +11,18 @@ doivent être actifs pour créer un lien ; la proposition de preuves réutilisab
 reste désactivée par défaut et nécessite un choix explicite. Ce lot n'ajoute ni
 rapprochement automatique ni validation indépendante de la relation.
 
+Complément du 1er novembre 2026 : packs ISO 27001 (93 mesures), ISO 42001 (38
+mesures) et NIS2 détaillé, calendrier de notification NIS2 avec classification de
+l'entité, évaluations TISAX AL2/AL3 avec maturité cible et export, registre des
+systèmes d'IA avec évaluations d'impact, gestion gouvernée de l'IA du copilote
+(journal des interactions, budgets, supervision humaine) et revue de direction
+structurée. Limites restantes : le TISAX est livré au niveau des chapitres, les
+questions de contrôle du catalogue VDA ISA se chargent par l'import CSV ; les
+correspondances multinormes ne sont pas préchargées ; l'export PDF de la
+déclaration d'applicabilité, l'administration graphique des correspondances et la
+validation des modèles de notification par autorité nationale restent à faire ; ces
+fonctions n'ont pas fait l'objet d'une certification ou d'un audit externe.
+
 ## Parcours de référence
 
 EGERIE présente des bibliothèques, des questionnaires collaboratifs, des vues

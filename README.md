@@ -160,6 +160,28 @@ maturité du catalogue VDA ISA se chargent avec l’import CSV. Ils constituent 
 base de pilotage à adapter au périmètre et ne valent ni certification ni avis
 juridique.
 
+### NIS2 opérationnel, TISAX et gouvernance de l’IA
+
+- **NIS2** : la page `/nis2` classe l’entité (essentielle, importante, hors champ),
+  puis suit les incidents qualifiés de « significatifs » avec les échéances de
+  l’article 23 (alerte précoce 24 h, notification 72 h, rapport final un mois après
+  la notification). Les délais courent depuis la détection ; un incident significatif
+  ne peut être clos sans ses trois déclarations. Un rappel horaire alerte le
+  responsable (`app:nis2:remind-deadlines`) et une trame de notification est
+  téléchargeable. Elle ne remplace pas le formulaire de l’autorité nationale.
+- **TISAX** : une évaluation sur le pack TISAX déclare son niveau (AL2 ou AL3), ses
+  objectifs, son périmètre et l’identifiant de participant ENX. Chaque exigence a une
+  maturité cible (3 par défaut) ; la synthèse par module liste les écarts, signale
+  les exigences non évaluées et s’exporte en Excel. « Prêt » signifie seulement
+  qu’aucun écart ne subsiste : le label est délivré par un prestataire d’audit.
+- **IA (ISO/IEC 42001)** : `/ai-governance` tient le registre des systèmes d’IA (le
+  copilote RiskPilot y est inscrit automatiquement), les évaluations d’impact
+  (relecture, approbation par une personne distincte de l’auteur, immuabilité) et la
+  liste des informations documentées obligatoires rapprochée des documents du SMSI.
+  Les incidents peuvent être classés « IA ». Le contexte du SMSI (enjeux, parties
+  intéressées, compétences, sensibilisation) se saisit dans les éléments de pilotage,
+  et une revue de direction ne s’approuve qu’avec les entrées de la clause 9.3.2.
+
 Le catalogue `/api/compliance/packs/catalog` permet aussi à chaque tenant d’adopter une version hachée en brouillon, puis de la faire approuver indépendamment. Le registre `/api/evidence` conserve les preuves versionnées, leur SHA-256, classification, validité et relations exigence–contrôle–résultat–action. Une preuve approuvée est immuable ; sa révision crée une version qui référence et remplace explicitement la précédente. La vue de couverture d’une exigence explique les éléments disponibles sans déduire automatiquement la conformité.
 
 L’écran `/compliance` regroupe les référentiels et les évaluations. Une évaluation porte sur un périmètre et génère un résultat pour chaque exigence active. Les évaluateurs saisissent un niveau de maturité de 0 à 5, un statut conforme, partiel, non conforme, non applicable ou non évalué, ainsi que des preuves et une action corrective facultative. Le score global exclut les exigences non applicables ou non évaluées.
