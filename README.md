@@ -175,12 +175,26 @@ Le copilote ne modifie aucun champ, score, preuve ou statut. Ses réponses citen
 l'exigence source, restent soumises à validation humaine et chaque appel réussi
 est audité avec fournisseur, modèle, politique, empreinte de la question et
 sources, sans conserver le texte de la conversation dans le journal. Le quota
-est limité à 20 appels par utilisateur et par heure. Pour OpenAI, l'intégration
-utilise la Responses API avec `store: false`; les endpoints personnalisés sont
-refusés pour ce workflow tant que leur protection SSRF n'est pas validée.
-Pour Mistral, l'interface propose les identifiants exacts
-`codestral-latest` et `mistral-large-latest` afin qu'une faute de saisie ne
-passe pas le test de clé avant d'échouer lors de la première génération.
+est limité à 20 appels par utilisateur et par heure, avec en plus un plafond
+journalier d'appels et un budget mensuel de tokens par organisation. Pour OpenAI,
+l'intégration utilise la Responses API avec `store: false`. Les fournisseurs
+sont Mistral, OpenAI et Gemini sur leur URL officielle ; les endpoints
+personnalisés ont été supprimés. Les modèles sont limités par une liste blanche
+serveur afin qu'une faute de saisie ne passe pas le test de clé avant d'échouer
+lors de la première génération.
+
+**Gouvernance IA (ISO/IEC 42001).** Chaque appel, y compris un échec ou un refus
+de quota, crée une `AiInteraction` : fournisseur, modèle demandé et renvoyé,
+version des consignes, politique de données, empreintes d'entrée et de sortie,
+tokens, latence, tentatives, code d'erreur et version de l'avis de consentement.
+Le contenu brut n'est jamais conservé. Un administrateur doit acquitter l'avis
+d'usage (DPA, transferts, sous-traitant) avant d'activer le copilote. Seuls les
+rôles pouvant agir (gestionnaire des risques, propriétaire d'action, auditeur)
+transmettent des données au fournisseur, et le contexte détaillé n'est envoyé
+qu'aux gestionnaires des risques. La décision humaine sur un brouillon
+(acceptée, modifiée ou rejetée) est enregistrée par
+`POST /api/copilot/interactions/{id}/decision` et le risque ou l'action créé
+porte le marqueur `aiAssisted`.
 
 Les routes sont `GET /api/compliance-results/{id}/copilot/context` pour
 prévisualiser les données et `POST /api/compliance-results/{id}/copilot` pour

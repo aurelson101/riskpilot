@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\AiCallMetrics;
 use App\Application\AiCopilotClient;
+use App\Application\AiCopilotRuntime;
 use App\Application\CurrentUser;
 use App\Entity\ActionPlan;
 use App\Entity\AiSettings;
 use App\Entity\RiskScenario;
 use App\Entity\User;
 use App\Repository\ActionPlanRepository;
-use App\Repository\AiSettingsRepository;
 use App\Repository\AssetRepository;
 use App\Repository\ComplianceResultRepository;
 use App\Repository\EmailSettingsRepository;
@@ -20,7 +21,6 @@ use App\Repository\ScopeRepository;
 use App\Repository\ThreatRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -29,9 +29,8 @@ final readonly class GlobalCopilotController
 {
     public function __construct(
         private CurrentUser $currentUser,
-        private AiSettingsRepository $settings,
+        private AiCopilotRuntime $runtime,
         private AiCopilotClient $client,
-        private RateLimiterFactoryInterface $aiCopilotLimiter,
         private ScopeRepository $scopes,
         private AssetRepository $assets,
         private ThreatRepository $threats,
@@ -54,13 +53,11 @@ final readonly class GlobalCopilotController
     public function grcBrief(Request $request): JsonResponse
     {
         $actor = $this->currentUser->get();
-        $settings = $this->findSettings();
-        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
-            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        $settings = $this->runtime->settingsFor($actor);
+        if (null !== $refusal = $this->runtime->unavailable($settings)) {
+            return $refusal;
         }
-        if ('CUSTOM' === $settings->getProvider()) {
-            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
-        }
+        \assert($settings instanceof AiSettings);
         $input = $request->toArray();
         if (array_key_exists('objective', $input) && !is_string($input['objective'])) {
             return $this->error('INVALID_REQUEST', 'L’objectif doit être un texte.', 422);
@@ -73,17 +70,13 @@ final readonly class GlobalCopilotController
         if ([] === $catalog) {
             return $this->error('COMPLIANCE_CATALOG_EMPTY', 'Aucun résultat de conformité n’est disponible pour cette organisation.', 422);
         }
-        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
-        if (!$limit->isAccepted()) {
-            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
-        }
         $coverage = $this->grcCoverage($catalog);
         $gaps = array_values(array_filter($catalog, static fn (array $item): bool => in_array($item['status'], ['PARTIAL', 'NON_COMPLIANT', 'NOT_ASSESSED'], true)));
-        try {
-            $brief = $this->client->draftGrcBrief($settings, $objective, ['coverage' => $coverage, 'gaps' => array_slice($gaps, 0, 120)], $actor->getLocale(), hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())));
-        } catch (\Throwable) {
-            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire une synthèse GRC valide.', 502);
+        $run = $this->runtime->run($actor, $settings, 'GRC_BRIEF', $objective, fn (AiCallMetrics $metrics): array => $this->client->draftGrcBrief($settings, $objective, ['coverage' => $coverage, 'gaps' => array_slice($gaps, 0, 120)], $actor->getLocale(), AiCopilotRuntime::safetyIdentifier($actor), $metrics), 'Le fournisseur IA n’a pas pu produire une synthèse GRC valide.');
+        if ($run instanceof JsonResponse) {
+            return $run;
         }
+        $brief = $run['result'];
         $actionableIds = array_column(array_slice($gaps, 0, 120), 'id');
         $seen = [];
         foreach ($brief['priorities'] as $priority) {
@@ -94,10 +87,10 @@ final readonly class GlobalCopilotController
         }
         $request->attributes->set('_audit_after', [[
             'provider' => $settings->getProvider(), 'model' => $settings->getModel(), 'dataPolicy' => $settings->getDataPolicy(),
-            'requestHash' => hash('sha256', $objective), 'workflow' => 'GRC_BRIEF', 'automaticWrite' => false,
+            'requestHash' => hash('sha256', $objective), 'workflow' => 'GRC_BRIEF', 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false,
         ]]);
 
-        return new JsonResponse(['brief' => $brief, 'coverage' => $coverage, 'automaticWrite' => false, 'notice' => 'Synthèse indicative : vérifiez chaque priorité avant de préparer une action.']);
+        return new JsonResponse(['brief' => $brief, 'coverage' => $coverage, 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false, 'notice' => 'Synthèse indicative : vérifiez chaque priorité avant de préparer une action.']);
     }
 
     #[Route('/compliance-action-draft', methods: ['POST'])]
@@ -105,13 +98,11 @@ final readonly class GlobalCopilotController
     public function complianceActionDraft(Request $request): JsonResponse
     {
         $actor = $this->currentUser->get();
-        $settings = $this->findSettings();
-        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
-            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        $settings = $this->runtime->settingsFor($actor);
+        if (null !== $refusal = $this->runtime->unavailable($settings)) {
+            return $refusal;
         }
-        if ('CUSTOM' === $settings->getProvider()) {
-            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
-        }
+        \assert($settings instanceof AiSettings);
         $input = $request->toArray();
         if (!is_string($input['prompt'] ?? null)) {
             return $this->error('INVALID_REQUEST', 'La demande doit être un texte.', 422);
@@ -124,24 +115,20 @@ final readonly class GlobalCopilotController
         if ([] === $catalog) {
             return $this->error('COMPLIANCE_CATALOG_EMPTY', 'Aucune exigence partielle, non conforme ou non évaluée n’est disponible.', 422);
         }
-        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
-        if (!$limit->isAccepted()) {
-            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        $run = $this->runtime->run($actor, $settings, 'COMPLIANCE_ACTION_DRAFT', $prompt, fn (AiCallMetrics $metrics): array => $this->client->draftComplianceAction($settings, $prompt, $catalog, $actor->getLocale(), AiCopilotRuntime::safetyIdentifier($actor), $metrics), 'Le fournisseur IA n’a pas pu produire un brouillon d’action conformité valide.');
+        if ($run instanceof JsonResponse) {
+            return $run;
         }
-        try {
-            $draft = $this->client->draftComplianceAction($settings, $prompt, $catalog, $actor->getLocale(), hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())));
-        } catch (\Throwable) {
-            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire un brouillon d’action conformité valide.', 502);
-        }
+        $draft = $run['result'];
         if (!in_array($draft['complianceResultId'], array_column($catalog, 'id'), true)) {
             return $this->error('AI_DRAFT_INVALID_RELATION', 'Le fournisseur IA a proposé une exigence qui ne fait pas partie de votre organisation.', 502);
         }
         $request->attributes->set('_audit_after', [[
             'provider' => $settings->getProvider(), 'model' => $settings->getModel(), 'dataPolicy' => $settings->getDataPolicy(),
-            'requestHash' => hash('sha256', $prompt), 'workflow' => 'COMPLIANCE_ACTION_DRAFT', 'automaticWrite' => false,
+            'requestHash' => hash('sha256', $prompt), 'workflow' => 'COMPLIANCE_ACTION_DRAFT', 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false,
         ]]);
 
-        return new JsonResponse(['draft' => $draft, 'automaticWrite' => false, 'notice' => 'Brouillon généré : relisez, choisissez un responsable et confirmez avant création.']);
+        return new JsonResponse(['draft' => $draft, 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false, 'notice' => 'Brouillon généré : relisez, choisissez un responsable et confirmez avant création.']);
     }
 
     #[Route('/risk-draft', methods: ['POST'])]
@@ -149,13 +136,11 @@ final readonly class GlobalCopilotController
     public function riskDraft(Request $request): JsonResponse
     {
         $actor = $this->currentUser->get();
-        $settings = $this->findSettings();
-        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
-            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        $settings = $this->runtime->settingsFor($actor);
+        if (null !== $refusal = $this->runtime->unavailable($settings)) {
+            return $refusal;
         }
-        if ('CUSTOM' === $settings->getProvider()) {
-            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour ce workflow.', 422);
-        }
+        \assert($settings instanceof AiSettings);
         $input = $request->toArray();
         if (!is_string($input['prompt'] ?? null)) {
             return $this->error('INVALID_REQUEST', 'La demande doit être un texte.', 422);
@@ -172,36 +157,34 @@ final readonly class GlobalCopilotController
         if ([] === $catalog['scopes'] || [] === $catalog['assets'] || [] === $catalog['threats']) {
             return $this->error('RISK_CATALOG_INCOMPLETE', 'Créez au moins un périmètre, un actif et une menace avant de générer un risque.', 422);
         }
-        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
-        if (!$limit->isAccepted()) {
-            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        $run = $this->runtime->run($actor, $settings, 'RISK_DRAFT', $prompt, fn (AiCallMetrics $metrics): array => $this->client->draftRisk($settings, $prompt, $catalog, $actor->getLocale(), AiCopilotRuntime::safetyIdentifier($actor), $metrics), 'Le fournisseur IA n’a pas pu produire un brouillon de risque valide.');
+        if ($run instanceof JsonResponse) {
+            return $run;
         }
-        try {
-            $draft = $this->client->draftRisk($settings, $prompt, $catalog, $actor->getLocale(), hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())));
-        } catch (\Throwable) {
-            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire un brouillon de risque valide.', 502);
-        }
+        $draft = $run['result'];
         if (!$this->catalogContains($catalog['scopes'], $draft['scopeId']) || !$this->catalogContains($catalog['assets'], $draft['assetId']) || !$this->catalogContains($catalog['threats'], $draft['threatId'])) {
             return $this->error('AI_DRAFT_INVALID_RELATION', 'Le fournisseur IA a proposé une relation qui ne fait pas partie de votre organisation.', 502);
         }
         $request->attributes->set('_audit_after', [[
             'provider' => $settings->getProvider(), 'model' => $settings->getModel(), 'dataPolicy' => $settings->getDataPolicy(),
-            'requestHash' => hash('sha256', $prompt), 'workflow' => 'RISK_DRAFT', 'automaticWrite' => false,
+            'requestHash' => hash('sha256', $prompt), 'workflow' => 'RISK_DRAFT', 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false,
         ]]);
 
-        return new JsonResponse(['draft' => $draft, 'automaticWrite' => false, 'notice' => 'Brouillon généré : relisez et confirmez avant création.']);
+        return new JsonResponse(['draft' => $draft, 'interactionId' => $run['interaction']->getId(), 'automaticWrite' => false, 'notice' => 'Brouillon généré : relisez et confirmez avant création.']);
     }
 
     #[Route('/context', methods: ['GET'])]
     public function context(): JsonResponse
     {
-        $settings = $this->findSettings();
+        $settings = $this->runtime->settingsFor($this->currentUser->get());
 
         return new JsonResponse([
-            'enabled' => $settings?->isEnabled() && null !== $settings->getEncryptedApiKey(),
+            'enabled' => $this->runtime->canSend() && $this->runtime->isUsable($settings),
+            'allowed' => $this->runtime->canSend(),
             'provider' => $settings?->getProvider(),
             'model' => $settings?->getModel(),
-            'dataPolicy' => $settings?->getDataPolicy() ?? 'MINIMAL',
+            'dataPolicy' => null === $settings ? 'MINIMAL' : $this->runtime->effectiveDataPolicy($settings),
+            'consentVersion' => AiCopilotRuntime::CONSENT_VERSION,
             'modes' => ['ASSIST', 'PILOT'],
             'capabilities' => ['GUIDANCE', 'NAVIGATION', 'GRC_BRIEF', 'RISK_DRAFT', 'COMPLIANCE_ACTION_DRAFT', 'ISMS_DOCUMENT_DRAFT'],
             'automaticWrite' => false,
@@ -213,13 +196,11 @@ final readonly class GlobalCopilotController
     public function ask(Request $request): JsonResponse
     {
         $actor = $this->currentUser->get();
-        $settings = $this->findSettings();
-        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
-            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        $settings = $this->runtime->settingsFor($actor);
+        if (null !== $refusal = $this->runtime->unavailable($settings)) {
+            return $refusal;
         }
-        if ('CUSTOM' === $settings->getProvider()) {
-            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour le chatbot tant que leur sécurité réseau n’est pas validée.', 422);
-        }
+        \assert($settings instanceof AiSettings);
         $input = $request->toArray();
         if (!is_string($input['question'] ?? null)
             || (array_key_exists('mode', $input) && !is_string($input['mode']))
@@ -230,42 +211,43 @@ final readonly class GlobalCopilotController
         $question = trim($input['question']);
         $mode = strtoupper(trim($input['mode'] ?? 'ASSIST'));
         $currentPath = trim($input['currentPath'] ?? '/');
-        if (!in_array($mode, ['ASSIST', 'PILOT'], true) || mb_strlen($currentPath) > 200) {
+        if (!in_array($mode, ['ASSIST', 'PILOT'], true) || 1 !== preg_match('#^/[A-Za-z0-9/_-]{0,199}$#', $currentPath)) {
             return $this->error('INVALID_MODE', 'Le mode ou le contexte de navigation est invalide.', 422);
         }
         if (true !== ($input['consent'] ?? false) || mb_strlen($question) < 3 || mb_strlen($question) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une question de 3 à 2 000 caractères sont obligatoires.', 422);
         }
-        $history = $this->history($input['history'] ?? []);
+        $history = $this->runtime->history($actor, $input['history'] ?? []);
         if (null === $history) {
             return $this->error('INVALID_HISTORY', 'L’historique est invalide ou dépasse huit messages.', 422);
         }
-        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
-        if (!$limit->isAccepted()) {
-            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        $dataPolicy = $this->runtime->effectiveDataPolicy($settings);
+        $context = $this->aiContext($dataPolicy);
+        $safetyIdentifier = AiCopilotRuntime::safetyIdentifier($actor);
+        $run = $this->runtime->run($actor, $settings, 'PILOT' === $mode ? 'COPILOT_PILOT' : 'COPILOT_ASSIST', $question, fn (AiCallMetrics $metrics): array => 'PILOT' === $mode
+            ? $this->client->pilot($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $currentPath, $this->pilotCapabilities(), $context, $metrics)
+            : ['answer' => $this->client->askGlobal($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $context, $metrics), 'actions' => []],
+            'Le fournisseur IA n’a pas pu produire de réponse.');
+        if ($run instanceof JsonResponse) {
+            return $run;
         }
-        try {
-            $safetyIdentifier = hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId()));
-            $context = $this->aiContext($settings->getDataPolicy());
-            $result = 'PILOT' === $mode
-                ? $this->client->pilot($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $currentPath, $this->pilotCapabilities(), $context)
-                : ['answer' => $this->client->askGlobal($settings, $question, $history, $actor->getLocale(), $safetyIdentifier, $context), 'actions' => []];
-        } catch (\Throwable) {
-            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire de réponse.', 502);
-        }
+        $result = $run['result'];
         $request->attributes->set('_audit_after', [[
             'provider' => $settings->getProvider(),
             'model' => $settings->getModel(),
-            'dataPolicy' => $settings->getDataPolicy(),
+            'dataPolicy' => $dataPolicy,
             'questionHash' => hash('sha256', $question),
             'workflow' => 'GLOBAL_COPILOT',
             'mode' => $mode,
-            'contextPolicy' => $settings->getDataPolicy(),
+            'contextPolicy' => $dataPolicy,
+            'interactionId' => $run['interaction']->getId(),
             'automaticWrite' => false,
         ]]);
 
         return new JsonResponse([
             'answer' => $result['answer'],
+            'signature' => $this->runtime->sign($actor, $result['answer']),
+            'interactionId' => $run['interaction']->getId(),
             'actions' => $this->validatedPilotActions($result['actions']),
             'mode' => $mode,
             'provider' => $settings->getProvider(),
@@ -273,37 +255,6 @@ final readonly class GlobalCopilotController
             'automaticWrite' => false,
             'notice' => 'Conseil à vérifier humainement. Utilisez un brouillon guidé pour créer un objet.',
         ]);
-    }
-
-    private function findSettings(): ?AiSettings
-    {
-        return $this->settings->findOneBy(['organization' => $this->currentUser->get()->getOrganization()]);
-    }
-
-    /** @param array<array-key, mixed> $input
-     * @return list<array{role: 'user'|'assistant', content: string}>|null
-     */
-    private function history(array $input): ?array
-    {
-        if (count($input) > 8) {
-            return null;
-        }
-        $history = [];
-        foreach ($input as $message) {
-            if (!is_array($message) || !in_array($message['role'] ?? null, ['user', 'assistant'], true)) {
-                return null;
-            }
-            if (!is_string($message['content'] ?? null)) {
-                return null;
-            }
-            $content = trim($message['content']);
-            if ('' === $content || mb_strlen($content) > 2000) {
-                return null;
-            }
-            $history[] = ['role' => $message['role'], 'content' => $content];
-        }
-
-        return $history;
     }
 
     private function error(string $code, string $message, int $status): JsonResponse

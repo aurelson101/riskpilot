@@ -19,6 +19,7 @@ class RiskScenario
     public const METHODS = ['SIMPLIFIED', 'ISO_27005', 'EBIOS_RM'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
+    #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?AiInteraction $aiInteraction = null;
     #[ORM\Column(length: 255)] private string $title;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $description = null;
     #[ORM\Column(length: 100)] private string $family = 'GENERAL';
@@ -63,6 +64,17 @@ class RiskScenario
         $this->currentControls = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getAiInteraction(): ?AiInteraction
+    {
+        return $this->aiInteraction;
+    }
+
+    /** Provenance ISO/IEC 42001 : l'objet a été créé à partir d'un brouillon IA relu et confirmé. */
+    public function markAiAssisted(AiInteraction $interaction): void
+    {
+        $this->aiInteraction = $interaction;
     }
 
     public function getId(): ?int

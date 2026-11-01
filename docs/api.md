@@ -59,15 +59,26 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 
 ## Copilote IA et brouillon de risque
 
-`PUT /api/settings/ai` accepte pour Mistral les modèles
-`codestral-latest` et `mistral-large-latest`. Une autre valeur est rejetée à
-l'enregistrement pour éviter qu'un test de clé réussisse avec un modèle
-inexistant avant l'échec d'une génération.
+`PUT /api/settings/ai` n'accepte que les fournisseurs `MISTRAL`, `OPENAI` et
+`GEMINI`, sur leur URL officielle, et uniquement les modèles de la liste blanche
+serveur (`AiSettingsController::MODELS`, renvoyée dans le champ `models`). Il
+accepte aussi `monthlyTokenBudget`, `dailyCallLimit` et `acknowledgeTerms` ;
+l'activation exige l'acquittement préalable de l'avis d'usage IA.
+`GET /api/settings/ai/usage` (administrateur) renvoie la consommation du mois.
 
 - `GET /api/copilot/context` expose l'état et les capacités du copilote sans secret ;
 - `POST /api/copilot` répond à une question après consentement explicite. Le mode `ASSIST` conseille sans action ; le mode `PILOT` reçoit le chemin courant et peut proposer jusqu'à trois actions applicatives strictement inscrites sur liste blanche ;
 - `POST /api/copilot/grc-brief` produit une synthèse multinorme et jusqu’à cinq priorités à partir des résultats de conformité actifs du tenant ;
-- `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée.
+- `POST /api/copilot/risk-draft` transforme une demande de 10 à 2 000 caractères en proposition de risque structurée ;
+- `POST /api/copilot/compliance-action-draft` propose une action corrective liée à un résultat de conformité ;
+- `GET /api/copilot/compliance-catalog` liste les résultats actionnables (gestionnaire des risques) ;
+- `POST /api/copilot/interactions/{id}/decision` enregistre la décision humaine (`ACCEPTED`, `EDITED`, `REJECTED`) sur un brouillon et relie le risque (`RISK`) ou l'action (`ACTION`) créé.
+
+Les appels de chat et de pilotage exigent un rôle capable d'agir ; un lecteur reçoit
+`403 AI_ROLE_REQUIRED`. Les refus de quota renvoient `429` avec `AI_RATE_LIMIT`,
+`AI_DAILY_LIMIT` ou `AI_BUDGET_EXCEEDED`. Chaque réponse contient `interactionId`
+et, pour le chat, une `signature` serveur à renvoyer avec le tour assistant dans
+`history` : un tour assistant sans signature valide est ignoré.
 
 Dans l'interface, l'action `OPEN_RISK_DRAFT` réutilise automatiquement la
 demande pilotée pour appeler `POST /api/copilot/risk-draft` et préremplir le

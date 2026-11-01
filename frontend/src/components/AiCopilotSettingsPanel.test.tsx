@@ -18,11 +18,37 @@ const settings = {
   dataPolicy: "MINIMAL",
   systemPrompt: "",
   enabled: true,
+  monthlyTokenBudget: 500000,
+  dailyCallLimit: 200,
+  termsAcknowledged: true,
+  termsVersion: "2026-11",
+  termsAcknowledgedAt: "2026-11-01T10:00:00+00:00",
+  models: ["gpt-5-mini", "gpt-4.1-mini", "gpt-4.1"],
   updatedAt: null,
 };
+const usage = {
+  usage: {
+    calls: 12,
+    succeeded: 10,
+    failed: 1,
+    refused: 1,
+    inputTokens: 900,
+    outputTokens: 300,
+  },
+  monthlyTokenBudget: 500000,
+  dailyCallLimit: 200,
+  dailyCalls: 3,
+  promptVersion: "2026-11-01",
+};
+
+function mockGet(current: typeof settings = settings) {
+  return vi.spyOn(api, "get").mockImplementation(async (url: string) => ({
+    data: url === "/settings/ai/usage" ? usage : current,
+  }));
+}
 
 function showPanel() {
-  vi.spyOn(api, "get").mockResolvedValue({ data: settings });
+  mockGet();
   render(
     <QueryClientProvider
       client={
@@ -65,7 +91,7 @@ it("clears a previous generation result after saving a different model", async (
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Modèle" }));
   fireEvent.click(await screen.findByRole("option", { name: "gpt-4.1-mini" }));
   const updated = { ...settings, model: "gpt-4.1-mini" };
-  vi.mocked(api.get).mockResolvedValue({ data: updated });
+  mockGet(updated);
   vi.spyOn(api, "put").mockResolvedValue({ data: updated });
   fireEvent.submit(
     screen
@@ -90,7 +116,7 @@ it("requires saving a changed model before testing generation", async () => {
   expect(testButton).toBeDisabled();
 });
 
-it.each(["Mistral AI", "Google Gemini", "Endpoint compatible"])(
+it.each(["Mistral AI", "Google Gemini"])(
   "discards an entered key when switching to %s and disables activation",
   async (provider) => {
     showPanel();
@@ -124,9 +150,39 @@ it("offers Gemini models while keeping generation disabled for unsaved changes",
   );
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Modèle" }));
   expect(
-    await screen.findByRole("option", { name: "gemini-3.8-flash" }),
+    await screen.findByRole("option", { name: "gemini-3.1-flash-lite" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("option", { name: "gemini-2.5-pro" }),
   ).toBeInTheDocument();
+});
+
+it("shows the monthly usage and offers no custom endpoint provider", async () => {
+  showPanel();
+  expect(
+    await screen.findByText(/Ce mois-ci : 12 appel\(s\)/),
+  ).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Fournisseur IA" }));
+  expect(
+    screen.queryByRole("option", { name: "Endpoint compatible" }),
+  ).not.toBeInTheDocument();
+});
+
+it("blocks activation until the usage terms are acknowledged", async () => {
+  mockGet({ ...settings, enabled: false, termsAcknowledged: false });
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <AiCopilotSettingsPanel />
+    </QueryClientProvider>,
+  );
+  const activation = await screen.findByRole("switch", {
+    name: "Activer le copilote IA pour l’organisation",
+  });
+  expect(activation).toBeDisabled();
+  fireEvent.click(screen.getByRole("switch", { name: /DPA/ }));
+  expect(activation).toBeEnabled();
 });

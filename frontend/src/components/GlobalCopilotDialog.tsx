@@ -29,7 +29,12 @@ import type { Asset, Scope, Threat, User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  /** Signature serveur d'une réponse assistant : sans elle, le tour est ignoré au rejeu. */
+  signature?: string;
+};
 type PilotAction = {
   type:
     | "NAVIGATE"
@@ -42,6 +47,7 @@ type PilotAction = {
 };
 type Context = {
   enabled: boolean;
+  allowed: boolean;
   provider: string | null;
   model: string | null;
   dataPolicy: "MINIMAL" | "CONTEXTUAL";
@@ -139,6 +145,14 @@ export function GlobalCopilotDialog({
   const [grcObjective, setGrcObjective] = useState("");
   const [grcConsent, setGrcConsent] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [riskInteractionId, setRiskInteractionId] = useState<number | null>(
+    null,
+  );
+  const [riskSnapshot, setRiskSnapshot] = useState("");
+  const [complianceInteractionId, setComplianceInteractionId] = useState<
+    number | null
+  >(null);
+  const [complianceSnapshot, setComplianceSnapshot] = useState("");
   const [success, setSuccess] = useState<{
     label: string;
     href: string;
@@ -215,7 +229,11 @@ export function GlobalCopilotDialog({
   const chat = useMutation({
     mutationFn: async () =>
       (
-        await api.post<{ answer: string; actions: PilotAction[] }>("/copilot", {
+        await api.post<{
+          answer: string;
+          signature: string;
+          actions: PilotAction[];
+        }>("/copilot", {
           question,
           consent,
           history: messages.slice(-8),
@@ -228,13 +246,54 @@ export function GlobalCopilotDialog({
       setMessages((current) => [
         ...current,
         { role: "user", content: question },
-        { role: "assistant", content: response.answer },
+        {
+          role: "assistant",
+          content: response.answer,
+          signature: response.signature,
+        },
       ]);
       setQuestion("");
       setConsent(false);
       setPilotActions(response.actions ?? []);
     },
   });
+  /** Supervision humaine ISO/IEC 42001 : trace la décision prise sur un brouillon IA et relie l'objet créé. */
+  const recordDecision = async (
+    interactionId: number | null,
+    targetType: "RISK" | "ACTION",
+    targetId: number,
+    edited: boolean,
+  ) => {
+    if (interactionId === null) return;
+    try {
+      await api.post(`/copilot/interactions/${interactionId}/decision`, {
+        decision: edited ? "EDITED" : "ACCEPTED",
+        targetType,
+        targetId,
+      });
+    } catch {
+      // La création a réussi ; l'absence de trace est visible dans le journal d'usage.
+    }
+  };
+  const riskState = () =>
+    JSON.stringify([
+      risk.title,
+      risk.description,
+      risk.scopeId,
+      risk.assetId,
+      risk.threatId,
+      risk.likelihood,
+      risk.impact,
+    ]);
+  const complianceState = () =>
+    JSON.stringify([
+      complianceAction.title,
+      complianceAction.description,
+      complianceAction.complianceResultId,
+      complianceAction.priority,
+      complianceAction.actionType,
+      complianceAction.dueDate,
+    ]);
   const createRisk = useMutation({
     mutationFn: async () =>
       (
@@ -263,6 +322,13 @@ export function GlobalCopilotDialog({
         })
       ).data,
     onSuccess: async (created) => {
+      await recordDecision(
+        riskInteractionId,
+        "RISK",
+        created.id,
+        riskState() !== riskSnapshot,
+      );
+      setRiskInteractionId(null);
       await queryClient.invalidateQueries({ queryKey: ["risks"] });
       setSuccess({ label: `Risque créé : ${created.title}`, href: "/risks" });
       setConfirmed(false);
@@ -271,12 +337,27 @@ export function GlobalCopilotDialog({
   const generateRisk = useMutation({
     mutationFn: async ({ request, consent }: DraftRequest) =>
       (
-        await api.post<{ draft: RiskDraft }>("/copilot/risk-draft", {
-          prompt: request,
-          consent,
-        })
+        await api.post<{ draft: RiskDraft; interactionId: number }>(
+          "/copilot/risk-draft",
+          {
+            prompt: request,
+            consent,
+          },
+        )
       ).data,
-    onSuccess: ({ draft }) => {
+    onSuccess: ({ draft, interactionId }) => {
+      setRiskInteractionId(interactionId);
+      setRiskSnapshot(
+        JSON.stringify([
+          draft.title,
+          draft.description,
+          String(draft.scopeId),
+          String(draft.assetId),
+          String(draft.threatId),
+          draft.likelihood,
+          draft.impact,
+        ]),
+      );
       setRisk((current) => ({
         ...current,
         title: draft.title,
@@ -295,15 +376,26 @@ export function GlobalCopilotDialog({
   const generateComplianceAction = useMutation({
     mutationFn: async ({ request, consent }: DraftRequest) =>
       (
-        await api.post<{ draft: ComplianceActionDraft }>(
-          "/copilot/compliance-action-draft",
-          { prompt: request, consent },
-        )
+        await api.post<{
+          draft: ComplianceActionDraft;
+          interactionId: number;
+        }>("/copilot/compliance-action-draft", { prompt: request, consent })
       ).data,
-    onSuccess: ({ draft }) => {
+    onSuccess: ({ draft, interactionId }) => {
       const dueDate = new Date(Date.now() + draft.dueInDays * 86_400_000)
         .toISOString()
         .slice(0, 10);
+      setComplianceInteractionId(interactionId);
+      setComplianceSnapshot(
+        JSON.stringify([
+          draft.title,
+          draft.description,
+          String(draft.complianceResultId),
+          draft.priority,
+          draft.actionType,
+          dueDate,
+        ]),
+      );
       setComplianceAction((current) => ({
         ...current,
         title: draft.title,
@@ -365,6 +457,13 @@ export function GlobalCopilotDialog({
       ).data;
     },
     onSuccess: async (created) => {
+      await recordDecision(
+        complianceInteractionId,
+        "ACTION",
+        created.id,
+        complianceState() !== complianceSnapshot,
+      );
+      setComplianceInteractionId(null);
       await queryClient.invalidateQueries({ queryKey: ["actions"] });
       setSuccess({
         label: `Action conformité créée : ${created.title}`,

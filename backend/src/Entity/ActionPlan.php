@@ -20,6 +20,7 @@ class ActionPlan
     public const ACTION_TYPES = ['TECHNICAL', 'ORGANIZATIONAL', 'HUMAN', 'PHYSICAL', 'CONTRACTUAL', 'OTHER'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
+    #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?AiInteraction $aiInteraction = null;
     #[ORM\Column(length: 255)] private string $title;
     #[ORM\Column(type: 'text', nullable: true)] private ?string $description = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
@@ -66,6 +67,17 @@ class ActionPlan
         $this->updatedAt = new \DateTimeImmutable();
         $this->auditFindings = new ArrayCollection();
         $this->complianceResults = new ArrayCollection();
+    }
+
+    public function getAiInteraction(): ?AiInteraction
+    {
+        return $this->aiInteraction;
+    }
+
+    /** Provenance ISO/IEC 42001 : l'objet a été créé à partir d'un brouillon IA relu et confirmé. */
+    public function markAiAssisted(AiInteraction $interaction): void
+    {
+        $this->aiInteraction = $interaction;
     }
 
     public function getId(): ?int

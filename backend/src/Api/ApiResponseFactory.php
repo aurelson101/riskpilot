@@ -65,6 +65,7 @@ final class ApiResponseFactory
                 ...array_map(static fn (\App\Entity\AuditFinding $item): array => ['type' => 'AUDIT_FINDING', 'id' => $item->getId(), 'title' => $item->getTitle()], $action->getAuditFindings()->toArray()),
                 ...array_map(static fn (ComplianceResult $item): array => ['type' => 'COMPLIANCE_RESULT', 'id' => $item->getId(), 'title' => $item->getRequirement()->getTitle()], $action->getComplianceResults()->toArray()),
             ],
+            'aiAssisted' => null !== $action->getAiInteraction(),
             'createdAt' => $action->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $action->getUpdatedAt()->format(DATE_ATOM),
         ];
     }
@@ -173,6 +174,7 @@ final class ApiResponseFactory
             'currentLikelihood' => $risk->getCurrentLikelihood(), 'currentImpact' => $risk->getCurrentImpact(), 'currentRiskScore' => $risk->getCurrentRiskScore(),
             'residualLikelihood' => $risk->getResidualLikelihood(), 'residualImpact' => $risk->getResidualImpact(), 'residualRiskScore' => $risk->getResidualRiskScore(),
             'treatmentDecision' => $risk->getTreatmentDecision(), 'status' => $risk->getStatus(), 'reviewDate' => $risk->getReviewDate()?->format('Y-m-d'),
+            'aiAssisted' => null !== $risk->getAiInteraction(),
             'createdAt' => $risk->getCreatedAt()->format(DATE_ATOM), 'updatedAt' => $risk->getUpdatedAt()->format(DATE_ATOM),
         ];
     }

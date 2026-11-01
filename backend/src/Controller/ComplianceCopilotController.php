@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\AiCallMetrics;
 use App\Application\AiCopilotClient;
+use App\Application\AiCopilotRuntime;
 use App\Application\CurrentUser;
 use App\Entity\AiSettings;
 use App\Entity\ComplianceResult;
-use App\Repository\AiSettingsRepository;
 use App\Repository\ComplianceResultRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/compliance-results/{id<\d+>}/copilot')]
@@ -21,9 +21,8 @@ final readonly class ComplianceCopilotController
     public function __construct(
         private CurrentUser $currentUser,
         private ComplianceResultRepository $results,
-        private AiSettingsRepository $settings,
+        private AiCopilotRuntime $runtime,
         private AiCopilotClient $client,
-        private RateLimiterFactoryInterface $aiCopilotLimiter,
     ) {
     }
 
@@ -34,14 +33,17 @@ final readonly class ComplianceCopilotController
         if (!$result instanceof ComplianceResult) {
             return $this->error('NOT_FOUND', 'Résultat de conformité introuvable.', 404);
         }
-        $settings = $this->findSettings();
+        $settings = $this->runtime->settingsFor($this->currentUser->get());
+        $policy = null === $settings ? 'MINIMAL' : $this->runtime->effectiveDataPolicy($settings);
 
         return new JsonResponse([
-            'enabled' => $settings?->isEnabled() ?? false,
+            'enabled' => $this->runtime->canSend() && $this->runtime->isUsable($settings),
+            'allowed' => $this->runtime->canSend(),
             'provider' => $settings?->getProvider(),
             'model' => $settings?->getModel(),
-            'dataPolicy' => $settings?->getDataPolicy() ?? 'MINIMAL',
-            'context' => $this->sharedContext($result, $settings?->getDataPolicy() ?? 'MINIMAL'),
+            'dataPolicy' => $policy,
+            'consentVersion' => AiCopilotRuntime::CONSENT_VERSION,
+            'context' => $this->sharedContext($result, $policy),
             'sources' => $this->sources($result),
             'notice' => 'Aucune réponse IA ne modifie automatiquement la conformité, les preuves ou le score.',
         ]);
@@ -55,13 +57,11 @@ final readonly class ComplianceCopilotController
         if (!$result instanceof ComplianceResult) {
             return $this->error('NOT_FOUND', 'Résultat de conformité introuvable.', 404);
         }
-        $settings = $this->findSettings();
-        if (!$settings instanceof AiSettings || !$settings->isEnabled() || null === $settings->getEncryptedApiKey()) {
-            return $this->error('AI_DISABLED', 'Le copilote IA n’est pas configuré et activé pour cette organisation.', 409);
+        $settings = $this->runtime->settingsFor($actor);
+        if (null !== $refusal = $this->runtime->unavailable($settings)) {
+            return $refusal;
         }
-        if ('CUSTOM' === $settings->getProvider()) {
-            return $this->error('CUSTOM_PROVIDER_UNAVAILABLE', 'Les endpoints personnalisés ne sont pas autorisés pour le chatbot tant que leur sécurité réseau n’est pas validée.', 422);
-        }
+        \assert($settings instanceof AiSettings);
         $input = $request->toArray();
         if (!is_string($input['question'] ?? null) || (array_key_exists('history', $input) && !is_array($input['history']))) {
             return $this->error('INVALID_REQUEST', 'La question et l’historique doivent respecter le format attendu.', 422);
@@ -70,32 +70,25 @@ final readonly class ComplianceCopilotController
         if (true !== ($input['consent'] ?? false) || mb_strlen($question) < 3 || mb_strlen($question) > 2000) {
             return $this->error('INVALID_REQUEST', 'Le consentement et une question de 3 à 2 000 caractères sont obligatoires.', 422);
         }
-        $history = $this->history($input['history'] ?? []);
+        $history = $this->runtime->history($actor, $input['history'] ?? []);
         if (null === $history) {
             return $this->error('INVALID_HISTORY', 'L’historique est invalide ou dépasse huit messages.', 422);
         }
-        $limit = $this->aiCopilotLimiter->create(sprintf('%d|%d', $actor->getOrganization()->getId(), $actor->getId()))->consume();
-        if (!$limit->isAccepted()) {
-            return $this->error('AI_RATE_LIMIT', 'Quota du copilote atteint. Réessayez plus tard.', 429);
+        $dataPolicy = $this->runtime->effectiveDataPolicy($settings);
+        $context = $this->sharedContext($result, $dataPolicy);
+        $run = $this->runtime->run($actor, $settings, 'COMPLIANCE_COPILOT', $question, fn (AiCallMetrics $metrics): string => $this->client->ask(
+            $settings, $context, $question, $history, $actor->getLocale(), AiCopilotRuntime::safetyIdentifier($actor), $metrics,
+        ), 'Le fournisseur IA n’a pas pu produire de réponse.');
+        if ($run instanceof JsonResponse) {
+            return $run;
         }
-        $context = $this->sharedContext($result, $settings->getDataPolicy());
-        try {
-            $answer = $this->client->ask(
-                $settings,
-                $context,
-                $question,
-                $history,
-                $actor->getLocale(),
-                hash('sha256', sprintf('riskpilot|%d|%d', $actor->getOrganization()->getId(), $actor->getId())),
-            );
-        } catch (\Throwable) {
-            return $this->error('AI_PROVIDER_FAILED', 'Le fournisseur IA n’a pas pu produire de réponse.', 502);
-        }
+        $answer = $run['result'];
         $request->attributes->set('_audit_after', [[
             'provider' => $settings->getProvider(),
             'model' => $settings->getModel(),
-            'dataPolicy' => $settings->getDataPolicy(),
+            'dataPolicy' => $dataPolicy,
             'questionHash' => hash('sha256', $question),
+            'interactionId' => $run['interaction']->getId(),
             'complianceResultId' => $result->getId(),
             'sourceIds' => array_column($this->sources($result), 'id'),
             'automaticWrite' => false,
@@ -103,6 +96,8 @@ final readonly class ComplianceCopilotController
 
         return new JsonResponse([
             'answer' => $answer,
+            'signature' => $this->runtime->sign($actor, $answer),
+            'interactionId' => $run['interaction']->getId(),
             'provider' => $settings->getProvider(),
             'model' => $settings->getModel(),
             'sources' => $this->sources($result),
@@ -116,11 +111,6 @@ final readonly class ComplianceCopilotController
         $result = $this->results->find($id);
 
         return $result instanceof ComplianceResult && $result->getAssessment()->getOrganization() === $this->currentUser->get()->getOrganization() ? $result : null;
-    }
-
-    private function findSettings(): ?AiSettings
-    {
-        return $this->settings->findOneBy(['organization' => $this->currentUser->get()->getOrganization()]);
     }
 
     /** @return array<string, scalar|array<array-key, scalar|null>|null> */
@@ -157,32 +147,6 @@ final readonly class ComplianceCopilotController
             'id' => (int) $result->getRequirement()->getId(),
             'label' => $result->getRequirement()->getReference().' — '.$result->getRequirement()->getTitle(),
         ]];
-    }
-
-    /** @param array<array-key, mixed> $input
-     * @return list<array{role: 'user'|'assistant', content: string}>|null
-     */
-    private function history(array $input): ?array
-    {
-        if (count($input) > 8) {
-            return null;
-        }
-        $history = [];
-        foreach ($input as $message) {
-            if (!is_array($message) || !in_array($message['role'] ?? null, ['user', 'assistant'], true)) {
-                return null;
-            }
-            if (!is_string($message['content'] ?? null)) {
-                return null;
-            }
-            $content = trim($message['content']);
-            if ('' === $content || mb_strlen($content) > 2000) {
-                return null;
-            }
-            $history[] = ['role' => $message['role'], 'content' => $content];
-        }
-
-        return $history;
     }
 
     private function error(string $code, string $message, int $status): JsonResponse

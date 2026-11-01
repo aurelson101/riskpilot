@@ -104,13 +104,14 @@ services:
         arguments:
             $shareLimiter: '@limiter.document_share'
 
-    App\Controller\ComplianceCopilotController:
+    App\Application\AiCopilotRuntime:
         arguments:
             $aiCopilotLimiter: '@limiter.ai_copilot'
+            $appSecret: '%app.secret%'
 
-    App\Controller\GlobalCopilotController:
+    App\Controller\AiSettingsController:
         arguments:
-            $aiCopilotLimiter: '@limiter.ai_copilot'
+            $aiSettingsTestLimiter: '@limiter.ai_settings_test'
 
     App\Controller\GlobalSearchController:
         arguments:

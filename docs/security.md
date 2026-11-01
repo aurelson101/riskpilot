@@ -20,3 +20,21 @@ Les mutations réussies sont inscrites dans un journal tenant-aware avec l’aut
 Les clés JWT locales sont ignorées par Git. En production, elles doivent être fournies par le gestionnaire de secrets. Les secrets TOTP, mots de passe SMTP, secrets clients OAuth et jetons Google/Microsoft sont chiffrés avec libsodium à partir de `APP_SECRET` : ce secret doit rester stable, unique et conservé dans le gestionnaire de secrets. Les connexions OAuth utilisent un état aléatoire à usage unique expirant après dix minutes et ne demandent que les droits d’envoi et d’identification du compte. Lorsqu’un JWT local expire ou devient invalide, l’interface efface la session et renvoie vers la connexion au lieu de conserver un écran de chargement. Le renouvellement sécurisé et la révocation centralisée des sessions restent nécessaires avant la mise en production.
 
 Les documents ISMS sont filtrés par organisation puis par propriétaire/ACL lorsqu’ils sont restreints. Les liens externes reposent sur 256 bits aléatoires et seule leur empreinte SHA-256 est conservée. Les mots de passe de partage utilisent Argon2id, les dates d’expiration et révocations sont contrôlées à chaque accès, et les tentatives publiques sont limitées par adresse IP et jeton.
+
+## Gouvernance et sécurité de l'IA
+
+Le copilote est encadré par `AiCopilotRuntime`, point de passage unique des
+appels : contrôle du rôle, quota utilisateur, plafond journalier et budget
+mensuel par organisation, puis journalisation dans `ai_interactions` (métadonnées
+et empreintes seulement). Les clés fournisseur sont chiffrées avec libsodium et
+ne sont jamais renvoyées. Les URL fournisseur sont imposées par le serveur, sans
+redirection, et les modèles sont limités par une liste blanche.
+
+Contre l'injection de prompt : le chemin courant est validé contre le format des
+routes, le contexte tenant est encodé avec `JSON_HEX_TAG`, l'historique rejoué
+est déclaré non fiable et les tours assistant sans signature HMAC serveur sont
+supprimés. Le modèle ne dispose d'aucun appel d'outil : `automaticWrite` reste
+faux et toute création passe par un brouillon relu et confirmé, dont la décision
+est tracée. Les échecs fournisseur sont journalisés (classe d'erreur, statut HTTP,
+tentatives) sans contenu. Limite connue : la clé de chiffrement dérive
+directement de `APP_SECRET`, sans rotation versionnée.

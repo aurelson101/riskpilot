@@ -36,8 +36,8 @@ final class ComplianceCopilotControllerTest extends WebTestCase
 
         $organization = new Organization('Primary');
         $otherOrganization = new Organization('Other');
-        $viewer = new User('viewer@example.test', 'Victor', 'Viewer', $organization, [User::ROLE_VIEWER]);
-        $other = new User('other@example.test', 'Other', 'Viewer', $otherOrganization, [User::ROLE_VIEWER]);
+        $viewer = new User('viewer@example.test', 'Victor', 'Viewer', $organization, [User::ROLE_RISK_MANAGER]);
+        $other = new User('other@example.test', 'Other', 'Viewer', $otherOrganization, [User::ROLE_RISK_MANAGER]);
         $scope = new Scope('Production', 'ORGANIZATION', $organization);
         $framework = new Framework('RGPD', '2016/679');
         $requirement = (new Requirement($framework, 'ART-32', 'Sécurité du traitement', 'Sécurité'))->setDescription('Description contextuelle');
@@ -65,6 +65,9 @@ final class ComplianceCopilotControllerTest extends WebTestCase
         self::assertInstanceOf(Organization::class, $managedOrganization);
         $settings = new AiSettings($managedOrganization);
         $settings->configure('OPENAI', 'https://api.openai.com/v1', 'gpt-test', 'CONTEXTUAL', '', true);
+        $acknowledger = $manager->find(User::class, $viewer->getId());
+        self::assertInstanceOf(User::class, $acknowledger);
+        $settings->acknowledgeTerms($acknowledger);
         $settings->setEncryptedApiKey(self::getContainer()->get(SecretCipher::class)->encrypt('provider-secret'));
         $manager->persist($settings);
         $manager->flush();

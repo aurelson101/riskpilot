@@ -54,6 +54,15 @@ final class AiSettingsControllerTest extends WebTestCase
             $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'apiKey' => $apiKey]);
             self::assertResponseStatusCodeSame(422);
         }
+        $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'provider' => 'OPENAI', 'model' => 'gpt-test-unknown']);
+        self::assertResponseStatusCodeSame(422, 'A model outside the server allowlist must be refused.');
+        $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'enabled' => true]);
+        self::assertResponseStatusCodeSame(422, 'Enabling requires the organisation-level terms acknowledgement.');
+        $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'acknowledgeTerms' => true, 'monthlyTokenBudget' => 5]);
+        self::assertResponseStatusCodeSame(422, 'The monthly token budget has a lower bound.');
+        $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'acknowledgeTerms' => true]);
+        self::assertResponseIsSuccessful();
+        self::assertTrue(json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['termsAcknowledged']);
 
         $client->jsonRequest('PUT', '/api/settings/ai', [
             'provider' => 'MISTRAL', 'model' => 'codestrale', 'apiKey' => 'test-key',
@@ -61,7 +70,7 @@ final class AiSettingsControllerTest extends WebTestCase
         ]);
         self::assertResponseStatusCodeSame(422);
         $invalidModel = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertStringContainsString('modèle Mistral pris en charge', $invalidModel['message']);
+        self::assertStringContainsString('modèle pris en charge', $invalidModel['message']);
 
         foreach (['mistral-medium-latest', 'mistral-medium-3-5', 'mistral-small-latest', 'mistral-small-2603', 'ministral-14b-2512'] as $model) {
             $client->jsonRequest('PUT', '/api/settings/ai', [...$validInput, 'provider' => 'MISTRAL', 'model' => $model]);
@@ -118,7 +127,7 @@ final class AiSettingsControllerTest extends WebTestCase
         ]);
         self::assertResponseStatusCodeSame(422);
         $customError = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertStringContainsString('endpoints personnalisés', $customError['message']);
+        self::assertStringContainsString('fournisseur IA sélectionné est invalide', $customError['message']);
 
         $stored = $manager->getRepository(AiSettings::class)->findOneBy(['organization' => $first]);
         self::assertInstanceOf(AiSettings::class, $stored);

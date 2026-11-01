@@ -82,6 +82,9 @@ final class GlobalCopilotControllerTest extends WebTestCase
         self::assertInstanceOf(Organization::class, $managedOrganization);
         $settings = new AiSettings($managedOrganization);
         $settings->configure('OPENAI', 'https://api.openai.com/v1', 'gpt-test', 'MINIMAL', '', true);
+        $acknowledger = $manager->find(User::class, $managerUser->getId());
+        self::assertInstanceOf(User::class, $acknowledger);
+        $settings->acknowledgeTerms($acknowledger);
         $settings->setEncryptedApiKey(self::getContainer()->get(SecretCipher::class)->encrypt('provider-secret'));
         $manager->persist($settings);
         $manager->flush();
@@ -176,10 +179,10 @@ final class GlobalCopilotControllerTest extends WebTestCase
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($viewer));
         $client->jsonRequest('POST', '/api/copilot', ['question' => 'Prépare une synthèse GRC', 'consent' => true, 'mode' => 'PILOT', 'currentPath' => '/']);
-        self::assertResponseIsSuccessful();
-        $viewerPilot = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame([], $viewerPilot['actions'], 'A viewer cannot open a manager-only AI workflow.');
-        self::assertFalse($viewerPilot['automaticWrite']);
+        self::assertResponseStatusCodeSame(403, 'A read-only viewer must not send tenant data to the AI provider.');
+        self::assertSame('AI_ROLE_REQUIRED', json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['code']);
+        $client->request('GET', '/api/copilot/context');
+        self::assertFalse(json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['enabled']);
 
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($other));
         $client->request('GET', '/api/copilot/context');

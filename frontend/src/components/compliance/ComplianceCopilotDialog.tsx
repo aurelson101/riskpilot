@@ -30,9 +30,14 @@ type ContextPreview = {
   sources: Source[];
   notice: string;
 };
-type Message = { role: "user" | "assistant"; content: string };
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  signature?: string;
+};
 type CopilotAnswer = {
   answer: string;
+  signature: string;
   provider: string;
   model: string;
   sources: Source[];
@@ -75,7 +80,11 @@ export function ComplianceCopilotDialog({
       setMessages((current) => [
         ...current,
         { role: "user", content: currentQuestion },
-        { role: "assistant", content: answer.answer },
+        {
+          role: "assistant",
+          content: answer.answer,
+          signature: answer.signature,
+        },
       ]);
       setQuestion("");
       setConsent(false);

@@ -15,7 +15,7 @@ import {
 import axios from "axios";
 import { api } from "../api/client";
 
-type Provider = "MISTRAL" | "OPENAI" | "GEMINI" | "CUSTOM";
+type Provider = "MISTRAL" | "OPENAI" | "GEMINI";
 type AiSettings = {
   provider: Provider;
   baseUrl: string;
@@ -24,14 +24,31 @@ type AiSettings = {
   dataPolicy: "MINIMAL" | "CONTEXTUAL";
   systemPrompt: string;
   enabled: boolean;
+  monthlyTokenBudget: number;
+  dailyCallLimit: number;
+  termsAcknowledged: boolean;
+  termsVersion: string;
+  termsAcknowledgedAt: string | null;
+  models: string[];
   updatedAt: string | null;
 };
-type Form = AiSettings & { apiKey: string };
+type Usage = {
+  usage: {
+    calls: number;
+    succeeded: number;
+    failed: number;
+    refused: number;
+    inputTokens: number;
+    outputTokens: number;
+  };
+  monthlyTokenBudget: number;
+  dailyCallLimit: number;
+  dailyCalls: number;
+  promptVersion: string;
+};
+type Form = AiSettings & { apiKey: string; acknowledgeTerms: boolean };
 
-const presets: Record<
-  Exclude<Provider, "CUSTOM">,
-  Pick<Form, "baseUrl" | "model">
-> = {
+const presets: Record<Provider, Pick<Form, "baseUrl" | "model">> = {
   MISTRAL: {
     baseUrl: "https://api.mistral.ai/v1",
     model: "mistral-large-latest",
@@ -43,7 +60,8 @@ const presets: Record<
   },
 };
 
-const providerModels: Partial<Record<Provider, readonly string[]>> = {
+/** Doit rester identique à AiSettingsController::MODELS : le serveur refuse tout autre modèle. */
+const providerModels: Record<Provider, readonly string[]> = {
   MISTRAL: [
     "mistral-large-latest",
     "mistral-medium-latest",
@@ -53,16 +71,9 @@ const providerModels: Partial<Record<Provider, readonly string[]>> = {
     "ministral-14b-2512",
     "codestral-latest",
   ],
-  OPENAI: [
-    "gpt-5-mini",
-    "gpt-4.1-mini",
-    "gpt-4.1",
-    "gpt-6.1-sol",
-    "gpt-6-luna",
-  ],
+  OPENAI: ["gpt-5-mini", "gpt-4.1-mini", "gpt-4.1"],
   GEMINI: [
     "gemini-3.5-flash-lite",
-    "gemini-3.8-flash",
     "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
@@ -76,16 +87,24 @@ export function AiCopilotSettingsPanel() {
     queryKey: ["ai-settings"],
     queryFn: async () => (await api.get<AiSettings>("/settings/ai")).data,
   });
+  const usage = useQuery({
+    queryKey: ["ai-usage"],
+    queryFn: async () => (await api.get<Usage>("/settings/ai/usage")).data,
+  });
   const [draft, setForm] = useState<Form | null>(null);
   const form =
-    draft ?? (settings.data ? { ...settings.data, apiKey: "" } : null);
+    draft ??
+    (settings.data
+      ? { ...settings.data, apiKey: "", acknowledgeTerms: false }
+      : null);
   const save = useMutation({
     mutationFn: async () =>
       (await api.put<AiSettings>("/settings/ai", form)).data,
     onSuccess: async (data) => {
       test.reset();
-      setForm({ ...data, apiKey: "" });
+      setForm({ ...data, apiKey: "", acknowledgeTerms: false });
       await cache.invalidateQueries({ queryKey: ["ai-settings"] });
+      await cache.invalidateQueries({ queryKey: ["ai-usage"] });
     },
   });
   const test = useMutation({
@@ -100,6 +119,7 @@ export function AiCopilotSettingsPanel() {
   if (settings.isLoading || !form) return null;
   const configurationSaved =
     form.apiKey === "" &&
+    !form.acknowledgeTerms &&
     (
       [
         "provider",
@@ -108,11 +128,12 @@ export function AiCopilotSettingsPanel() {
         "dataPolicy",
         "systemPrompt",
         "enabled",
+        "monthlyTokenBudget",
+        "dailyCallLimit",
       ] as const
     ).every((field) => form[field] === settings.data?.[field]);
-  const models = [
-    ...new Set([...(providerModels[form.provider] ?? []), form.model]),
-  ];
+  const models = providerModels[form.provider];
+  const termsOk = form.termsAcknowledged || form.acknowledgeTerms;
 
   return (
     <Card variant="outlined">
@@ -179,17 +200,16 @@ export function AiCopilotSettingsPanel() {
                     provider === settings.data?.provider &&
                     settings.data.apiKeyConfigured,
                   enabled: false,
-                  ...(provider === "CUSTOM" ? {} : presets[provider]),
+                  ...presets[provider],
                 });
               }}
             >
               <MenuItem value="MISTRAL">Mistral AI</MenuItem>
               <MenuItem value="OPENAI">OpenAI</MenuItem>
               <MenuItem value="GEMINI">Google Gemini</MenuItem>
-              <MenuItem value="CUSTOM">Endpoint compatible</MenuItem>
             </TextField>
             <TextField
-              select={form.provider !== "CUSTOM"}
+              select
               fullWidth
               required
               label="Modèle"
@@ -210,11 +230,8 @@ export function AiCopilotSettingsPanel() {
             required
             label="URL de l’API"
             value={form.baseUrl}
-            disabled={form.provider !== "CUSTOM"}
-            onChange={(event) =>
-              setForm({ ...form, baseUrl: event.target.value })
-            }
-            helperText="HTTPS obligatoire. Le test automatique des endpoints personnalisés est désactivé."
+            disabled
+            helperText="URL officielle du fournisseur, imposée par le serveur (protection contre les accès réseau internes)."
           />
           <TextField
             type="password"
@@ -258,10 +275,67 @@ export function AiCopilotSettingsPanel() {
               setForm({ ...form, systemPrompt: event.target.value })
             }
           />
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+            <TextField
+              type="number"
+              fullWidth
+              label="Budget mensuel de tokens"
+              value={form.monthlyTokenBudget}
+              inputProps={{ min: 10000, max: 50000000, step: 10000 }}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  monthlyTokenBudget: Number(event.target.value),
+                })
+              }
+              helperText="Les appels sont refusés (429) une fois le budget de l’organisation épuisé."
+            />
+            <TextField
+              type="number"
+              fullWidth
+              label="Plafond d’appels par jour"
+              value={form.dailyCallLimit}
+              inputProps={{ min: 1, max: 100000 }}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  dailyCallLimit: Number(event.target.value),
+                })
+              }
+            />
+          </Stack>
+          {usage.data && (
+            <Alert severity="info">
+              Ce mois-ci : {usage.data.usage.calls} appel(s) dont{" "}
+              {usage.data.usage.failed} en échec et {usage.data.usage.refused}{" "}
+              refusé(s) ;{" "}
+              {usage.data.usage.inputTokens + usage.data.usage.outputTokens} /{" "}
+              {usage.data.monthlyTokenBudget} tokens. Aujourd’hui :{" "}
+              {usage.data.dailyCalls} / {usage.data.dailyCallLimit} appels.
+              Version des consignes : {usage.data.promptVersion}.
+            </Alert>
+          )}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={termsOk}
+                disabled={form.termsAcknowledged}
+                onChange={(event) =>
+                  setForm({ ...form, acknowledgeTerms: event.target.checked })
+                }
+              />
+            }
+            label={
+              form.termsAcknowledged
+                ? `Avis d’usage IA ${form.termsVersion} acquitté${form.termsAcknowledgedAt ? ` le ${new Date(form.termsAcknowledgedAt).toLocaleDateString("fr-FR")}` : ""}`
+                : "J’atteste que le contrat de traitement (DPA), les transferts hors UE éventuels et le sous-traitant IA ont été validés pour cette organisation"
+            }
+          />
           <FormControlLabel
             control={
               <Switch
                 checked={form.enabled}
+                disabled={!termsOk}
                 onChange={(event) =>
                   setForm({ ...form, enabled: event.target.checked })
                 }
@@ -279,7 +353,6 @@ export function AiCopilotSettingsPanel() {
                 !form.apiKeyConfigured ||
                 !configurationSaved ||
                 save.isPending ||
-                form.provider === "CUSTOM" ||
                 test.isPending
               }
               onClick={() => test.mutate()}
