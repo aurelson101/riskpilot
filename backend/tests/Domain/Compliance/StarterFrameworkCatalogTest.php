@@ -70,6 +70,20 @@ final class StarterFrameworkCatalogTest extends TestCase
         self::assertStringContainsString('import CSV', $definition['description']);
     }
 
+    public function testTisaxControlQuestionsAttachToTheirSectionsAndEveryModuleHasSome(): void
+    {
+        $requirements = (new StarterFrameworkCatalog())->definition('tisax')['requirements'];
+        $references = array_column($requirements, 0);
+        self::assertSame(array_unique($references), $references, 'References are unique.');
+        $questions = array_filter($requirements, static fn (array $row): bool => 1 === preg_match('/^\d+\.\d+\.\d+$/', $row[0]));
+        self::assertCount(58, $questions);
+        foreach ($questions as $question) {
+            self::assertContains($question[3] ?? null, $references, $question[0].' has a known parent section.');
+            self::assertStringStartsWith($question[3].'.', $question[0]);
+        }
+        self::assertSame(['Sécurité de l’information', 'Protection des prototypes', 'Protection des données'], array_values(array_unique(array_column($questions, 2))));
+    }
+
     public function testNis2DetailsArticle21AndTheArticle23Timeline(): void
     {
         $references = array_column((new StarterFrameworkCatalog())->definition('nis2')['requirements'], 0);

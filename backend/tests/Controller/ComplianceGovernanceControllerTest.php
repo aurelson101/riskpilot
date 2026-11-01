@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
-use App\Entity\Framework;
+use App\Domain\Compliance\StarterFrameworkCatalog;
 use App\Entity\ComplianceAssessment;
 use App\Entity\ComplianceResult;
-use App\Entity\RequirementMapping;
+use App\Entity\Framework;
 use App\Entity\Organization;
 use App\Entity\Requirement;
+use App\Entity\RequirementMapping;
 use App\Entity\Scope;
 use App\Entity\SecurityControl;
 use App\Entity\User;
@@ -86,6 +87,60 @@ final class ComplianceGovernanceControllerTest extends WebTestCase
         $this->client->jsonRequest('POST', '/api/control-tests', ['controlId' => $this->control->getId(), 'testerId' => $this->admin->getId(), 'type' => 'OPERATING_EFFECTIVENESS', 'frequency' => 'ANNUAL', 'procedure' => 'Inspecter les approbations', 'performedAt' => '2026-07-19', 'nextReviewAt' => '2027-07-19', 'result' => 'EFFECTIVE', 'sampleSize' => 12, 'evidence' => ['AUDIT-12']]);
         self::assertResponseStatusCodeSame(201);
         self::assertSame('EFFECTIVE', $this->payload()['result']);
+    }
+
+    public function testStatementOfApplicabilityPdfIsTenantScopedAndDownloadable(): void
+    {
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/statements-of-applicability', ['title' => 'SoA ISO 27001', 'frameworkId' => $this->framework->getId(), 'scopeId' => $this->scope->getId(), 'ownerId' => $this->manager->getId()]);
+        $statement = $this->payload();
+        $this->client->request('GET', '/api/statements-of-applicability/'.$statement['id'].'/export.pdf');
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $this->client->getResponse()->headers->get('Content-Type'));
+        self::assertStringStartsWith('%PDF', (string) $this->client->getResponse()->getContent());
+        self::assertStringContainsString('soa-v1.pdf', (string) $this->client->getResponse()->headers->get('Content-Disposition'));
+        self::assertNotEmpty($this->client->getResponse()->headers->get('X-RiskPilot-Document-SHA256'));
+
+        $this->authenticate($this->foreignAdmin);
+        $this->client->request('GET', '/api/statements-of-applicability/'.$statement['id'].'/export.pdf');
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testSuggestedMappingsAreCreatedOnceByAnAuthorizedUserWithoutEvidenceInheritance(): void
+    {
+        $manager = self::getContainer()->get(EntityManagerInterface::class);
+        [$iso, $isoRequirements] = self::getContainer()->get(StarterFrameworkCatalog::class)->instantiate('iso27001');
+        [$nis2, $nis2Requirements] = self::getContainer()->get(StarterFrameworkCatalog::class)->instantiate('nis2');
+        foreach ([$iso, $nis2, ...$isoRequirements, ...$nis2Requirements] as $entity) {
+            $manager->persist($entity);
+        }
+        $manager->flush();
+
+        $this->authenticate($this->viewer);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings/suggested');
+        self::assertResponseStatusCodeSame(403);
+
+        $this->authenticate($this->manager);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings/suggested');
+        self::assertResponseIsSuccessful();
+        $first = $this->payload();
+        self::assertSame(['iso27001', 'nis2'], $first['installedPacks']);
+        self::assertGreaterThan(30, $first['created']);
+        $mappings = $manager->getRepository(RequirementMapping::class)->findAll();
+        self::assertCount($first['created'], $mappings);
+        foreach ($mappings as $mapping) {
+            self::assertFalse($mapping->doesInheritEvidence());
+            self::assertStringStartsWith('[Suggestion à valider]', (string) $mapping->getRationale());
+            self::assertSame($this->manager->getId(), $mapping->getCreatedBy()->getId());
+        }
+
+        $this->client->jsonRequest('POST', '/api/requirement-mappings/suggested');
+        self::assertSame(0, $this->payload()['created'], 'A second call creates nothing.');
+        self::assertCount($first['created'], $manager->getRepository(RequirementMapping::class)->findAll());
+
+        $this->authenticate($this->foreignAdmin);
+        $this->client->jsonRequest('POST', '/api/requirement-mappings/suggested');
+        self::assertSame($first['created'], $this->payload()['created'], 'Each organization receives its own suggestions.');
     }
 
     public function testTenantIsolationAndMappingValidation(): void

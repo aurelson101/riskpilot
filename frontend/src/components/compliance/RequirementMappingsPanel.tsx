@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Add, DeleteOutline } from "@mui/icons-material";
+import { Add, AutoAwesome, DeleteOutline } from "@mui/icons-material";
 import {
   Alert,
   Autocomplete,
@@ -139,6 +139,17 @@ export function RequirementMappingsPanel() {
       setMappingToDelete(null);
     },
   });
+  const suggestMappings = useMutation({
+    mutationFn: async () =>
+      (
+        await api.post<{
+          created: number;
+          skipped: number;
+          installedPacks: string[];
+        }>("/requirement-mappings/suggested")
+      ).data,
+    onSuccess: refreshMappings,
+  });
   const closeCreateDialog = () => {
     if (createMapping.isPending) return;
     setDialogOpen(false);
@@ -200,6 +211,19 @@ export function RequirementMappingsPanel() {
             {canManage && (
               <Button
                 variant="outlined"
+                startIcon={<AutoAwesome />}
+                disabled={suggestMappings.isPending}
+                sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+                onClick={() => suggestMappings.mutate()}
+              >
+                {english
+                  ? "Load suggested mappings"
+                  : "Charger les correspondances suggérées"}
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                variant="outlined"
                 startIcon={<Add />}
                 sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
                 onClick={() => {
@@ -212,6 +236,23 @@ export function RequirementMappingsPanel() {
             )}
           </Stack>
 
+          {suggestMappings.isSuccess && (
+            <Alert severity="info" onClose={() => suggestMappings.reset()}>
+              {english
+                ? `${suggestMappings.data.created} mapping(s) added from the installed packs. They are proposals to review: they never imply compliance and inherit no evidence.`
+                : `${suggestMappings.data.created} correspondance(s) ajoutée(s) à partir des packs installés. Ce sont des propositions à valider : elles n’impliquent aucune conformité et n’héritent d’aucune preuve.`}
+            </Alert>
+          )}
+          {suggestMappings.isError && (
+            <Alert severity="error">
+              {responseMessage(
+                suggestMappings.error,
+                english
+                  ? "Unable to load the suggested mappings."
+                  : "Impossible de charger les correspondances suggérées.",
+              )}
+            </Alert>
+          )}
           {mappings.isPending && (
             <Stack alignItems="center" py={2}>
               <CircularProgress

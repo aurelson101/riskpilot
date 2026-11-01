@@ -16,12 +16,15 @@ mesures) et NIS2 détaillé, calendrier de notification NIS2 avec classification
 l'entité, évaluations TISAX AL2/AL3 avec maturité cible et export, registre des
 systèmes d'IA avec évaluations d'impact, gestion gouvernée de l'IA du copilote
 (journal des interactions, budgets, supervision humaine) et revue de direction
-structurée. Limites restantes : le TISAX est livré au niveau des chapitres, les
-questions de contrôle du catalogue VDA ISA se chargent par l'import CSV ; les
-correspondances multinormes ne sont pas préchargées ; l'export PDF de la
-déclaration d'applicabilité, l'administration graphique des correspondances et la
-validation des modèles de notification par autorité nationale restent à faire ; ces
-fonctions n'ont pas fait l'objet d'une certification ou d'un audit externe.
+structurée, export PDF de la déclaration d'applicabilité et correspondances
+multinormes suggérées. Limites restantes : le pack TISAX contient 58 questions de
+contrôle reformulées dont la numérotation et les critères de maturité détaillés
+sont à confirmer avec l'import CSV du catalogue VDA ISA officiel ; les
+correspondances suggérées (27001 vers 42001, NIS2 et TISAX) sont des propositions
+à valider, sans héritage de preuve, et aucune ne couvre la protection des
+prototypes ; la validation des modèles de notification par autorité nationale reste
+à faire ; ces fonctions n'ont pas fait l'objet d'une certification ou d'un audit
+externe.
 
 ## Parcours de référence
 

@@ -188,6 +188,37 @@ describe("RequirementMappingsPanel", () => {
       screen.getByRole("button", { name: "Créer la correspondance" }),
     ).toBeEnabled();
   });
+  it("charge les correspondances suggérées pour un gestionnaire et les présente comme à valider", async () => {
+    identity.roles = ["ROLE_RISK_MANAGER"];
+    mockReads([]);
+    const post = vi.spyOn(api, "post").mockResolvedValue({
+      data: { created: 42, skipped: 3, installedPacks: ["iso27001", "nis2"] },
+    });
+    renderPanel();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Charger les correspondances suggérées",
+      }),
+    );
+
+    expect(
+      await screen.findByText(/42 correspondance\(s\) ajoutée\(s\)/),
+    ).toBeVisible();
+    expect(screen.getByText(/propositions à valider/)).toBeVisible();
+    expect(post).toHaveBeenCalledWith("/requirement-mappings/suggested");
+  });
+  it("n’offre pas les correspondances suggérées au viewer", async () => {
+    mockReads([mapping]);
+    renderPanel();
+
+    expect(await findMappingRow()).toBeVisible();
+    expect(
+      screen.queryByRole("button", {
+        name: "Charger les correspondances suggérées",
+      }),
+    ).not.toBeInTheDocument();
+  });
   it("permet au viewer de lire les correspondances sans aucune action", async () => {
     mockReads([mapping]);
     renderPanel();

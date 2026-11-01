@@ -64,6 +64,8 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 - `GET /api/nis2/incidents/{id}/report` : trame de notification au format Markdown ;
 - `POST|PUT /api/resilience/incidents` acceptent `category` (`SECURITY`, `AI`, `PRIVACY`, `OTHER`), `significant`, `earlyWarningAt` et `finalReportAt` ; un incident significatif impose la notification réglementaire, le rapport final suppose la notification, et la clôture exige les trois déclarations ;
 - `POST|PUT /api/compliance-assessments` acceptent `tisaxLevel` (`AL2`, `AL3`), `tisaxObjectives`, `siteScope` et `participantId` (conservés si absents d'une mise à jour) ; `PUT /api/compliance-results/{id}` accepte `targetMaturity` (0 à 5) ;
+- `GET /api/statements-of-applicability/{id}/export.pdf` : déclaration d’applicabilité en PDF (langue du profil, empreinte SHA-256 en en-tête) ;
+- `POST /api/requirement-mappings/suggested` : crée, pour l’organisation, les correspondances suggérées entre les packs installés (droits de gestion) ; idempotent, sans héritage de preuve, rationale préfixée « [Suggestion à valider] » ; renvoie `created`, `skipped`, `installedPacks` ;
 - `GET /api/compliance-assessments/{id}/tisax` : synthèse par module, écarts bloquants et exigences incomplètes ; `GET …/tisax.xlsx` : export Excel ;
 - `GET|POST /api/ai-governance/systems`, `PUT …/systems/{id}` : registre des systèmes d'IA (niveau de risque `MINIMAL`, `LIMITED`, `HIGH`, `PROHIBITED` ; un système interdit ne peut être actif, un système à haut risque actif exige une supervision humaine) ;
 - `GET|POST /api/ai-governance/systems/{id}/impact-assessments`, `PUT …/impact-assessments/{id}`, `POST …/submit` et `POST …/approve` (administrateur distinct de l'auteur) ; une évaluation approuvée est immuable ;

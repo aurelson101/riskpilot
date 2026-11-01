@@ -50,6 +50,12 @@ final class PdfReportRenderer
     }
 
     /** @param array<string, mixed> $data */
+    public function renderStatementOfApplicability(string $title, array $data, string $locale = 'fr'): string
+    {
+        return $this->renderDocument($title, $this->statementDocument($title, $data, $locale), $data, 'SOA');
+    }
+
+    /** @param array<string, mixed> $data */
     private function renderDocument(string $title, string $html, array $data, string $type): string
     {
         $options = new Options();
@@ -297,6 +303,53 @@ final class PdfReportRenderer
             '<div class="notice">'.$this->t('Ce document contient tous les champs et tous les enregistrements visibles par l’utilisateur au moment de l’export. Les valeurs non renseignées sont signalées explicitement.', 'This document contains every field and every record visible to the user at export time. Missing values are explicitly identified.', $locale).'</div>'.
             ('' === $records ? '<p class="empty">'.$this->t('Aucun enregistrement à exporter.', 'No record to export.', $locale).'</p>' : $records).
             $this->footer($this->t('Export détaillé', 'Detailed export', $locale), $organization, $documentId).'</body></html>';
+    }
+
+    /** @param array<string, mixed> $data */
+    private function statementDocument(string $title, array $data, string $locale): string
+    {
+        $locale = 'en' === $locale ? 'en' : 'fr';
+        $organization = (string) ($data['organization'] ?? $this->t('Organisation non renseignée', 'Organization not provided', $locale));
+        $documentId = $this->documentId('SOA', $data);
+        $statuses = [
+            'NOT_IMPLEMENTED' => $this->t('Non mis en œuvre', 'Not implemented', $locale),
+            'PLANNED' => $this->t('Planifié', 'Planned', $locale),
+            'PARTIAL' => $this->t('Partiel', 'Partial', $locale),
+            'IMPLEMENTED' => $this->t('Mis en œuvre', 'Implemented', $locale),
+        ];
+        $rows = '';
+        $counts = ['applicable' => 0, 'excluded' => 0, 'implemented' => 0, 'unjustified' => 0];
+        foreach ((array) ($data['items'] ?? []) as $item) {
+            $item = (array) $item;
+            $applicable = (bool) ($item['applicable'] ?? true);
+            $justification = trim((string) ($item['justification'] ?? ''));
+            ++$counts[$applicable ? 'applicable' : 'excluded'];
+            if ($applicable && 'IMPLEMENTED' === ($item['implementationStatus'] ?? null)) {
+                ++$counts['implemented'];
+            }
+            if (!$applicable && '' === $justification) {
+                ++$counts['unjustified'];
+            }
+            $status = $applicable ? ($statuses[(string) ($item['implementationStatus'] ?? '')] ?? (string) ($item['implementationStatus'] ?? '')) : '—';
+            $rows .= '<tr><td>'.$this->escape((string) ($item['reference'] ?? '')).'</td><td>'.$this->escape((string) ($item['title'] ?? '')).'</td><td>'.($applicable ? $this->t('Oui', 'Yes', $locale) : $this->t('Non', 'No', $locale)).'</td><td>'.('' === $justification ? '<span class="empty">'.$this->t('Non renseignée', 'Not provided', $locale).'</span>' : nl2br($this->escape($justification))).'</td><td>'.$this->escape($status).'</td><td>'.$this->escape((string) ($item['owner'] ?? '')).'</td><td>'.$this->escape($this->date((string) ($item['nextReviewAt'] ?? ''), $locale)).'</td></tr>';
+        }
+        $table = $this->decisionTable([$this->t('Réf.', 'Ref.', $locale), $this->t('Exigence', 'Requirement', $locale), $this->t('Applicable', 'Applicable', $locale), $this->t('Justification', 'Justification', $locale), $this->t('Mise en œuvre', 'Implementation', $locale), $this->t('Responsable', 'Owner', $locale), $this->t('Revue', 'Review', $locale)], $rows, $this->t('Aucune exigence.', 'No requirement.', $locale));
+        $approval = '' !== trim((string) ($data['approvedBy'] ?? ''))
+            ? $this->t('Approuvée par', 'Approved by', $locale).' '.$this->escape((string) $data['approvedBy']).' '.$this->t('le', 'on', $locale).' '.$this->escape($this->date((string) ($data['approvedAt'] ?? ''), $locale))
+            : $this->t('Non approuvée à la date de l’export.', 'Not approved at export time.', $locale);
+        $css = $this->sharedCss().'th,td{font-size:7.5px;padding:4px}';
+        $cards = '<table class="cards" role="presentation"><tr>'
+            .'<td class="card"><strong>'.$counts['applicable'].'</strong>'.$this->t('Applicables', 'Applicable', $locale).'</td>'
+            .'<td class="card"><strong>'.$counts['excluded'].'</strong>'.$this->t('Exclues', 'Excluded', $locale).'</td>'
+            .'<td class="card"><strong>'.$counts['implemented'].'</strong>'.$this->t('Mises en œuvre', 'Implemented', $locale).'</td>'
+            .'<td class="card"><strong>'.$counts['unjustified'].'</strong>'.$this->t('Exclusions sans justification', 'Exclusions without justification', $locale).'</td></tr></table>';
+
+        return '<!doctype html><html lang="'.$locale.'"><head><meta charset="UTF-8"><title>'.$this->escape($title).'</title><style>'.$css.'</style></head><body>'.
+            $this->brandHeader($title, $organization, $documentId, $this->t('CONFIDENTIEL', 'CONFIDENTIAL', $locale), (string) ($data['status'] ?? '')).
+            '<div class="meta">'.$this->escape((string) ($data['framework'] ?? '')).' · '.$this->t('Périmètre', 'Scope', $locale).' : '.$this->escape((string) ($data['scope'] ?? '')).' · '.$this->t('Version', 'Version', $locale).' '.(int) ($data['version'] ?? 1).' · '.$this->t('Responsable', 'Owner', $locale).' : '.$this->escape((string) ($data['owner'] ?? '')).'<br>'.$approval.'<br>'.$this->t('Généré le', 'Generated on', $locale).' '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''), $locale)).('' !== trim((string) ($data['generatedBy'] ?? '')) ? ' '.$this->t('par', 'by', $locale).' '.$this->escape((string) $data['generatedBy']) : '').'</div></header>'.
+            $cards.$table.
+            '<div class="notice">'.$this->t('Cette déclaration d’applicabilité restitue les décisions saisies dans RiskPilot. Elle ne constitue ni une certification ni une attestation de conformité et doit être validée par la direction.', 'This statement of applicability reflects the decisions recorded in RiskPilot. It is neither a certification nor an attestation of compliance and must be validated by management.', $locale).'</div>'.
+            $this->footer($this->t('Déclaration d’applicabilité', 'Statement of applicability', $locale), $organization, $documentId).'</body></html>';
     }
 
     private function sharedCss(): string

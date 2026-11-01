@@ -149,14 +149,17 @@ Des packs de démarrage gouvernés sont fournis pour le RGPD, NIS2 (article 21
 détaillé point par point et calendrier de notification de l’article 23),
 ISO/IEC 27001:2022 (sous-clauses 4 à 10 et les 93 mesures de l’annexe A),
 ISO/IEC 42001:2023 (clauses 4 à 10 et les 38 mesures de l’annexe A), TISAX / VDA
-ISA 6 (structure des chapitres) et EBIOS Risk Manager. Ils s’installent de façon
+ISA 6 (chapitres, sections et 58 questions de contrôle reformulées) et EBIOS Risk Manager. Ils s’installent de façon
 idempotente avec `php bin/console app:compliance:install-starter-packs`, qui
 complète aussi un référentiel déjà installé en ajoutant les exigences manquantes
 sans modifier les existantes. Les packs RGPD et NIS2 renvoient aux textes publics
 européens ; les packs ISO et TISAX contiennent les identifiants officiels avec
 des intitulés reformulés, sans texte normatif, et exigent une copie licenciée de
-la norme ou du catalogue. Pour TISAX, les questions de contrôle et critères de
-maturité du catalogue VDA ISA se chargent avec l’import CSV. Ils constituent une
+la norme ou du catalogue. Pour TISAX, la numérotation des questions et les critères de
+maturité détaillés sont à confirmer avec l’import CSV du catalogue VDA ISA officiel.
+Le bouton « Charger les correspondances suggérées » (Conformité → SoA & contrôles)
+ajoute des correspondances entre les packs installés ; ce sont des propositions à
+valider, sans héritage de preuve. La déclaration d’applicabilité s’exporte en CSV et en PDF. Ils constituent une
 base de pilotage à adapter au périmètre et ne valent ni certification ni avis
 juridique.
 

@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/client";
+import { downloadApiFile } from "../../api/download";
 import type {
   Framework,
   Scope,
@@ -179,6 +180,18 @@ export function ComplianceGovernancePanel() {
                     onClick={() => void download(item)}
                   >
                     CSV
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<Download />}
+                    onClick={() =>
+                      void downloadApiFile(
+                        `/statements-of-applicability/${item.id}/export.pdf`,
+                        `soa-v${item.version}.pdf`,
+                      )
+                    }
+                  >
+                    PDF
                   </Button>
                   {item.status !== "APPROVED" &&
                     item.status !== "SUPERSEDED" && (

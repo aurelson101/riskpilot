@@ -53,13 +53,13 @@ final class TisaxControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $summary = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertTrue($summary['declarationComplete']);
-        self::assertSame(21, $summary['totals']['total'], 'The 21 leaf sections are assessed; the 9 chapters are groupings.');
-        self::assertSame(21, $summary['totals']['incomplete']);
+        self::assertSame(58, $summary['totals']['total'], 'The 58 control questions are assessed; chapters and sections are groupings.');
+        self::assertSame(58, $summary['totals']['incomplete']);
         self::assertFalse($summary['ready']);
 
         $client->request('GET', '/api/compliance-assessments/'.$assessment['id'].'/results');
         $results = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        $leaf = array_values(array_filter($results, static fn (array $row): bool => '1.1' === $row['requirement']['reference']))[0];
+        $leaf = array_values(array_filter($results, static fn (array $row): bool => '1.1.1' === $row['requirement']['reference']))[0];
         $client->jsonRequest('PUT', '/api/compliance-results/'.$leaf['id'], ['maturityLevel' => 2, 'complianceStatus' => 'PARTIAL', 'targetMaturity' => 3]);
         self::assertResponseIsSuccessful();
         self::assertSame(3, json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['targetMaturity']);
@@ -70,7 +70,7 @@ final class TisaxControllerTest extends WebTestCase
         $summary = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(1, $summary['totals']['blocking']);
         $gaps = array_merge(...array_column($summary['modules'], 'gaps'));
-        self::assertSame('1.1', $gaps[0]['reference']);
+        self::assertSame('1.1.1', $gaps[0]['reference']);
 
         $client->request('GET', '/api/compliance-assessments/'.$assessment['id'].'/tisax.xlsx');
         self::assertResponseIsSuccessful();

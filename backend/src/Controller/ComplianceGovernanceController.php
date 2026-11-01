@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Application\PdfReportRenderer;
+use App\Domain\Compliance\StarterFrameworkCatalog;
+use App\Domain\Compliance\StarterMappingCatalog;
+use App\Entity\Framework;
 use App\Entity\RequirementMapping;
 use App\Entity\SecurityControlTest;
 use App\Entity\StatementOfApplicability;
@@ -21,8 +25,8 @@ use App\Repository\SecurityControlRepository;
 use App\Repository\SecurityControlTestRepository;
 use App\Repository\StatementOfApplicabilityRepository;
 use App\Repository\UserRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -44,6 +48,9 @@ final readonly class ComplianceGovernanceController
         private RiskScenarioRepository $risks,
         private ActionPlanRepository $actions,
         private ComplianceResultRepository $results,
+        private PdfReportRenderer $pdfExporter,
+        private StarterFrameworkCatalog $starterPacks,
+        private StarterMappingCatalog $starterMappings,
     ) {
     }
 
@@ -182,6 +189,51 @@ final readonly class ComplianceGovernanceController
         return new Response($content, 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="soa-v%d.csv"', $statement->getVersionNumber())]);
     }
 
+    #[Route('/api/statements-of-applicability/{id<\d+>}/export.pdf', methods: ['GET'])]
+    public function exportStatementPdf(int $id): Response
+    {
+        $actor = $this->currentUser->get();
+        $statement = $this->statements->findOneVisibleTo($id, $actor);
+        if (null === $statement) {
+            return $this->notFound('SoA introuvable.');
+        }
+        $items = $statement->getItems()->toArray();
+        usort($items, static fn (StatementOfApplicabilityItem $a, StatementOfApplicabilityItem $b): int => strnatcmp($a->getRequirement()->getReference(), $b->getRequirement()->getReference()));
+        $content = $this->pdfExporter->renderStatementOfApplicability($statement->getTitle(), [
+            'organization' => $actor->getOrganization()->getName(),
+            'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
+            'generatedBy' => $this->userName($actor),
+            'framework' => $statement->getFramework()->getName().' '.$statement->getFramework()->getVersion(),
+            'scope' => $statement->getScope()->getName(),
+            'version' => $statement->getVersionNumber(),
+            'status' => $statement->getStatus(),
+            'owner' => $this->userName($statement->getOwner()),
+            'approvedBy' => null === $statement->getApprovedBy() ? null : $this->userName($statement->getApprovedBy()),
+            'approvedAt' => $statement->getApprovedAt()?->format(DATE_ATOM),
+            'items' => array_map(fn (StatementOfApplicabilityItem $item): array => [
+                'reference' => $item->getRequirement()->getReference(),
+                'title' => $item->getRequirement()->getTitle(),
+                'applicable' => $item->isApplicable(),
+                'justification' => $item->getJustification(),
+                'implementationStatus' => $item->getImplementationStatus(),
+                'owner' => null === $item->getOwner() ? null : $this->userName($item->getOwner()),
+                'nextReviewAt' => $item->getNextReviewAt()?->format('Y-m-d'),
+            ], $items),
+        ], $actor->getLocale());
+        $hash = hash('sha256', $content);
+
+        return new Response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => sprintf('attachment; filename="soa-v%d.pdf"', $statement->getVersionNumber()),
+            'Content-Length' => (string) strlen($content),
+            'Content-Language' => $actor->getLocale(),
+            'Cache-Control' => 'private, no-store',
+            'ETag' => '"'.$hash.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-RiskPilot-Document-SHA256' => $hash,
+        ]);
+    }
+
     #[Route('/api/control-tests', methods: ['GET'])]
     public function controlTests(): JsonResponse
     {
@@ -264,6 +316,43 @@ final readonly class ComplianceGovernanceController
         }
 
         return new JsonResponse($this->mappingResponse($mapping), 201);
+    }
+
+    /** Crée les correspondances suggérées entre les packs installés ; elles restent à valider et n'héritent d'aucune preuve. */
+    #[Route('/api/requirement-mappings/suggested', methods: ['POST'])]
+    public function installSuggestedMappings(): JsonResponse
+    {
+        if (!$this->canManage()) {
+            return $this->forbidden();
+        }
+        $actor = $this->currentUser->get();
+        $organization = $actor->getOrganization();
+        $byPack = [];
+        foreach (['iso27001', 'iso42001', 'nis2', 'tisax'] as $key) {
+            $definition = $this->starterPacks->definition($key);
+            $framework = $this->frameworks->findOneBy(['name' => $definition['name'], 'version' => $definition['version'], 'status' => 'ACTIVE']);
+            if ($framework instanceof Framework) {
+                foreach ($this->requirements->findBy(['framework' => $framework, 'status' => 'ACTIVE']) as $requirement) {
+                    $byPack[$key][$requirement->getReference()] = $requirement;
+                }
+            }
+        }
+        $created = 0;
+        $skipped = 0;
+        foreach ($this->starterMappings->mappings() as $suggestion) {
+            $source = $byPack[$suggestion['source'][0]][$suggestion['source'][1]] ?? null;
+            $target = $byPack[$suggestion['target'][0]][$suggestion['target'][1]] ?? null;
+            if (null === $source || null === $target
+                || null !== $this->mappings->findOneBy(['organization' => $organization, 'sourceRequirement' => $source, 'targetRequirement' => $target])) {
+                ++$skipped;
+                continue;
+            }
+            $this->entityManager->persist(new RequirementMapping($organization, $source, $target, $suggestion['coverage'], false, $actor, $suggestion['rationale']));
+            ++$created;
+        }
+        $this->entityManager->flush();
+
+        return new JsonResponse(['created' => $created, 'skipped' => $skipped, 'installedPacks' => array_keys($byPack)], 200);
     }
 
     #[Route('/api/requirement-mappings/{id<\d+>}', methods: ['DELETE'])]
