@@ -82,4 +82,26 @@ final class PdfReportRendererTest extends TestCase
         self::assertStringContainsString('Score résiduel', $html);
         self::assertStringContainsString('Non renseigné', $html);
     }
+
+    public function testDetailedExportStartsWithASummaryTableAndRecordsNoLongerForceAPageEach(): void
+    {
+        $renderer = new PdfReportRenderer();
+        $method = new \ReflectionMethod($renderer, 'dataExportDocument');
+        $long = str_repeat('Texte long. ', 40);
+        $html = $method->invoke($renderer, 'Plans d’action', [
+            'organization' => 'Example Ltd', 'generatedAt' => '2026-09-29T10:00:00+00:00', 'generatedBy' => 'Risk Manager',
+            'rows' => [
+                ['ID', 'Action', 'Description', 'Échéance', 'Code statut'],
+                [1, 'Former les équipes', $long, new \DateTimeImmutable('2026-12-01'), 'OPEN'],
+                [2, 'Revoir les accès', $long, null, 'DONE'],
+            ],
+        ], 'en');
+
+        self::assertStringContainsString('<h2>Overview</h2><table class="summary">', $html);
+        self::assertMatchesRegularExpression('~<table class="summary">.*<th>Action</th>.*<th>Échéance</th>.*</table>~s', $html);
+        self::assertStringNotContainsString('<th>Description</th>', explode('</table>', (string) strstr($html, '<table class="summary">'))[0], 'Long columns stay out of the summary.');
+        self::assertStringNotContainsString('<th>Code statut</th>', explode('</table>', (string) strstr($html, '<table class="summary">'))[0]);
+        self::assertStringContainsString('2026-12-01', $html, 'Dates follow the user locale.');
+        self::assertStringNotContainsString('page-break-before:always', $html);
+    }
 }

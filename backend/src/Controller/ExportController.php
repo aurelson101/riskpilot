@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\CsvExporter;
 use App\Application\CurrentUser;
 use App\Application\PdfReportRenderer;
 use App\Application\XlsxExporter;
@@ -36,6 +37,7 @@ final readonly class ExportController
         private ComplianceResultRepository $results,
         private XlsxExporter $xlsxExporter,
         private PdfReportRenderer $pdfExporter,
+        private CsvExporter $csvExporter,
     ) {
     }
 
@@ -59,7 +61,7 @@ final readonly class ExportController
                 $risk->getCurrentLikelihood(), $risk->getCurrentImpact(), $risk->getCurrentRiskScore(),
                 $risk->getResidualLikelihood(), $risk->getResidualImpact(), $risk->getResidualRiskScore(),
                 self::TREATMENT_LABELS[$risk->getTreatmentDecision()] ?? $risk->getTreatmentDecision(), $risk->getTreatmentDecision(),
-                $this->statusLabel($risk->getStatus()), $risk->getStatus(), $risk->getReviewDate()?->format('d/m/Y'),
+                $this->statusLabel($risk->getStatus()), $risk->getStatus(), $risk->getReviewDate(),
             ];
         }
 
@@ -80,8 +82,8 @@ final readonly class ExportController
                 $action->getId(), $action->getTitle(), $action->getDescription(), $action->getRelatedRisk()?->getTitle(),
                 $action->getRelatedControl()?->getName(), $action->getOwner()->getFirstName().' '.$action->getOwner()->getLastName(),
                 $action->getOwner()->getEmail(), $action->getPriority(), $this->statusLabel($action->getStatus()), $action->getStatus(),
-                $action->getProgress(), $action->getStartDate()?->format('d/m/Y'), $action->getDueDate()->format('d/m/Y'),
-                $action->getCompletionDate()?->format('d/m/Y'), $action->getEstimatedCost(), $action->getActualCost(),
+                $action->getProgress(), $action->getStartDate(), $action->getDueDate(),
+                $action->getCompletionDate(), $action->getEstimatedCost(), $action->getActualCost(),
                 $action->getExpectedRiskReduction(), $action->getTicketNumber(), $action->getTicketUrl(), $action->getOrigin(),
                 $action->getActionType(), implode(', ', $action->getFrameworkIds()), implode(', ', $action->getRequirementIds()),
                 sprintf('%d audit · %d conformité', $action->getAuditFindings()->count(), $action->getComplianceResults()->count()),
@@ -107,7 +109,7 @@ final readonly class ExportController
         foreach ($this->results->findForAssessment($assessment) as $result) {
             $rows[] = [
                 $assessment->getFramework()->getName(), $assessment->getFramework()->getVersion(), $assessment->getScope()->getName(),
-                $assessment->getAssessmentDate()->format('d/m/Y'), $assessment->getGlobalScore(), $result->getRequirement()->getReference(),
+                $assessment->getAssessmentDate(), $assessment->getGlobalScore(), $result->getRequirement()->getReference(),
                 $result->getRequirement()->getTitle(), $result->getRequirement()->getCategory(), $result->getMaturityLevel(),
                 $this->statusLabel($result->getComplianceStatus()), $result->getComplianceStatus(), $result->getComment(),
                 implode(', ', $result->getEvidence()), $result->getRemediationAction()?->getTitle(),
@@ -117,7 +119,7 @@ final readonly class ExportController
         return $this->export($format, 'Évaluation de conformité', 'conformite-'.$id, $rows);
     }
 
-    /** @param list<list<int|float|string|null>> $rows */
+    /** @param list<list<int|float|string|\DateTimeInterface|null>> $rows */
     private function export(string $format, string $title, string $prefix, array $rows): Response
     {
         if ('pdf' === $format) {
@@ -154,31 +156,7 @@ final readonly class ExportController
             ]);
         }
 
-        return $this->csv($this->filename($prefix, 'csv'), $rows);
-    }
-
-    /** @param list<list<int|float|string|null>> $rows */
-    private function csv(string $filename, array $rows): Response
-    {
-        $stream = fopen('php://temp', 'r+');
-        if (false === $stream) {
-            throw new \RuntimeException('Unable to create export.');
-        }
-        fwrite($stream, "\xEF\xBB\xBF");
-        foreach ($rows as $row) {
-            fputcsv($stream, array_map($this->safeCell(...), $row), ';', '"', '');
-        }
-        rewind($stream);
-        $content = stream_get_contents($stream);
-        fclose($stream);
-
-        return new Response(false === $content ? '' : $content, Response::HTTP_OK, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'private, no-store',
-            'Content-Language' => 'fr',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $this->csvExporter->response($rows, $this->filename($prefix, 'csv'), $this->currentUser->get()->getLocale());
     }
 
     private function filename(string $prefix, string $extension): string
@@ -191,12 +169,5 @@ final readonly class ExportController
     private function statusLabel(string $status): string
     {
         return self::STATUS_LABELS[$status] ?? $status;
-    }
-
-    private function safeCell(int|float|string|null $value): string
-    {
-        $text = (string) $value;
-
-        return preg_match('/^[=+\-@]/', $text) ? "'".$text : $text;
     }
 }

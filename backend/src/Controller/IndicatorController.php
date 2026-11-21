@@ -20,7 +20,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/v1/indicators')]
 final readonly class IndicatorController
 {
-    public function __construct(private IndicatorRepository $indicators, private IndicatorValueRepository $values, private CurrentUser $currentUser, private EntityManagerInterface $entityManager)
+    public function __construct(private IndicatorRepository $indicators, private IndicatorValueRepository $values, private CurrentUser $currentUser, private EntityManagerInterface $entityManager, private \App\Application\CsvExporter $csv)
     {
     }
 
@@ -146,16 +146,13 @@ final readonly class IndicatorController
         if (null === $indicator) {
             return $this->notFound();
         }
-        $stream = fopen('php://temp', 'r+');
-        fputcsv($stream, ['id', 'value', 'unit', 'measuredAt', 'period', 'source', 'comment', 'version']);
+        // Export de données destiné aux outils : séparateur virgule et dates ISO 8601, texte libre neutralisé contre les formules.
+        $rows = [['id', 'value', 'unit', 'measuredAt', 'period', 'source', 'comment', 'version']];
         foreach ($this->values->findBy(['indicator' => $indicator], ['measuredAt' => 'ASC']) as $value) {
-            fputcsv($stream, [$value->getId(), $value->getValue(), $indicator->getUnit(), $value->getMeasuredAt()->format(DATE_ATOM), $value->getPeriod(), $value->getSource(), $value->getComment(), $value->getVersion()]);
+            $rows[] = [$value->getId(), $value->getValue(), $indicator->getUnit(), $value->getMeasuredAt()->format(DATE_ATOM), $value->getPeriod(), $value->getSource(), $value->getComment(), $value->getVersion()];
         }
-        rewind($stream);
-        $csv = stream_get_contents($stream);
-        fclose($stream);
 
-        return new Response($csv, 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="indicator-%s.csv"', $indicator->getCode())]);
+        return $this->csv->response($rows, sprintf('indicator-%s.csv', $indicator->getCode()), $this->currentUser->get()->getLocale(), ',');
     }
 
     #[Route('/{id<\d+>}/values/batch', methods: ['POST'])] #[IsGranted(User::ROLE_RISK_MANAGER)]

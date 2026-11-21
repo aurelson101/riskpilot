@@ -32,7 +32,7 @@ final class PdfReportRenderer
     }
 
     /**
-     * @param list<list<int|float|string|null>> $rows
+     * @param list<list<int|float|string|\DateTimeInterface|null>> $rows
      */
     public function renderDataExport(string $title, string $organization, array $rows, string $locale = 'fr', ?string $generatedBy = null): string
     {
@@ -273,9 +273,11 @@ final class PdfReportRenderer
         $rows = (array) ($data['rows'] ?? []);
         $headers = array_map('strval', (array) array_shift($rows));
         $documentId = $this->documentId('EXPORT', $data);
+        $rows = array_map(fn ($row): array => array_map(fn ($value): string => $this->exportCell($value, $locale), array_values((array) $row)), $rows);
+        $summary = $this->exportSummary($headers, $rows, $locale);
         $records = '';
         foreach ($rows as $index => $rawRow) {
-            $row = array_values((array) $rawRow);
+            $row = $rawRow;
             $recordTitle = trim((string) ($row[1] ?? $row[0] ?? ''));
             $recordTitle = '' === $recordTitle ? $this->t('Enregistrement', 'Record', $locale).' '.($index + 1) : $recordTitle;
             $details = '';
@@ -294,15 +296,62 @@ final class PdfReportRenderer
             $records .= '<section class="record"><h2>'.($index + 1).'. '.$this->escape($recordTitle).'</h2><table class="details"><tbody>'.$details.'</tbody></table></section>';
         }
         $count = count($rows);
-        $css = $this->sharedCss().'.record{page-break-before:always}.record h2{margin-top:0}.details{font-size:8px}.details .field-label{width:18%;background:#eaf5fb}.details td{width:32%}.export-summary{margin-top:18px}.export-summary strong{font-size:18px;color:#0369a1}';
+        $css = $this->sharedCss().'.record{page-break-inside:avoid;margin-top:6px}.record h2{margin-top:14px}.summary{font-size:8px}.summary th{background:#1f6e8c;color:#fff}.summary tbody tr:nth-child(even) td{background:#f1f7fa}.details{font-size:8px}.details .field-label{width:18%;background:#eaf5fb}.details td{width:32%}.export-summary{margin-top:18px}.export-summary strong{font-size:18px;color:#0369a1}';
 
         return '<!doctype html><html lang="'.$locale.'"><head><meta charset="UTF-8"><title>'.$this->escape($title).'</title><style>'.$css.'</style></head><body>'.
             $this->brandHeader($title, $organization, $documentId, $this->t('CONFIDENTIEL', 'CONFIDENTIAL', $locale), $this->t('Export complet', 'Complete export', $locale)).
             '<div class="meta">'.$this->t('Généré le', 'Generated on', $locale).' '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''), $locale)).('' !== trim((string) ($data['generatedBy'] ?? '')) ? ' '.$this->t('par', 'by', $locale).' '.$this->escape((string) $data['generatedBy']) : '').'</div></header>'.
             '<div class="export-summary"><strong>'.$count.'</strong> '.$this->t('enregistrement(s) exporté(s)', 'exported record(s)', $locale).'</div>'.
             '<div class="notice">'.$this->t('Ce document contient tous les champs et tous les enregistrements visibles par l’utilisateur au moment de l’export. Les valeurs non renseignées sont signalées explicitement.', 'This document contains every field and every record visible to the user at export time. Missing values are explicitly identified.', $locale).'</div>'.
+            $summary.
             ('' === $records ? '<p class="empty">'.$this->t('Aucun enregistrement à exporter.', 'No record to export.', $locale).'</p>' : $records).
             $this->footer($this->t('Export détaillé', 'Detailed export', $locale), $organization, $documentId).'</body></html>';
+    }
+
+    private function exportCell(mixed $value, string $locale): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('en' === $locale ? 'Y-m-d' : 'd/m/Y');
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
+     * Tableau de synthèse en tête d'export : les colonnes courtes (identifiant, titre, statut, dates…) de chaque enregistrement,
+     * pour parcourir le document sans tourner cinquante pages.
+     *
+     * @param list<string>       $headers
+     * @param list<list<string>> $rows
+     */
+    private function exportSummary(array $headers, array $rows, string $locale): string
+    {
+        if ([] === $rows || [] === $headers) {
+            return '';
+        }
+        $columns = [];
+        foreach ($headers as $index => $header) {
+            $longest = 0;
+            foreach ($rows as $row) {
+                $longest = max($longest, mb_strlen($row[$index] ?? ''));
+            }
+            if ($longest > 0 && $longest <= 60 && !str_contains(strtolower($header), 'code')) {
+                $columns[] = $index;
+            }
+            if (count($columns) >= 6) {
+                break;
+            }
+        }
+        if ([] === $columns) {
+            $columns = [0];
+        }
+        $head = '<tr><th style="width:24px">#</th>'.implode('', array_map(fn (int $index): string => '<th>'.$this->escape($headers[$index]).'</th>', $columns)).'</tr>';
+        $body = '';
+        foreach ($rows as $position => $row) {
+            $body .= '<tr><td>'.($position + 1).'</td>'.implode('', array_map(fn (int $index): string => '<td>'.$this->escape($row[$index] ?? '').'</td>', $columns)).'</tr>';
+        }
+
+        return '<h2>'.$this->t('Synthèse', 'Overview', $locale).'</h2><table class="summary"><thead>'.$head.'</thead><tbody>'.$body.'</tbody></table>';
     }
 
     /** @param array<string, mixed> $data */

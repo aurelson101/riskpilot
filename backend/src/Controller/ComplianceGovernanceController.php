@@ -36,6 +36,7 @@ final readonly class ComplianceGovernanceController
 {
     public function __construct(
         private CurrentUser $currentUser,
+        private \App\Application\CsvExporter $csv,
         private EntityManagerInterface $entityManager,
         private StatementOfApplicabilityRepository $statements,
         private SecurityControlTestRepository $controlTests,
@@ -177,16 +178,12 @@ final readonly class ComplianceGovernanceController
         if (null === $statement) {
             return $this->notFound('SoA introuvable.');
         }
-        $stream = fopen('php://temp', 'r+');
-        fputcsv($stream, ['Référence', 'Exigence', 'Applicable', 'Justification', 'Mise en œuvre', 'Responsable', 'Contrôles', 'Risques', 'Actions', 'Preuves', 'Prochaine revue'], ';');
+        $rows = [['Référence', 'Exigence', 'Applicable', 'Justification', 'Mise en œuvre', 'Responsable', 'Contrôles', 'Risques', 'Actions', 'Preuves', 'Prochaine revue']];
         foreach ($statement->getItems() as $item) {
-            fputcsv($stream, [$item->getRequirement()->getReference(), $item->getRequirement()->getTitle(), $item->isApplicable() ? 'Oui' : 'Non', $item->getJustification(), $item->getImplementationStatus(), null === $item->getOwner() ? null : $this->userName($item->getOwner()), implode(', ', array_map(static fn ($control): string => $control->getName(), $item->getControls()->toArray())), implode(', ', array_map(static fn ($risk): string => $risk->getTitle(), $item->getRisks()->toArray())), implode(', ', array_map(static fn ($action): string => $action->getTitle(), $item->getActions()->toArray())), implode(', ', $item->getEvidence()), $item->getNextReviewAt()?->format('Y-m-d')], ';');
+            $rows[] = [$item->getRequirement()->getReference(), $item->getRequirement()->getTitle(), $item->isApplicable() ? 'Oui' : 'Non', $item->getJustification(), $item->getImplementationStatus(), null === $item->getOwner() ? null : $this->userName($item->getOwner()), implode(', ', array_map(static fn ($control): string => $control->getName(), $item->getControls()->toArray())), implode(', ', array_map(static fn ($risk): string => $risk->getTitle(), $item->getRisks()->toArray())), implode(', ', array_map(static fn ($action): string => $action->getTitle(), $item->getActions()->toArray())), implode(', ', $item->getEvidence()), $item->getNextReviewAt()];
         }
-        rewind($stream);
-        $content = "\xEF\xBB\xBF".(string) stream_get_contents($stream);
-        fclose($stream);
 
-        return new Response($content, 200, ['Content-Type' => 'text/csv; charset=UTF-8', 'Content-Disposition' => sprintf('attachment; filename="soa-v%d.csv"', $statement->getVersionNumber())]);
+        return $this->csv->response($rows, sprintf('soa-v%d.csv', $statement->getVersionNumber()), $this->currentUser->get()->getLocale());
     }
 
     #[Route('/api/statements-of-applicability/{id<\d+>}/export.pdf', methods: ['GET'])]

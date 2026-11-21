@@ -30,6 +30,7 @@ final readonly class DoraRegisterController
         private UserRepository $users,
         private DoraRegisterCompleteness $completeness,
         private EntityManagerInterface $entityManager,
+        private \App\Application\CsvExporter $csv,
     ) {
     }
 
@@ -103,24 +104,8 @@ final readonly class DoraRegisterController
         foreach ($this->arrangements->findVisibleTo($this->currentUser->get()) as $item) {
             $rows[] = [$item->getThirdParty()->getName(), $item->getProviderLei(), $item->getServiceType(), $item->getDescription(), $item->supportsCriticalFunction() ? 'oui' : 'non', $item->getFunctionSupported(), $item->getContractReference(), $item->getStartsAt()?->format('Y-m-d'), $item->getEndsAt()?->format('Y-m-d'), $item->getDataLocation(), $item->getSubcontractors(), $item->getSubstitutability(), $item->getExitPlanTestedAt()?->format('Y-m-d'), $item->getStatus(), implode(' ', $this->completeness->gaps($item, $now))];
         }
-        $stream = fopen('php://temp', 'r+');
-        if (false === $stream) {
-            throw new \RuntimeException('Unable to create export.');
-        }
-        fwrite($stream, "\xEF\xBB\xBF");
-        foreach ($rows as $row) {
-            fputcsv($stream, array_map($this->safeCell(...), $row), ';', '"', '');
-        }
-        rewind($stream);
-        $content = stream_get_contents($stream);
-        fclose($stream);
 
-        return new Response(false === $content ? '' : $content, Response::HTTP_OK, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="registre-dora-'.$now->format('Y-m-d').'.csv"',
-            'Cache-Control' => 'private, no-store',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $this->csv->response($rows, 'registre-dora-'.$now->format('Y-m-d').'.csv', $this->currentUser->get()->getLocale(), ';', 'Y-m-d');
     }
 
     /** @param array<string, mixed> $data */
@@ -176,13 +161,6 @@ final readonly class DoraRegisterController
             'status' => $arrangement->getStatus(), 'owner' => ['id' => $owner->getId(), 'name' => trim($owner->getFirstName().' '.$owner->getLastName())],
             'gaps' => $this->completeness->gaps($arrangement, $now), 'updatedAt' => $arrangement->getUpdatedAt()->format(DATE_ATOM),
         ];
-    }
-
-    private function safeCell(int|float|string|null $value): string
-    {
-        $text = (string) $value;
-
-        return 1 === preg_match('/^[=+\-@\t\r]/', $text) ? "'".$text : $text;
     }
 
     private function invalid(string $message): JsonResponse

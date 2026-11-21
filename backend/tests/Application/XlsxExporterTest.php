@@ -31,7 +31,8 @@ final class XlsxExporterTest extends TestCase
         self::assertIsString($sheet);
         self::assertStringContainsString('state="frozen"', $sheet);
         self::assertStringContainsString('<autoFilter ref="A3:B4"/>', $sheet);
-        self::assertStringContainsString('&apos;=DANGEROUS()', $sheet);
+        self::assertStringContainsString('t="inlineStr"><is><t xml:space="preserve">=DANGEROUS()</t>', $sheet, 'Text cells are never evaluated: no stray apostrophe is added.');
+        self::assertStringNotContainsString('&apos;=DANGEROUS()', $sheet);
         self::assertIsString($styles);
         self::assertStringContainsString('FF17324D', $styles);
         self::assertStringContainsString('FFEAF2F6', $styles);
@@ -112,5 +113,34 @@ final class XlsxExporterTest extends TestCase
             $zip->close();
             unlink($path);
         }
+    }
+
+    public function testDatesAreRealDateCellsAndAnInformationSheetDescribesTheExport(): void
+    {
+        $content = (new XlsxExporter())->render('Plans', 'Tenant', [
+            ['Action', 'Échéance', 'Coût'],
+            ['A', new \DateTimeImmutable('2026-11-21'), -12.5],
+            ['B', new \DateTimeImmutable('2026-11-21 06:00:00'), 3],
+            ['-minus', null, 0],
+        ], ['Généré par' => 'Alice Admin']);
+        $path = tempnam(sys_get_temp_dir(), 'xlsx-test-');
+        file_put_contents($path, $content);
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($path));
+        $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $info = (string) $zip->getFromName('xl/worksheets/sheet2.xml');
+        $workbook = (string) $zip->getFromName('xl/workbook.xml');
+        $core = (string) $zip->getFromName('docProps/core.xml');
+        $zip->close();
+        unlink($path);
+
+        self::assertStringContainsString('<c r="B4" s="7" t="n"><v>46347</v></c>', $sheet, '2026-11-21 is serial 46347.');
+        self::assertStringContainsString('<c r="B5" s="8" t="n"><v>46347.25</v></c>', $sheet);
+        self::assertStringContainsString('<c r="C4" s="6" t="n"><v>-12.5</v></c>', $sheet);
+        self::assertStringContainsString('>-minus<', $sheet);
+        self::assertStringContainsString('name="Informations"', $workbook);
+        self::assertStringContainsString('Alice Admin', $info);
+        self::assertStringContainsString('<t xml:space="preserve">3</t>', $info);
+        self::assertStringContainsString('<dc:creator>Alice Admin</dc:creator>', $core);
     }
 }
