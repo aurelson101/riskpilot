@@ -50,6 +50,7 @@ type Incident = {
   owner: { id: number; name: string };
   aiSystem: { id: number; name: string } | null;
   product: { id: number; name: string; version: string } | null;
+  vulnerability: { id: number; name: string; severity: string } | null;
   steps: Step[];
   worstStatus: StepStatus;
 };
@@ -79,6 +80,9 @@ type Arrangement = {
   description: string;
   supportsCriticalFunction: boolean;
   providerLei: string | null;
+  governingLaw?: string | null;
+  terminationNoticeDays?: number | null;
+  lastAuditedAt?: string | null;
   status: string;
   gaps: string[];
 };
@@ -144,6 +148,10 @@ const gapLabels: Record<string, string> = {
   EXIT_PLAN_NOT_TESTED: "Plan de sortie jamais testé",
   EXIT_PLAN_TEST_OUTDATED: "Test du plan de sortie de plus de 12 mois",
   CONTRACT_ENDING_SOON: "Contrat se terminant sous 6 mois",
+  GOVERNING_LAW_MISSING: "Droit applicable manquant",
+  TERMINATION_NOTICE_MISSING: "Préavis de résiliation manquant",
+  PROVIDER_AUDIT_MISSING: "Audit du prestataire jamais réalisé",
+  PROVIDER_AUDIT_OUTDATED: "Audit du prestataire de plus de 24 mois",
 };
 const serviceTypeLabels: Record<string, string> = {
   CLOUD_INFRASTRUCTURE: "Infrastructure cloud",
@@ -213,16 +221,40 @@ function IncidentsTab({ canManage }: { canManage: boolean }) {
     widespread: false,
     criticalInfrastructure: false,
     death: false,
+    vulnerabilityId: "",
+  });
+  const vulnerabilities = useQuery({
+    queryKey: ["vulnerabilities-options"],
+    queryFn: async () =>
+      (await api.get<Array<{ id: number; name: string }>>("/vulnerabilities"))
+        .data,
+    enabled: dialog && form.regime === "CRA_VULNERABILITY",
+  });
+  const coverage = useQuery({
+    queryKey: ["vulnerability-coverage"],
+    queryFn: async () =>
+      (
+        await api.get<{
+          unreported: number;
+          items: Array<{ id: number; name: string; reported: boolean }>;
+        }>("/regulatory-incidents/vulnerability-coverage")
+      ).data,
   });
   const create = useMutation({
-    mutationFn: async () =>
-      api.post("/regulatory-incidents", {
-        ...form,
+    mutationFn: async () => {
+      const { vulnerabilityId, ...rest } = form;
+      return api.post("/regulatory-incidents", {
+        ...rest,
         awareAt: new Date(form.awareAt).toISOString(),
-      }),
+        ...(form.regime === "CRA_VULNERABILITY" && vulnerabilityId
+          ? { vulnerabilityId: Number(vulnerabilityId) }
+          : {}),
+      });
+    },
     onSuccess: async () => {
       setDialog(false);
       await cache.invalidateQueries({ queryKey: ["regulatory-incidents"] });
+      await cache.invalidateQueries({ queryKey: ["vulnerability-coverage"] });
     },
   });
   const file = useMutation({
@@ -288,6 +320,14 @@ function IncidentsTab({ canManage }: { canManage: boolean }) {
       {list.data.items.length === 0 && (
         <Alert severity="success">Aucun dossier de notification.</Alert>
       )}
+      {(coverage.data?.unreported ?? 0) > 0 && (
+        <Alert severity="warning">
+          {`${coverage.data?.unreported} vulnérabilité(s) ouverte(s) de sévérité élevée ou critique sans signalement CRA rattaché : ${coverage.data?.items
+            .filter((item) => !item.reported)
+            .map((item) => item.name)
+            .join(", ")}.`}
+        </Alert>
+      )}
       {list.data.items.map((incident) => (
         <Card key={incident.id}>
           <CardContent>
@@ -313,6 +353,9 @@ function IncidentsTab({ canManage }: { canManage: boolean }) {
                   : ""}
                 {incident.product
                   ? ` · Produit : ${incident.product.name} ${incident.product.version}`
+                  : ""}
+                {incident.vulnerability
+                  ? ` · Vulnérabilité : ${incident.vulnerability.name}`
                   : ""}
               </Typography>
               <Table size="small">
@@ -438,6 +481,23 @@ function IncidentsTab({ canManage }: { canManage: boolean }) {
               onChange={(e) => setForm({ ...form, awareAt: e.target.value })}
               slotProps={{ inputLabel: { shrink: true } }}
             />
+            {form.regime === "CRA_VULNERABILITY" && (
+              <TextField
+                select
+                label="Vulnérabilité du registre concernée (facultatif)"
+                value={form.vulnerabilityId}
+                onChange={(e) =>
+                  setForm({ ...form, vulnerabilityId: e.target.value })
+                }
+              >
+                <MenuItem value="">Aucune</MenuItem>
+                {(vulnerabilities.data ?? []).map((item) => (
+                  <MenuItem key={item.id} value={String(item.id)}>
+                    {item.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             {form.regime === "AI_ACT_SERIOUS_INCIDENT" && (
               <Stack>
                 {(
@@ -720,14 +780,25 @@ function DoraRegisterTab({ canManage }: { canManage: boolean }) {
     supportsCriticalFunction: false,
     providerLei: "",
     contractReference: "",
+    governingLaw: "",
+    terminationNoticeDays: "",
+    lastAuditedAt: "",
   };
   const [form, setForm] = useState(empty);
   const create = useMutation({
-    mutationFn: async () =>
-      api.post("/dora/arrangements", {
-        ...form,
+    mutationFn: async () => {
+      const { governingLaw, terminationNoticeDays, lastAuditedAt, ...rest } =
+        form;
+      return api.post("/dora/arrangements", {
+        ...rest,
         thirdPartyId: Number(form.thirdPartyId),
-      }),
+        ...(governingLaw.trim() ? { governingLaw: governingLaw.trim() } : {}),
+        ...(terminationNoticeDays !== ""
+          ? { terminationNoticeDays: Number(terminationNoticeDays) }
+          : {}),
+        ...(lastAuditedAt ? { lastAuditedAt } : {}),
+      });
+    },
     onSuccess: async () => {
       setDialog(false);
       setForm(empty);
@@ -870,6 +941,32 @@ function DoraRegisterTab({ canManage }: { canManage: boolean }) {
               onChange={(e) =>
                 setForm({ ...form, contractReference: e.target.value })
               }
+            />
+            <TextField
+              label="Droit applicable"
+              value={form.governingLaw}
+              onChange={(e) =>
+                setForm({ ...form, governingLaw: e.target.value })
+              }
+              slotProps={{ htmlInput: { maxLength: 100 } }}
+            />
+            <TextField
+              type="number"
+              label="Préavis de résiliation (jours)"
+              value={form.terminationNoticeDays}
+              onChange={(e) =>
+                setForm({ ...form, terminationNoticeDays: e.target.value })
+              }
+              slotProps={{ htmlInput: { min: 0, max: 3650 } }}
+            />
+            <TextField
+              type="date"
+              label="Dernier audit du prestataire"
+              value={form.lastAuditedAt}
+              onChange={(e) =>
+                setForm({ ...form, lastAuditedAt: e.target.value })
+              }
+              slotProps={{ inputLabel: { shrink: true } }}
             />
             {create.isError && (
               <Alert severity="error">{errorText(create.error)}</Alert>

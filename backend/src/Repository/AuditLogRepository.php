@@ -72,6 +72,9 @@ final class AuditLogRepository extends ServiceEntityRepository
             ->andWhere('a.organization = :organization')
             ->andWhere('a.createdAt >= :from')
             ->andWhere('a.createdAt < :until')
+            // Les téléchargements (action EXPORT) sont des consultations : ils ne comptent pas comme activité de gouvernance.
+            ->andWhere('a.action <> :export')
+            ->setParameter('export', 'EXPORT')
             ->setParameter('organization', $organization)
             ->setParameter('from', $from)
             ->setParameter('until', $until)

@@ -92,7 +92,7 @@ class PlatformIntegration
 
     public function setEncryptedCredential(string $value): void
     {
-        if (!in_array($this->type, ['DIRECTORY', 'OIDC'], true) || '' === $value) {
+        if (!in_array($this->type, ['DIRECTORY', 'OIDC', 'SAML'], true) || '' === $value) {
             throw new \LogicException('Credential annuaire invalide.');
         }
         $this->encryptedCredential = $value;
@@ -272,6 +272,17 @@ class PlatformIntegration
         if (!is_string($certificate) || strlen($certificate) > 8192 || str_contains($certificate, 'PRIVATE KEY') || false === @openssl_x509_read($certificate)) {
             throw new \InvalidArgumentException('Le certificat du fournisseur SAML doit être un certificat X.509 public au format PEM.');
         }
+        $slo = $configuration['sloUrl'] ?? null;
+        if (null !== $slo && '' !== $slo && (!is_string($slo) || !$this->validHttpsUrl($slo))) {
+            throw new \InvalidArgumentException('L’adresse de déconnexion SAML (SingleLogoutService) doit être une URL HTTPS valide.');
+        }
+        if (array_key_exists('encryptAssertions', $configuration) && !is_bool($configuration['encryptAssertions'])) {
+            throw new \InvalidArgumentException('encryptAssertions doit être un booléen.');
+        }
+        $spCertificate = $configuration['spCertificate'] ?? null;
+        if (null !== $spCertificate && (!is_string($spCertificate) || strlen($spCertificate) > 8192 || str_contains($spCertificate, 'PRIVATE KEY') || false === @openssl_x509_read($spCertificate))) {
+            throw new \InvalidArgumentException('Le certificat de chiffrement du service est invalide.');
+        }
         $this->validateRoleMappings($configuration, true);
     }
 
@@ -305,7 +316,7 @@ class PlatformIntegration
             throw new \InvalidArgumentException('La configuration doit rester inférieure à 64 Kio et être sérialisable.');
         }
         $this->rejectPlainSecrets($configuration);
-        foreach (['issuer', 'url', 'baseUrl', 'direction', 'conflictStrategy', 'host', 'baseDn', 'bindDn', 'userFilter', 'testUsername', 'caCertificate', 'idpCertificate', 'ssoUrl', 'spEntityId'] as $key) {
+        foreach (['issuer', 'url', 'baseUrl', 'direction', 'conflictStrategy', 'host', 'baseDn', 'bindDn', 'userFilter', 'testUsername', 'caCertificate', 'idpCertificate', 'ssoUrl', 'spEntityId', 'sloUrl', 'spCertificate'] as $key) {
             if (array_key_exists($key, $configuration) && !is_string($configuration[$key])) {
                 throw new \InvalidArgumentException('Un champ de configuration textuel est invalide.');
             }

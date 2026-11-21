@@ -98,11 +98,11 @@ final readonly class DoraRegisterController
     #[Route('/register.csv', methods: ['GET'])]
     public function export(): Response
     {
-        $header = ['Prestataire', 'LEI', 'Type de service', 'Description', 'Fonction critique ou importante', 'Fonction soutenue', 'Référence du contrat', 'Début', 'Fin', 'Localisation des données', 'Sous-traitants', 'Substituabilité', 'Dernier test du plan de sortie', 'Statut', 'Écarts'];
+        $header = ['Prestataire', 'LEI', 'Type de service', 'Description', 'Fonction critique ou importante', 'Fonction soutenue', 'Référence du contrat', 'Début', 'Fin', 'Localisation des données', 'Sous-traitants', 'Substituabilité', 'Dernier test du plan de sortie', 'Droit applicable', 'Préavis de résiliation (jours)', 'Dernier audit du prestataire', 'Statut', 'Écarts'];
         $rows = [$header];
         $now = new \DateTimeImmutable();
         foreach ($this->arrangements->findVisibleTo($this->currentUser->get()) as $item) {
-            $rows[] = [$item->getThirdParty()->getName(), $item->getProviderLei(), $item->getServiceType(), $item->getDescription(), $item->supportsCriticalFunction() ? 'oui' : 'non', $item->getFunctionSupported(), $item->getContractReference(), $item->getStartsAt()?->format('Y-m-d'), $item->getEndsAt()?->format('Y-m-d'), $item->getDataLocation(), $item->getSubcontractors(), $item->getSubstitutability(), $item->getExitPlanTestedAt()?->format('Y-m-d'), $item->getStatus(), implode(' ', $this->completeness->gaps($item, $now))];
+            $rows[] = [$item->getThirdParty()->getName(), $item->getProviderLei(), $item->getServiceType(), $item->getDescription(), $item->supportsCriticalFunction() ? 'oui' : 'non', $item->getFunctionSupported(), $item->getContractReference(), $item->getStartsAt()?->format('Y-m-d'), $item->getEndsAt()?->format('Y-m-d'), $item->getDataLocation(), $item->getSubcontractors(), $item->getSubstitutability(), $item->getExitPlanTestedAt()?->format('Y-m-d'), $item->getGoverningLaw(), $item->getTerminationNoticeDays(), $item->getLastAuditedAt()?->format('Y-m-d'), $item->getStatus(), implode(' ', $this->completeness->gaps($item, $now))];
         }
 
         return $this->csv->response($rows, 'registre-dora-'.$now->format('Y-m-d').'.csv', $this->currentUser->get()->getLocale(), ';', 'Y-m-d');
@@ -133,6 +133,15 @@ final readonly class DoraRegisterController
             array_key_exists('exitPlanTestedAt', $data) ? $this->date($data['exitPlanTestedAt']) : $arrangement->getExitPlanTestedAt(),
             (string) ($data['status'] ?? $arrangement->getStatus()),
         );
+        $notice = array_key_exists('terminationNoticeDays', $data) ? $data['terminationNoticeDays'] : $arrangement->getTerminationNoticeDays();
+        if (null !== $notice && (!is_int($notice) || $notice < 0)) {
+            throw new \InvalidArgumentException('Le préavis de résiliation doit être un nombre entier de jours.');
+        }
+        $arrangement->setContractTerms(
+            $text('governingLaw', $arrangement->getGoverningLaw()),
+            $notice,
+            array_key_exists('lastAuditedAt', $data) ? $this->date($data['lastAuditedAt']) : $arrangement->getLastAuditedAt(),
+        );
     }
 
     private function date(mixed $value): ?\DateTimeImmutable
@@ -158,6 +167,7 @@ final readonly class DoraRegisterController
             'serviceType' => $arrangement->getServiceType(), 'description' => $arrangement->getDescription(), 'supportsCriticalFunction' => $arrangement->supportsCriticalFunction(), 'functionSupported' => $arrangement->getFunctionSupported(),
             'providerLei' => $arrangement->getProviderLei(), 'contractReference' => $arrangement->getContractReference(), 'startsAt' => $arrangement->getStartsAt()?->format('Y-m-d'), 'endsAt' => $arrangement->getEndsAt()?->format('Y-m-d'),
             'dataLocation' => $arrangement->getDataLocation(), 'subcontractors' => $arrangement->getSubcontractors(), 'substitutability' => $arrangement->getSubstitutability(), 'exitPlanTestedAt' => $arrangement->getExitPlanTestedAt()?->format('Y-m-d'),
+            'governingLaw' => $arrangement->getGoverningLaw(), 'terminationNoticeDays' => $arrangement->getTerminationNoticeDays(), 'lastAuditedAt' => $arrangement->getLastAuditedAt()?->format('Y-m-d'),
             'status' => $arrangement->getStatus(), 'owner' => ['id' => $owner->getId(), 'name' => trim($owner->getFirstName().' '.$owner->getLastName())],
             'gaps' => $this->completeness->gaps($arrangement, $now), 'updatedAt' => $arrangement->getUpdatedAt()->format(DATE_ATOM),
         ];

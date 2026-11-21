@@ -6,7 +6,7 @@ docker network inspect rpdev-net >/dev/null 2>&1 || docker network create rpdev-
 docker start rpdev-pg rpdev-redis >/dev/null 2>&1 || true
 docker rm -f rpdev-kc rpdev-app >/dev/null 2>&1 || true
 docker run -d --name rpdev-kc --network rpdev-net --memory 700m \
-  -e KC_HTTP_ENABLED=true -e KC_HOSTNAME=https://keycloak.recette.test -e KC_PROXY_HEADERS=xforwarded -e KC_HOSTNAME_STRICT=false \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=Recette-Admin-1 -e KC_HTTP_ENABLED=true -e KC_HOSTNAME=https://keycloak.recette.test -e KC_PROXY_HEADERS=xforwarded -e KC_HOSTNAME_STRICT=false \
   -e JAVA_OPTS_KC_HEAP="-Xms128m -Xmx400m" \
   -v $HOME/rp-dev/recette/realm.json:/opt/keycloak/data/import/realm.json:ro \
   quay.io/keycloak/keycloak:26.0 start-dev --import-realm >/dev/null

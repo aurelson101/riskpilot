@@ -23,7 +23,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class SsoController
 {
-    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private OidcRoleMapper $roleMapper, private SamlClient $saml, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
+    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private OidcRoleMapper $roleMapper, private SamlClient $saml, private \App\Repository\AuthSessionRepository $sessions, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
     {
     }
 
@@ -98,13 +98,13 @@ final readonly class SsoController
         try {
             $state = $request->request->get('RelayState', '');
             $cookie = $request->cookies->get('riskpilot_sso_state', '');
-            if (!is_string($state) || '' === $state || !is_string($cookie) || !hash_equals($cookie, $state)) {
+            if ('' === $state || !hash_equals($cookie, $state)) {
                 throw new \RuntimeException('État SSO invalide.');
             }
             // La demande est consommée une seule fois : une même réponse ne peut pas être rejouée.
             $flow = $this->flows->take($state);
             $response = $request->request->get('SAMLResponse', '');
-            if (null === $flow || ($flow['integrationId'] ?? null) !== $id || !is_string($flow['requestId'] ?? null) || !is_string($response) || '' === $response || strlen($response) > 1_000_000) {
+            if (null === $flow || ($flow['integrationId'] ?? null) !== $id || !is_string($flow['requestId'] ?? null) || '' === $response || strlen($response) > 1_000_000) {
                 throw new \RuntimeException('Parcours SSO expiré.');
             }
             $integration = $this->integration($id);
@@ -113,7 +113,7 @@ final readonly class SsoController
             }
             $authentication = $this->saml->authenticate($integration, $this->appUrl, $response, $flow['requestId']);
 
-            return $this->issueTicket($integration, $flow['fingerprint'], $authentication['subject'], $authentication['claims'], []);
+            return $this->issueTicket($integration, $flow['fingerprint'], $authentication['subject'], $authentication['claims'], ['samlNameId' => $authentication['subject'], 'samlSessionIndex' => $authentication['sessionIndex'], 'samlNameIdFormat' => $authentication['nameIdFormat']]);
         } catch (\Throwable) {
             return $this->redirect('error');
         }
@@ -132,6 +132,40 @@ final readonly class SsoController
         } catch (\Throwable) {
             return new Response('', 404);
         }
+    }
+
+    /**
+     * Déconnexion unique SAML (SLO) : réponse du fournisseur à une déconnexion lancée par RiskPilot, ou demande de
+     * déconnexion lancée par le fournisseur (signature obligatoire), qui révoque les sessions du compte concerné.
+     */
+    #[Route('/api/auth/sso/saml/{id}/sls', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function samlLogout(int $id, Request $request): RedirectResponse
+    {
+        $login = new RedirectResponse(rtrim($this->appUrl, '/').'/login');
+        $login->headers->set('Cache-Control', 'no-store, private');
+        try {
+            if (!$this->loginLimiter->create('sso-sls|'.($request->getClientIp() ?? 'unknown'))->consume()->isAccepted()) {
+                return $login;
+            }
+            $integration = $this->integration($id);
+            $query = array_map('strval', array_filter($request->query->all(), 'is_string'));
+            if ('SAML' !== $integration->getType() || !isset($query['SAMLRequest']) || strlen($query['SAMLRequest']) > 100000) {
+                return $login;
+            }
+            $result = $this->saml->processLogoutRequest($integration, $this->appUrl, $query, (string) $request->server->get('QUERY_STRING', ''));
+            $user = $this->resolveAccount($integration, $result['nameId']);
+            if ($user instanceof User && $user->getOrganization() === $integration->getOrganization()) {
+                $this->sessions->revokeAll($user);
+                $this->entityManager->flush();
+            }
+            if (null !== $result['responseUrl']) {
+                return new RedirectResponse($result['responseUrl'], 302, ['Cache-Control' => 'no-store, private']);
+            }
+        } catch (\Throwable) {
+            // Une demande invalide ne révèle rien : retour à l'écran de connexion.
+        }
+
+        return $login;
     }
 
     private function startSaml(PlatformIntegration $integration, string $state): RedirectResponse
@@ -260,6 +294,11 @@ final readonly class SsoController
      */
     private function logoutUrl(array $flow, PlatformIntegration $integration): ?string
     {
+        if ('SAML' === $integration->getType()) {
+            $nameId = $flow['samlNameId'] ?? null;
+
+            return is_string($nameId) ? $this->saml->logoutUrl($integration, $this->appUrl, $nameId, is_string($flow['samlSessionIndex'] ?? null) ? $flow['samlSessionIndex'] : null, is_string($flow['samlNameIdFormat'] ?? null) ? $flow['samlNameIdFormat'] : null, rtrim($this->appUrl, '/').'/login') : null;
+        }
         $endpoint = $flow['endSessionEndpoint'] ?? null;
         $idToken = $flow['idToken'] ?? null;
         if (!is_string($endpoint) || !is_string($idToken) || '' === $idToken) {

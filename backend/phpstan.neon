@@ -6,3 +6,9 @@ parameters:
     paths:
         - src
         - tests
+    ignoreErrors:
+        # Les fournisseurs de données et les assistants des tests manipulent des tableaux de formes variées :
+        # leur typage détaillé n'apporte rien. Le code de production (src) reste soumis aux règles strictes.
+        -
+            identifier: missingType.iterableValue
+            path: tests/*

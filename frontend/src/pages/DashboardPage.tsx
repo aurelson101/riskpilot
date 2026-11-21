@@ -74,7 +74,7 @@ export function DashboardPage() {
     Object.entries(data.riskLevels) as Array<[RiskLevel, number]>
   ).map(([name, value]) => ({ name: levelLabels[name], value, level: name }));
   const download = async (
-    resource: "risks" | "actions",
+    resource: "risks" | "actions" | "workbook",
     format: "csv" | "xlsx" | "pdf",
   ) => {
     const key = `${resource}-${format}`;
@@ -132,6 +132,15 @@ export function DashboardPage() {
             onClick={() => void download("actions", "xlsx")}
           >
             {exporting === "actions-xlsx" ? "Export…" : "Actions Excel"}
+          </Button>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<DownloadOutlined />}
+            disabled={exporting !== null}
+            onClick={() => void download("workbook", "xlsx")}
+          >
+            {exporting === "workbook-xlsx" ? "Export…" : "Classeur Excel"}
           </Button>
         </Stack>
       </Stack>

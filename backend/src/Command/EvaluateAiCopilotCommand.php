@@ -32,7 +32,7 @@ final class EvaluateAiCopilotCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('organization-id', InputArgument::REQUIRED, 'Organisation dont la configuration IA est utilisée.')
-            ->addOption('yes', null, InputOption::VALUE_NONE, 'Confirme l’envoi de 12 questions de test au fournisseur IA configuré.')
+            ->addOption('yes', null, InputOption::VALUE_NONE, 'Confirme l’envoi de 18 questions de test au fournisseur IA configuré.')
             ->addOption('min-score', null, InputOption::VALUE_REQUIRED, 'Note minimale (0 à 1) sous laquelle la commande échoue.', '0.7')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Affiche le rapport au format JSON.');
     }

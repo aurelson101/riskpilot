@@ -225,13 +225,14 @@ final class MultiRegulatoryControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(201);
         $arrangement = $this->json();
         self::assertSame('529900T8BM49AURSDO55', $arrangement['providerLei']);
-        foreach (['CONTRACT_REFERENCE_MISSING', 'FUNCTION_NOT_DESCRIBED', 'SUBSTITUTABILITY_NOT_ASSESSED', 'EXIT_PLAN_NOT_TESTED', 'DATA_LOCATION_MISSING'] as $gap) {
+        foreach (['CONTRACT_REFERENCE_MISSING', 'FUNCTION_NOT_DESCRIBED', 'SUBSTITUTABILITY_NOT_ASSESSED', 'EXIT_PLAN_NOT_TESTED', 'DATA_LOCATION_MISSING', 'GOVERNING_LAW_MISSING', 'TERMINATION_NOTICE_MISSING', 'PROVIDER_AUDIT_MISSING'] as $gap) {
             self::assertContains($gap, $arrangement['gaps']);
         }
 
         $this->client->jsonRequest('PUT', '/api/dora/arrangements/'.$arrangement['id'], [
             'functionSupported' => 'Paiements', 'contractReference' => 'CTR-9', 'startsAt' => '2025-01-01', 'dataLocation' => 'UE', 'subcontractors' => 'Aucun',
             'substitutability' => 'DIFFICULT', 'exitPlanTestedAt' => (new \DateTimeImmutable('-2 months'))->format('Y-m-d'),
+            'governingLaw' => 'Droit français', 'terminationNoticeDays' => 90, 'lastAuditedAt' => (new \DateTimeImmutable('-3 months'))->format('Y-m-d'),
         ]);
         self::assertResponseIsSuccessful();
         self::assertSame([], $this->json()['gaps']);

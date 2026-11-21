@@ -16,7 +16,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/api/audit-logs')] #[IsGranted(User::ROLE_ADMIN)]
 final readonly class AuditLogController
 {
-    public function __construct(private AuditLogRepository $logs, private CurrentUser $currentUser, private string $appSecret)
+    public function __construct(private AuditLogRepository $logs, private CurrentUser $currentUser, private string $appSecret, private \App\Application\CsvExporter $csv, private \App\Application\XlsxExporter $xlsx, private \App\Application\PdfReportRenderer $pdf)
     {
     }
 
@@ -72,6 +72,46 @@ final readonly class AuditLogController
             'X-RiskPilot-Signature' => $signature,
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    /**
+     * Preuve d'audit lisible (CSV, Excel ou PDF) : un événement par ligne, empreintes de la chaîne et verdict d'intégrité
+     * calculé au moment de l'export. L'export JSON signé reste la forme de référence pour une vérification automatisée.
+     */
+    #[Route('/export.{format<csv|xlsx|pdf>}', methods: ['GET'])]
+    public function exportEvidence(string $format): Response
+    {
+        $actor = $this->currentUser->get();
+        $sealed = $this->logs->findSealedFor($actor);
+        $previous = null;
+        $broken = null;
+        foreach ($sealed as $log) {
+            if (!$log->verify($previous)) {
+                $broken = $log->getId();
+                break;
+            }
+            $previous = $log->getEventHash();
+        }
+        $verdict = null === $broken ? sprintf('chaîne valide (%d événements scellés)', count($sealed)) : sprintf('CHAÎNE ROMPUE à l’événement %d', $broken);
+        $rows = [['ID', 'Date', 'Utilisateur', 'Action', 'Ressource', 'Identifiant', 'Adresse IP', 'Requête', 'Empreinte précédente', 'Empreinte']];
+        foreach ($this->logs->findVisibleTo($actor) as $log) {
+            $user = $log->getUser();
+            $rows[] = [$log->getId(), $log->getCreatedAt(), null === $user ? ($log->getActorId() ? 'Compte #'.$log->getActorId() : 'Service') : $user->getEmail(), $log->getAction(), $log->getEntityType(), $log->getEntityId(), $log->getIpAddress(), $log->getRequestId(), $log->getPreviousHash(), $log->getEventHash()];
+        }
+        $organization = $actor->getOrganization()->getName();
+        $by = trim($actor->getFirstName().' '.$actor->getLastName());
+        $stamp = (new \DateTimeImmutable())->format('Y-m-d');
+        $info = ['Généré par' => $by, 'Intégrité de la chaîne' => $verdict, 'Dernière empreinte' => (string) $previous];
+        if ('pdf' === $format) {
+            $content = $this->pdf->renderDataExport('Journal d’audit', $organization, $rows, $actor->getLocale(), $by, ['Intégrité de la chaîne' => $verdict, 'Dernière empreinte' => (string) $previous]);
+
+            return new Response($content, Response::HTTP_OK, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="audit-'.$stamp.'.pdf"', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+        }
+        if ('xlsx' === $format) {
+            return new Response($this->xlsx->render('Journal d’audit', $organization, $rows, $info), Response::HTTP_OK, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition' => 'attachment; filename="audit-'.$stamp.'.xlsx"', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+        }
+
+        return $this->csv->response($rows, 'audit-'.$stamp.'.csv', $actor->getLocale(), ';', 'Y-m-d H:i:s');
     }
 
     /** @return array<string, mixed> */

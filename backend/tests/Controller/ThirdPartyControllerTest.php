@@ -445,7 +445,6 @@ final class ThirdPartyControllerTest extends WebTestCase
         return $assessment;
     }
 
-    /** @return array<string, mixed> */
     public function testProfileValidationRejectsMalformedFieldsWithoutPartialMutation(): void
     {
         $this->authenticate($this->manager);

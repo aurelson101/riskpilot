@@ -88,6 +88,9 @@ use Symfony\Component\Routing\Attribute\Route;
                 }
                 $item->setEncryptedCredential($this->cipher->encrypt($password));
             }
+            if ('SAML' === $type) {
+                $configuration = $this->samlEncryption($item, $configuration);
+            }
             if (in_array($type, ['OIDC', 'SAML'], true)) {
                 $this->validateSso($item, $configuration, $data['enabled'] ?? false);
             }
@@ -197,6 +200,7 @@ use Symfony\Component\Routing\Attribute\Route;
                 }
             }
             if ('SAML' === $item->getType()) {
+                $configuration = $this->samlEncryption($item, $configuration);
                 $this->validateSso($item, $configuration, $enabled);
             }
             $item->update($data['name'] ?? $item->getName(), $configuration, $enabled);
@@ -264,6 +268,40 @@ use Symfony\Component\Routing\Attribute\Route;
         }
 
         return $actor;
+    }
+
+    /**
+     * Chiffrement des assertions SAML : la paire de clés du service est générée côté serveur (RSA 2048, certificat
+     * auto-signé) ; la clé privée est chiffrée au repos et le certificat public figure dans les métadonnées.
+     * Désactiver puis réactiver l'option régénère la paire (rotation).
+     *
+     * @param array<string, mixed> $configuration
+     *
+     * @return array<string, mixed>
+     */
+    private function samlEncryption(PlatformIntegration $item, array $configuration): array
+    {
+        if (true !== ($configuration['encryptAssertions'] ?? false)) {
+            unset($configuration['spCertificate']);
+
+            return $configuration;
+        }
+        $existing = $item->getConfiguration()['spCertificate'] ?? null;
+        if (is_string($existing) && null !== $item->getEncryptedCredential() && true === ($item->getConfiguration()['encryptAssertions'] ?? false)) {
+            $configuration['spCertificate'] = $existing;
+
+            return $configuration;
+        }
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        $csr = false === $key ? false : openssl_csr_new(['commonName' => 'RiskPilot SAML '.$item->getName()], $key);
+        $certificate = false === $key || false === $csr ? false : openssl_csr_sign($csr, null, $key, 3650);
+        if (false === $key || false === $certificate || !openssl_x509_export($certificate, $pem) || !openssl_pkey_export($key, $private)) {
+            throw new \InvalidArgumentException('Génération de la clé de chiffrement SAML impossible.');
+        }
+        $item->setEncryptedCredential($this->cipher->encrypt($private));
+        $configuration['spCertificate'] = $pem;
+
+        return $configuration;
     }
 
     /** @param array<string, mixed> $configuration */

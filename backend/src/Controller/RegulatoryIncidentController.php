@@ -37,10 +37,33 @@ final readonly class RegulatoryIncidentController
         private RegulatoryIncidentRepository $incidents,
         private AiSystemRepository $aiSystems,
         private DigitalProductRepository $products,
+        private \App\Repository\VulnerabilityRepository $vulnerabilities,
         private UserRepository $users,
         private RegulatoryDeadlines $deadlines,
         private EntityManagerInterface $entityManager,
     ) {
+    }
+
+    /** Vulnérabilités sévères du registre encore ouvertes et indication d'un signalement CRA rattaché (ou non). */
+    #[Route('/vulnerability-coverage', methods: ['GET'])]
+    public function vulnerabilityCoverage(): JsonResponse
+    {
+        $actor = $this->currentUser->get();
+        $reported = [];
+        foreach ($this->incidents->findVisibleTo($actor) as $incident) {
+            if (null !== $incident->getVulnerability()) {
+                $reported[(int) $incident->getVulnerability()->getId()][] = $incident->getId();
+            }
+        }
+        $items = [];
+        foreach ($this->vulnerabilities->findVisibleTo($actor) as $vulnerability) {
+            if ('OPEN' !== $vulnerability->getStatus() || !in_array($vulnerability->getSeverity(), ['HIGH', 'CRITICAL'], true)) {
+                continue;
+            }
+            $items[] = ['id' => $vulnerability->getId(), 'name' => $vulnerability->getName(), 'severity' => $vulnerability->getSeverity(), 'reports' => $reported[(int) $vulnerability->getId()] ?? [], 'reported' => isset($reported[(int) $vulnerability->getId()])];
+        }
+
+        return new JsonResponse(['items' => $items, 'unreported' => count(array_filter($items, static fn (array $item): bool => !$item['reported']))]);
     }
 
     #[Route('', methods: ['GET'])]
@@ -199,6 +222,13 @@ final readonly class RegulatoryIncidentController
             }
         }
         $incident->link($aiSystem, $product);
+        if (array_key_exists('vulnerabilityId', $data)) {
+            $vulnerability = null === $data['vulnerabilityId'] ? null : $this->vulnerabilities->findOneVisibleTo((int) $data['vulnerabilityId'], $actor);
+            if (null !== $data['vulnerabilityId'] && !$vulnerability instanceof \App\Entity\Vulnerability) {
+                throw new \InvalidArgumentException('Vulnérabilité introuvable.');
+            }
+            $incident->linkVulnerability($vulnerability);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -216,6 +246,7 @@ final readonly class RegulatoryIncidentController
             'owner' => ['id' => $owner->getId(), 'name' => trim($owner->getFirstName().' '.$owner->getLastName())],
             'aiSystem' => null === $incident->getAiSystem() ? null : ['id' => $incident->getAiSystem()->getId(), 'name' => $incident->getAiSystem()->getName()],
             'product' => null === $incident->getProduct() ? null : ['id' => $incident->getProduct()->getId(), 'name' => $incident->getProduct()->getName(), 'version' => $incident->getProduct()->getVersion()],
+            'vulnerability' => null === $incident->getVulnerability() ? null : ['id' => $incident->getVulnerability()->getId(), 'name' => $incident->getVulnerability()->getName(), 'severity' => $incident->getVulnerability()->getSeverity()],
             'steps' => $steps, 'worstStatus' => $this->deadlines->worstStatus($steps), 'updatedAt' => $incident->getUpdatedAt()->format(DATE_ATOM),
         ];
     }

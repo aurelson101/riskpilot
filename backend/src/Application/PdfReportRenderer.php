@@ -33,8 +33,9 @@ final class PdfReportRenderer
 
     /**
      * @param list<list<int|float|string|\DateTimeInterface|null>> $rows
+     * @param array<string, string>                                $metadata lignes d'information affichées sous l'en-tête (ex. verdict d'intégrité)
      */
-    public function renderDataExport(string $title, string $organization, array $rows, string $locale = 'fr', ?string $generatedBy = null): string
+    public function renderDataExport(string $title, string $organization, array $rows, string $locale = 'fr', ?string $generatedBy = null, array $metadata = []): string
     {
         if ([] === $rows) {
             throw new \InvalidArgumentException('A PDF export requires a header row.');
@@ -43,6 +44,7 @@ final class PdfReportRenderer
             'organization' => $organization,
             'generatedAt' => (new \DateTimeImmutable())->format(DATE_ATOM),
             'generatedBy' => $generatedBy,
+            'metadata' => $metadata,
             'rows' => $rows,
         ];
 
@@ -301,6 +303,7 @@ final class PdfReportRenderer
         return '<!doctype html><html lang="'.$locale.'"><head><meta charset="UTF-8"><title>'.$this->escape($title).'</title><style>'.$css.'</style></head><body>'.
             $this->brandHeader($title, $organization, $documentId, $this->t('CONFIDENTIEL', 'CONFIDENTIAL', $locale), $this->t('Export complet', 'Complete export', $locale)).
             '<div class="meta">'.$this->t('Généré le', 'Generated on', $locale).' '.$this->escape($this->dateTime((string) ($data['generatedAt'] ?? ''), $locale)).('' !== trim((string) ($data['generatedBy'] ?? '')) ? ' '.$this->t('par', 'by', $locale).' '.$this->escape((string) $data['generatedBy']) : '').'</div></header>'.
+            implode('', array_map(fn ($label, $value): string => '<div class="meta">'.$this->escape((string) $label).' : '.$this->escape((string) $value).'</div>', array_keys((array) ($data['metadata'] ?? [])), array_values((array) ($data['metadata'] ?? [])))).
             '<div class="export-summary"><strong>'.$count.'</strong> '.$this->t('enregistrement(s) exporté(s)', 'exported record(s)', $locale).'</div>'.
             '<div class="notice">'.$this->t('Ce document contient tous les champs et tous les enregistrements visibles par l’utilisateur au moment de l’export. Les valeurs non renseignées sont signalées explicitement.', 'This document contains every field and every record visible to the user at export time. Missing values are explicitly identified.', $locale).'</div>'.
             $summary.

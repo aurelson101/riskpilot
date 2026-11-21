@@ -32,6 +32,9 @@ class IctArrangement
     #[ORM\Column(type: 'text', nullable: true)] private ?string $subcontractors = null;
     #[ORM\Column(length: 20)] private string $substitutability = 'NOT_ASSESSED';
     #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $exitPlanTestedAt = null;
+    #[ORM\Column(length: 100, nullable: true)] private ?string $governingLaw = null;
+    #[ORM\Column(type: 'smallint', nullable: true)] private ?int $terminationNoticeDays = null;
+    #[ORM\Column(nullable: true)] private ?\DateTimeImmutable $lastAuditedAt = null;
     #[ORM\Column(length: 20)] private string $status = 'ACTIVE';
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
@@ -74,6 +77,33 @@ class IctArrangement
         $this->exitPlanTestedAt = $exitPlanTestedAt;
         $this->status = $status;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /** Conditions contractuelles complémentaires du registre (droit applicable, préavis de résiliation, dernier audit du prestataire). */
+    public function setContractTerms(?string $governingLaw, ?int $terminationNoticeDays, ?\DateTimeImmutable $lastAuditedAt): void
+    {
+        if (null !== $terminationNoticeDays && ($terminationNoticeDays < 0 || $terminationNoticeDays > 3650)) {
+            throw new \InvalidArgumentException('Le préavis de résiliation doit être compris entre 0 et 3650 jours.');
+        }
+        $this->governingLaw = $this->clean($governingLaw, 100);
+        $this->terminationNoticeDays = $terminationNoticeDays;
+        $this->lastAuditedAt = $lastAuditedAt;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getGoverningLaw(): ?string
+    {
+        return $this->governingLaw;
+    }
+
+    public function getTerminationNoticeDays(): ?int
+    {
+        return $this->terminationNoticeDays;
+    }
+
+    public function getLastAuditedAt(): ?\DateTimeImmutable
+    {
+        return $this->lastAuditedAt;
     }
 
     private function clean(?string $value, int $limit): ?string

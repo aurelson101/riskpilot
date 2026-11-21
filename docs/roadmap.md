@@ -44,8 +44,9 @@ produit. Les critères ci-dessous sont des travaux à réaliser, pas des livrais
 - **Livré** : packs AI Act, DORA et CRA ; qualification AI Act des systèmes d'IA ; registre des notifications DORA/CRA/AI Act avec échéances ; inventaire de produits CRA ; registre des accords TIC DORA ; provisioning SCIM 2.0 ; correction du test de délégation dépendant de la date.
 - **Livré ensuite** : rappels quotidiens DORA/CRA/AI Act, rôles issus des groupes OIDC, déconnexion côté fournisseur, groupes SCIM (portée `scim:groups`), banc d'évaluation du copilote (`app:ai:evaluate`).
 - **Livré le même jour** : SAML 2.0, rattachement SCIM par `externalId`, audit des écritures SCIM, fournisseur IA auto-hébergé, contexte réglementaire du copilote ; recette réelle SAML et SCIM avec Keycloak 26 (`scripts/recette-saml/`).
+- **Livré ensuite** : SAML SLO et assertions chiffrées (recette Keycloak 10/10), audit et limitation des exports, classeur Excel multi-feuilles, preuve d'audit CSV/Excel/PDF, champs contractuels DORA, lien vulnérabilité ↔ signalement CRA, jeu d'évaluation du copilote à 18 questions.
 - **P1 — Recette OIDC** : valider OIDC et rôles par groupes avec un Keycloak ou Authentik HTTPS public de préproduction ; refaire la recette SAML avec Authentik.
-- **P2 — SAML** : déconnexion unique (SLO) et assertions chiffrées.
+- **P2 — Exports** : planification d'exports par email, en-têtes localisés, export par lots pour les très grands tenants.
 - **P2 — Registre DORA** : aligner les champs sur les normes techniques d'exécution.
 - **P2 — CRA** : relier vulnérabilités, produits et signalements.
 - **P2 — IA** : élargir le jeu d'évaluation et l'exécuter régulièrement sur la configuration réelle.

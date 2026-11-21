@@ -34,6 +34,7 @@ class RegulatoryIncident
     #[ORM\Column(type: 'json')] private array $completed = [];
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?AiSystem $aiSystem = null;
     #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?DigitalProduct $product = null;
+    #[ORM\ManyToOne] #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] private ?Vulnerability $vulnerability = null;
     #[ORM\Column] private \DateTimeImmutable $createdAt;
     #[ORM\Column] private \DateTimeImmutable $updatedAt;
     public function __construct(Organization $organization, User $owner, string $regime, string $title, string $description, \DateTimeImmutable $awareAt)
@@ -128,6 +129,20 @@ class RegulatoryIncident
         }
         $this->aiSystem = $aiSystem;
         $this->product = $product;
+    }
+
+    /** Rattache le signalement CRA de vulnérabilité à la vulnérabilité du registre qu'il couvre. */
+    public function linkVulnerability(?Vulnerability $vulnerability): void
+    {
+        if (null !== $vulnerability && RegulatoryDeadlines::CRA_VULNERABILITY !== $this->regime) {
+            throw new \InvalidArgumentException('Une vulnérabilité ne peut être liée qu’à un signalement CRA de vulnérabilité.');
+        }
+        $this->vulnerability = $vulnerability;
+    }
+
+    public function getVulnerability(): ?Vulnerability
+    {
+        return $this->vulnerability;
     }
 
     /** @return array{classifiedAt: ?\DateTimeImmutable, correctiveAvailableAt: ?\DateTimeImmutable, widespread: bool, criticalInfrastructure: bool, death: bool} */

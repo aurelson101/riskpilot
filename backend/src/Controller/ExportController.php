@@ -12,6 +12,7 @@ use App\Repository\ActionPlanRepository;
 use App\Repository\ComplianceAssessmentRepository;
 use App\Repository\ComplianceResultRepository;
 use App\Repository\RiskScenarioRepository;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -44,6 +45,44 @@ final readonly class ExportController
     #[Route('/risks.{format<csv|xlsx|pdf>}', methods: ['GET'])]
     public function risks(string $format): Response
     {
+        return $this->export($format, 'Registre des risques', 'registre-risques', $this->riskRows());
+    }
+
+    #[Route('/actions.{format<csv|xlsx|pdf>}', methods: ['GET'])]
+    public function actions(string $format): Response
+    {
+        return $this->export($format, 'Plans d’action', 'plans-actions', $this->actionRows());
+    }
+
+    /**
+     * Classeur Excel unique : risques, plans d'action et, si une évaluation est indiquée (?assessment=ID), ses résultats de conformité.
+     */
+    #[Route('/workbook.xlsx', methods: ['GET'])]
+    public function workbook(Request $request): Response
+    {
+        $actor = $this->currentUser->get();
+        $sheets = ['Registre des risques' => $this->riskRows(), 'Plans d’action' => $this->actionRows()];
+        $assessmentId = $request->query->get('assessment');
+        if (null !== $assessmentId) {
+            $assessment = ctype_digit((string) $assessmentId) ? $this->assessments->findOneVisibleTo((int) $assessmentId, $actor) : null;
+            if (null === $assessment) {
+                return new Response('Évaluation introuvable.', Response::HTTP_NOT_FOUND);
+            }
+            $sheets['Conformité'] = $this->complianceRows($assessment);
+        }
+        $content = $this->xlsxExporter->renderWorkbook('Synthèse GRC', $actor->getOrganization()->getName(), $sheets, ['Généré par' => trim($actor->getFirstName().' '.$actor->getLastName())]);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$this->filename('synthese-grc', 'xlsx').'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /** @return list<list<int|float|string|\DateTimeInterface|null>> */
+    private function riskRows(): array
+    {
         $rows = [[
             'ID', 'Scénario', 'Description', 'Périmètre', 'Actif', 'Menace', 'Vulnérabilités',
             'Responsable', 'Email responsable', 'Vraisemblance brute', 'Impact brut', 'Score brut',
@@ -65,11 +104,11 @@ final readonly class ExportController
             ];
         }
 
-        return $this->export($format, 'Registre des risques', 'registre-risques', $rows);
+        return $rows;
     }
 
-    #[Route('/actions.{format<csv|xlsx|pdf>}', methods: ['GET'])]
-    public function actions(string $format): Response
+    /** @return list<list<int|float|string|\DateTimeInterface|null>> */
+    private function actionRows(): array
     {
         $rows = [[
             'ID', 'Action', 'Description', 'Risque lié', 'Mesure liée', 'Responsable', 'Email responsable',
@@ -92,7 +131,7 @@ final readonly class ExportController
             ];
         }
 
-        return $this->export($format, 'Plans d’action', 'plans-actions', $rows);
+        return $rows;
     }
 
     #[Route('/compliance/{id<\d+>}.{format<csv|xlsx|pdf>}', methods: ['GET'])]
@@ -102,6 +141,13 @@ final readonly class ExportController
         if (null === $assessment) {
             return new Response('Évaluation introuvable.', Response::HTTP_NOT_FOUND);
         }
+
+        return $this->export($format, 'Évaluation de conformité', 'conformite-'.$id, $this->complianceRows($assessment));
+    }
+
+    /** @return list<list<int|float|string|\DateTimeInterface|null>> */
+    private function complianceRows(\App\Entity\ComplianceAssessment $assessment): array
+    {
         $rows = [[
             'Référentiel', 'Version', 'Périmètre', 'Date évaluation', 'Score global (%)', 'Référence',
             'Exigence', 'Domaine', 'Maturité (0-5)', 'Statut', 'Code statut', 'Commentaire', 'Preuves', 'Action corrective',
@@ -116,7 +162,7 @@ final readonly class ExportController
             ];
         }
 
-        return $this->export($format, 'Évaluation de conformité', 'conformite-'.$id, $rows);
+        return $rows;
     }
 
     /** @param list<list<int|float|string|\DateTimeInterface|null>> $rows */

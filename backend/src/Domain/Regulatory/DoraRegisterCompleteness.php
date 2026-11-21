@@ -39,6 +39,14 @@ final class DoraRegisterCompleteness
         } elseif ($tested < $now->modify('-12 months')) {
             $gaps[] = 'EXIT_PLAN_TEST_OUTDATED';
         }
+        foreach (['GOVERNING_LAW_MISSING' => $arrangement->getGoverningLaw(), 'TERMINATION_NOTICE_MISSING' => $arrangement->getTerminationNoticeDays(), 'PROVIDER_AUDIT_MISSING' => $arrangement->getLastAuditedAt()] as $code => $value) {
+            if (null === $value) {
+                $gaps[] = $code;
+            }
+        }
+        if (null !== $arrangement->getLastAuditedAt() && $arrangement->getLastAuditedAt() < $now->modify('-24 months')) {
+            $gaps[] = 'PROVIDER_AUDIT_OUTDATED';
+        }
         $end = $arrangement->getEndsAt();
         if (null !== $end && $end > $now && $end <= $now->modify('+6 months')) {
             $gaps[] = 'CONTRACT_ENDING_SOON';

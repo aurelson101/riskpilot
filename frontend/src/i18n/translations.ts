@@ -2710,6 +2710,36 @@ const pairs: Array<[fr: string, en: string]> = [
     "New access token (leave empty to keep)",
   ],
   ["Jeton d’accès (facultatif)", "Access token (optional)"],
+  ["Classeur Excel", "Excel workbook"],
+  ["Preuve d’audit", "Audit evidence"],
+  ["L’export du journal a échoué.", "Audit log export failed."],
+  [
+    "Vulnérabilité du registre concernée (facultatif)",
+    "Related register vulnerability (optional)",
+  ],
+  ["Droit applicable", "Governing law"],
+  ["Préavis de résiliation (jours)", "Termination notice (days)"],
+  ["Dernier audit du prestataire", "Last provider audit"],
+  ["Droit applicable manquant", "Governing law missing"],
+  ["Préavis de résiliation manquant", "Termination notice missing"],
+  ["Audit du prestataire jamais réalisé", "Provider never audited"],
+  [
+    "Audit du prestataire de plus de 24 mois",
+    "Provider audit older than 24 months",
+  ],
+  [
+    "Adresse de déconnexion SAML (SingleLogoutService, facultative)",
+    "SAML sign-out address (SingleLogoutService, optional)",
+  ],
+  [
+    "URL HTTPS de la liaison HTTP-Redirect : la déconnexion RiskPilot ferme aussi la session chez le fournisseur, et une déconnexion signée par le fournisseur ferme les sessions RiskPilot.",
+    "HTTPS URL of the HTTP-Redirect binding: signing out of RiskPilot also ends the provider session, and a provider-signed logout ends RiskPilot sessions.",
+  ],
+  ["Exiger des assertions chiffrées", "Require encrypted assertions"],
+  [
+    "RiskPilot génère la clé de chiffrement (la clé privée reste chiffrée sur le serveur). Importez ensuite les métadonnées chez le fournisseur pour qu’il chiffre les assertions avec le certificat publié.",
+    "RiskPilot generates the encryption key (the private key stays encrypted on the server). Then import the metadata into the provider so it encrypts assertions with the published certificate.",
+  ],
 ];
 
 export const frToEn = new Map(pairs);

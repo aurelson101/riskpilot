@@ -15,3 +15,7 @@ framework:
             policy: sliding_window
             limit: 1000
             interval: '1 minute'
+        data_export:
+            policy: sliding_window
+            limit: 1000
+            interval: '1 minute'

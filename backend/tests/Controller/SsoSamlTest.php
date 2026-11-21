@@ -211,4 +211,86 @@ final class SsoSamlTest extends WebTestCase
         $items = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['items'];
         self::assertSame('SAML', $items[0]['protocol']);
     }
+
+    private function adminHeader(): void
+    {
+        $admin = $this->manager->getRepository(User::class)->findOneBy(['email' => 'admin@example.test']);
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.self::getContainer()->get(JWTTokenManagerInterface::class)->create($admin));
+    }
+
+    /** @return array<string, mixed> */
+    private function configuration(): array
+    {
+        $this->adminHeader();
+        $this->client->request('GET', '/api/v1/integrations');
+
+        return json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['items'][0]['configuration'];
+    }
+
+    public function testEncryptedAssertionsAreRequiredWhenEnabledAndTheKeyNeverLeavesTheServer(): void
+    {
+        $configuration = $this->configuration();
+        $this->client->jsonRequest('PUT', '/api/v1/integrations/'.$this->integrationId, ['configuration' => $configuration + ['encryptAssertions' => true]]);
+        self::assertResponseIsSuccessful();
+        $saved = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $certificate = $saved['configuration']['spCertificate'];
+        self::assertStringContainsString('BEGIN CERTIFICATE', $certificate);
+        self::assertStringNotContainsString('PRIVATE KEY', json_encode($saved, JSON_THROW_ON_ERROR), 'The private key is never returned.');
+        $this->client->jsonRequest('PUT', '/api/v1/integrations/'.$this->integrationId, ['configuration' => $saved['configuration']]);
+        self::assertSame($certificate, json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['configuration']['spCertificate'], 'The key pair is stable across saves.');
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+
+        $this->client->request('GET', '/api/auth/sso/saml/'.$this->integrationId.'/metadata');
+        self::assertStringContainsString('KeyDescriptor', (string) $this->client->getResponse()->getContent());
+
+        $flow = $this->start();
+        $this->assertRejected($flow, []);
+
+        $flow = $this->start();
+        $this->post($flow, ['encryptFor' => $certificate]);
+        self::assertResponseRedirects('http://localhost:8080/login?sso=complete');
+        self::getContainer()->get('limiter.login')->create('sso-complete|127.0.0.1')->reset();
+        $this->client->jsonRequest('POST', '/api/auth/sso/complete', []);
+        self::assertResponseIsSuccessful();
+
+        $flow = $this->start();
+        $stranger = new SamlTestIdp();
+        $this->post($flow, ['encryptFor' => $stranger->certificate]);
+        self::assertResponseRedirects('http://localhost:8080/login?sso=error', null, 'An assertion encrypted for another key cannot be read.');
+
+        $this->adminHeader();
+        $this->client->jsonRequest('PUT', '/api/v1/integrations/'.$this->integrationId, ['configuration' => $configuration]);
+        self::assertArrayNotHasKey('spCertificate', json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['configuration']);
+    }
+
+    public function testSingleLogoutIsOfferedAfterSignInAndProviderInitiatedLogoutRequiresASignature(): void
+    {
+        $configuration = $this->configuration();
+        $this->client->jsonRequest('PUT', '/api/v1/integrations/'.$this->integrationId, ['configuration' => $configuration + ['sloUrl' => 'https://idp.example.test/realms/test/protocol/saml/logout']]);
+        self::assertResponseIsSuccessful();
+        $this->client->setServerParameter('HTTP_AUTHORIZATION', '');
+
+        $session = $this->login(['subject' => 'user-1']);
+        $url = (string) ($session['sso']['logoutUrl'] ?? '');
+        self::assertStringStartsWith('https://idp.example.test/realms/test/protocol/saml/logout?', $url);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $xml = (string) gzinflate((string) base64_decode($query['SAMLRequest'], true));
+        self::assertStringContainsString('>user-1<', $xml);
+        self::assertSame('http://localhost:8080/login', $query['RelayState']);
+
+        // Provider-initiated logout: unsigned requests are ignored, signed ones revoke the sessions.
+        $sls = '/api/auth/sso/saml/'.$this->integrationId.'/sls';
+        $slsUrl = 'http://localhost:8080'.$sls;
+        $before = $this->manager->getRepository(\App\Entity\AuthSession::class)->count(['revokedAt' => null]);
+        self::assertGreaterThan(0, $before);
+        $this->client->request('GET', $sls.'?'.http_build_query($this->idp->logoutRequest($slsUrl, $this->sp(), 'user-1', false), '', '&', PHP_QUERY_RFC3986));
+        self::assertResponseRedirects('http://localhost:8080/login');
+        self::assertSame($before, $this->manager->getRepository(\App\Entity\AuthSession::class)->count(['revokedAt' => null]), 'An unsigned logout request changes nothing.');
+
+        $this->client->request('GET', $sls.'?'.http_build_query($this->idp->logoutRequest($slsUrl, $this->sp(), 'user-1', true), '', '&', PHP_QUERY_RFC3986));
+        self::assertResponseStatusCodeSame(302);
+        self::assertStringStartsWith('https://idp.example.test/realms/test/protocol/saml/logout?SAMLResponse=', (string) $this->client->getResponse()->headers->get('Location'));
+        $this->manager->clear();
+        self::assertSame(0, $this->manager->getRepository(\App\Entity\AuthSession::class)->count(['revokedAt' => null]), 'Sessions of the account are revoked.');
+    }
 }

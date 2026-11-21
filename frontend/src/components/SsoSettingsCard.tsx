@@ -25,6 +25,8 @@ type Configuration = {
   ssoUrl?: string;
   idpCertificate?: string;
   spEntityId?: string;
+  sloUrl?: string;
+  encryptAssertions?: boolean;
   linkScimExternalId?: boolean;
   accountMappings: Mapping[];
   hostedDomain?: string;
@@ -60,6 +62,8 @@ const initial = {
   ssoUrl: "",
   idpCertificate: "",
   spEntityId: "",
+  sloUrl: "",
+  encryptAssertions: false,
   linkScimExternalId: false,
   name: "",
   provider: "MICROSOFT_ENTRA",
@@ -133,10 +137,10 @@ export function SsoSettingsCard() {
     !saml &&
     (editingId === null ||
       Boolean(
-      editing &&
-      (editing.configuration.issuer !== form.issuer.trim() ||
-        editing.configuration.clientId !== form.clientId.trim()),
-    ));
+        editing &&
+        (editing.configuration.issuer !== form.issuer.trim() ||
+          editing.configuration.clientId !== form.clientId.trim()),
+      ));
   const duplicateSubject = (subject: string, index: number) =>
     Boolean(subject.trim()) &&
     form.accountMappings.some(
@@ -172,6 +176,8 @@ export function SsoSettingsCard() {
                 ...(form.spEntityId.trim()
                   ? { spEntityId: form.spEntityId.trim() }
                   : {}),
+                ...(form.sloUrl.trim() ? { sloUrl: form.sloUrl.trim() } : {}),
+                ...(form.encryptAssertions ? { encryptAssertions: true } : {}),
               }
             : { clientId: form.clientId.trim() }),
           ...(form.linkScimExternalId ? { linkScimExternalId: true } : {}),
@@ -233,8 +239,7 @@ export function SsoSettingsCard() {
           <Typography color="text.secondary">
             Connectez Microsoft, Google, Keycloak, Authentik ou tout fournisseur
             OIDC ou SAML 2.0. Les comptes et les droits restent gérés dans
-            RiskPilot ; le MFA RiskPilot reste obligatoire lorsqu’il est
-            activé.
+            RiskPilot ; le MFA RiskPilot reste obligatoire lorsqu’il est activé.
           </Typography>
           {error && <Alert severity="error">{error}</Alert>}
           {saved && (
@@ -270,6 +275,9 @@ export function SsoSettingsCard() {
                       ssoUrl: item.configuration.ssoUrl ?? "",
                       idpCertificate: item.configuration.idpCertificate ?? "",
                       spEntityId: item.configuration.spEntityId ?? "",
+                      sloUrl: item.configuration.sloUrl ?? "",
+                      encryptAssertions:
+                        item.configuration.encryptAssertions ?? false,
                       linkScimExternalId:
                         item.configuration.linkScimExternalId ?? false,
                       name: item.name,
@@ -358,9 +366,12 @@ export function SsoSettingsCard() {
                   .filter(
                     ([value]) =>
                       !saml ||
-                      ["KEYCLOAK", "AUTHENTIK", "MICROSOFT_ENTRA", "GENERIC"].includes(
-                        value,
-                      ),
+                      [
+                        "KEYCLOAK",
+                        "AUTHENTIK",
+                        "MICROSOFT_ENTRA",
+                        "GENERIC",
+                      ].includes(value),
                   )
                   .map(([value, label]) => (
                     <MenuItem key={value} value={value}>
@@ -383,91 +394,123 @@ export function SsoSettingsCard() {
                   saml
                     ? "Valeur entityID des métadonnées du fournisseur, par exemple https://sso.example.com/realms/riskpilot."
                     : form.provider === "MICROSOFT_ENTRA"
-                    ? "Remplacez les zéros par l’identifiant du tenant Entra ID. Application de type Web, mono-tenant."
-                    : form.provider === "GOOGLE_WORKSPACE"
-                      ? "Créez un client OAuth de type application Web dans Google Cloud."
-                      : "Autorisez cet émetteur dans OIDC_DIAGNOSTIC_ISSUERS côté serveur. Signature RS256 requise."
+                      ? "Remplacez les zéros par l’identifiant du tenant Entra ID. Application de type Web, mono-tenant."
+                      : form.provider === "GOOGLE_WORKSPACE"
+                        ? "Créez un client OAuth de type application Web dans Google Cloud."
+                        : "Autorisez cet émetteur dans OIDC_DIAGNOSTIC_ISSUERS côté serveur. Signature RS256 requise."
                 }
               />
               {saml ? (
-              <>
-              <TextField
-                required
-                label="Adresse de connexion SAML (SingleSignOnService)"
-                value={form.ssoUrl}
-                onChange={(e) => setForm({ ...form, ssoUrl: e.target.value })}
-                helperText="URL HTTPS de la liaison HTTP-Redirect du fournisseur."
-              />
-              <TextField
-                required
-                multiline
-                minRows={4}
-                label="Certificat de signature du fournisseur (PEM)"
-                value={form.idpCertificate}
-                onChange={(e) =>
-                  setForm({ ...form, idpCertificate: e.target.value })
-                }
-                helperText="Certificat X.509 public (-----BEGIN CERTIFICATE-----). Les réponses ou assertions non signées par ce certificat sont refusées ; SHA-1 est refusé."
-              />
-              <TextField
-                label="Identifiant RiskPilot (entityID du service, facultatif)"
-                value={form.spEntityId}
-                onChange={(e) =>
-                  setForm({ ...form, spEntityId: e.target.value })
-                }
-                helperText="Par défaut, l’adresse des métadonnées RiskPilot."
-              />
-              <TextField
-                label="Adresse de retour à enregistrer chez le fournisseur (ACS)"
-                value={
-                  editingId === null
-                    ? "Disponible après l’enregistrement"
-                    : `${window.location.origin}/api/auth/sso/saml/${editingId}/acs`
-                }
-                slotProps={{ input: { readOnly: true } }}
-              />
-              <TextField
-                label="Métadonnées RiskPilot à importer chez le fournisseur"
-                value={
-                  editingId === null
-                    ? "Disponible après l’enregistrement"
-                    : `${window.location.origin}/api/auth/sso/saml/${editingId}/metadata`
-                }
-                slotProps={{ input: { readOnly: true } }}
-              />
-              </>
+                <>
+                  <TextField
+                    required
+                    label="Adresse de connexion SAML (SingleSignOnService)"
+                    value={form.ssoUrl}
+                    onChange={(e) =>
+                      setForm({ ...form, ssoUrl: e.target.value })
+                    }
+                    helperText="URL HTTPS de la liaison HTTP-Redirect du fournisseur."
+                  />
+                  <TextField
+                    required
+                    multiline
+                    minRows={4}
+                    label="Certificat de signature du fournisseur (PEM)"
+                    value={form.idpCertificate}
+                    onChange={(e) =>
+                      setForm({ ...form, idpCertificate: e.target.value })
+                    }
+                    helperText="Certificat X.509 public (-----BEGIN CERTIFICATE-----). Les réponses ou assertions non signées par ce certificat sont refusées ; SHA-1 est refusé."
+                  />
+                  <TextField
+                    label="Identifiant RiskPilot (entityID du service, facultatif)"
+                    value={form.spEntityId}
+                    onChange={(e) =>
+                      setForm({ ...form, spEntityId: e.target.value })
+                    }
+                    helperText="Par défaut, l’adresse des métadonnées RiskPilot."
+                  />
+                  <TextField
+                    label="Adresse de déconnexion SAML (SingleLogoutService, facultative)"
+                    value={form.sloUrl}
+                    onChange={(e) =>
+                      setForm({ ...form, sloUrl: e.target.value })
+                    }
+                    helperText="URL HTTPS de la liaison HTTP-Redirect : la déconnexion RiskPilot ferme aussi la session chez le fournisseur, et une déconnexion signée par le fournisseur ferme les sessions RiskPilot."
+                  />
+                  <FormControlLabel
+                    label="Exiger des assertions chiffrées"
+                    control={
+                      <Switch
+                        checked={form.encryptAssertions}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            encryptAssertions: e.target.checked,
+                          })
+                        }
+                      />
+                    }
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    RiskPilot génère la clé de chiffrement (la clé privée reste
+                    chiffrée sur le serveur). Importez ensuite les métadonnées
+                    chez le fournisseur pour qu’il chiffre les assertions avec
+                    le certificat publié.
+                  </Typography>
+                  <TextField
+                    label="Adresse de retour à enregistrer chez le fournisseur (ACS)"
+                    value={
+                      editingId === null
+                        ? "Disponible après l’enregistrement"
+                        : `${window.location.origin}/api/auth/sso/saml/${editingId}/acs`
+                    }
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                  <TextField
+                    label="Métadonnées RiskPilot à importer chez le fournisseur"
+                    value={
+                      editingId === null
+                        ? "Disponible après l’enregistrement"
+                        : `${window.location.origin}/api/auth/sso/saml/${editingId}/metadata`
+                    }
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </>
               ) : (
-              <>
-              <TextField
-                required
-                label="Identifiant client"
-                value={form.clientId}
-                onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-                autoComplete="off"
-              />
-              <TextField
-                required={needsNewSecret}
-                type="password"
-                label="Secret client"
-                value={form.credential}
-                onChange={(e) =>
-                  setForm({ ...form, credential: e.target.value })
-                }
-                autoComplete="new-password"
-                helperText={
-                  editingId && !needsNewSecret
-                    ? "Laissez vide pour conserver le secret chiffré."
-                    : editingId
-                      ? "Identité SSO modifiée : saisissez le nouveau secret client."
-                      : "Stocké chiffré et jamais renvoyé par l’API."
-                }
-              />
-              <TextField
-                label="URL de retour à enregistrer chez le fournisseur"
-                value={`${window.location.origin}/api/auth/sso/callback`}
-                slotProps={{ input: { readOnly: true } }}
-              />
-              </>
+                <>
+                  <TextField
+                    required
+                    label="Identifiant client"
+                    value={form.clientId}
+                    onChange={(e) =>
+                      setForm({ ...form, clientId: e.target.value })
+                    }
+                    autoComplete="off"
+                  />
+                  <TextField
+                    required={needsNewSecret}
+                    type="password"
+                    label="Secret client"
+                    value={form.credential}
+                    onChange={(e) =>
+                      setForm({ ...form, credential: e.target.value })
+                    }
+                    autoComplete="new-password"
+                    helperText={
+                      editingId && !needsNewSecret
+                        ? "Laissez vide pour conserver le secret chiffré."
+                        : editingId
+                          ? "Identité SSO modifiée : saisissez le nouveau secret client."
+                          : "Stocké chiffré et jamais renvoyé par l’API."
+                    }
+                  />
+                  <TextField
+                    label="URL de retour à enregistrer chez le fournisseur"
+                    value={`${window.location.origin}/api/auth/sso/callback`}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </>
               )}
               {form.provider === "GOOGLE_WORKSPACE" && (
                 <TextField
@@ -489,7 +532,9 @@ export function SsoSettingsCard() {
                 attribués ni retirés par le fournisseur.
               </Typography>
               <TextField
-                label={saml ? "Attribut des groupes" : "Revendication des groupes"}
+                label={
+                  saml ? "Attribut des groupes" : "Revendication des groupes"
+                }
                 value={form.roleClaim}
                 onChange={(e) =>
                   setForm({ ...form, roleClaim: e.target.value })

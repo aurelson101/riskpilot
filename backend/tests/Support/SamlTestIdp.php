@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use RobRichards\XMLSecLibs\XMLSecEnc;
 use RobRichards\XMLSecLibs\XMLSecurityDSig;
 use RobRichards\XMLSecLibs\XMLSecurityKey;
 
@@ -36,8 +37,8 @@ final class SamlTestIdp
     }
 
     /**
-     * @param array{subject?: string, attributes?: array<string, list<string>>, audience?: string, destination?: string, inResponseTo?: ?string, notOnOrAfter?: string, sign?: string, algorithm?: string, tamper?: bool, issuer?: string} $options
-     *                                                                                                                                                                                                                                              sign : 'assertion' (défaut), 'response', 'both' ou 'none'
+     * @param array{subject?: string, attributes?: array<string, list<string>>, audience?: string, destination?: string, inResponseTo?: ?string, notOnOrAfter?: string, sign?: string, algorithm?: string, tamper?: bool, issuer?: string, encryptFor?: string} $options
+     *                                                                                                                                                                                                                                                                   sign : 'assertion' (défaut), 'response', 'both' ou 'none'
      */
     public function response(string $acsUrl, string $spEntityId, string $requestId, array $options = []): string
     {
@@ -75,6 +76,10 @@ final class SamlTestIdp
             $root = $document->documentElement;
             $this->sign($document, $root, $root->getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:protocol', 'Status')->item(0), $algorithm);
         }
+        if (isset($options['encryptFor'])) {
+            $assertion = $document->getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'Assertion')->item(0);
+            $this->encrypt($document, $assertion, $options['encryptFor']);
+        }
         $result = $document->saveXML();
         if (true === ($options['tamper'] ?? false)) {
             // Modifie le NameID après signature : la signature ne correspond plus au contenu.
@@ -82,6 +87,42 @@ final class SamlTestIdp
         }
 
         return base64_encode($result);
+    }
+
+    /** Remplace l'assertion par une assertion chiffrée (AES-256-CBC, clé enveloppée RSA-OAEP avec le certificat du service). */
+    private function encrypt(\DOMDocument $document, \DOMElement $assertion, string $certificate): void
+    {
+        $encryption = new XMLSecEnc();
+        $encryption->setNode($assertion);
+        $encryption->type = XMLSecEnc::Element;
+        $session = new XMLSecurityKey(XMLSecurityKey::AES256_CBC);
+        $session->generateSessionKey();
+        $public = new XMLSecurityKey(XMLSecurityKey::RSA_OAEP_MGF1P, ['type' => 'public']);
+        $public->loadKey($certificate, false, true);
+        $encryption->encryptKey($public, $session);
+        $encrypted = $encryption->encryptNode($session, false);
+        $wrapper = $document->createElementNS('urn:oasis:names:tc:SAML:2.0:assertion', 'saml:EncryptedAssertion');
+        $wrapper->appendChild($document->importNode($encrypted, true));
+        $assertion->parentNode->replaceChild($wrapper, $assertion);
+    }
+
+    /**
+     * Demande de déconnexion initiée par le fournisseur, liaison HTTP-Redirect ; signée avec la clé du fournisseur si demandé.
+     *
+     * @return array<string, string>
+     */
+    public function logoutRequest(string $destination, string $spEntityId, string $nameId, bool $signed = true): array
+    {
+        $xml = '<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_lo'.bin2hex(random_bytes(8)).'" Version="2.0" IssueInstant="'.gmdate('Y-m-d\TH:i:s\Z').'" Destination="'.$destination.'"><saml:Issuer>'.self::ENTITY_ID.'</saml:Issuer><saml:NameID>'.htmlspecialchars($nameId, ENT_XML1).'</saml:NameID></samlp:LogoutRequest>';
+        $query = ['SAMLRequest' => base64_encode((string) gzdeflate($xml)), 'RelayState' => 'https://idp.example.test/back'];
+        if ($signed) {
+            $query['SigAlg'] = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+            $signedString = 'SAMLRequest='.rawurlencode($query['SAMLRequest']).'&RelayState='.rawurlencode($query['RelayState']).'&SigAlg='.rawurlencode($query['SigAlg']);
+            openssl_sign($signedString, $signature, $this->privateKey, OPENSSL_ALGO_SHA256);
+            $query['Signature'] = base64_encode($signature);
+        }
+
+        return $query;
     }
 
     private function sign(\DOMDocument $document, \DOMElement $target, \DOMNode $before, string $algorithm): void

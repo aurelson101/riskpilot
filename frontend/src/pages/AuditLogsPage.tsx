@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -16,6 +17,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { api } from "../api/client";
+import { downloadApiFile } from "../api/download";
 import { useInterfaceLocale } from "../i18n/InterfaceLocaleContext";
 import { AuditManagementPanel } from "../components/audit/AuditManagementPanel";
 
@@ -32,6 +34,7 @@ type AuditLog = {
 export function AuditLogsPage() {
   const locale = useInterfaceLocale();
   const [tab, setTab] = useState(0);
+  const [exportError, setExportError] = useState(false);
   const query = useQuery({
     queryKey: ["audit-logs"],
     queryFn: async () => (await api.get<AuditLog[]>("/audit-logs")).data,
@@ -59,6 +62,33 @@ export function AuditLogsPage() {
       {tab === 1 && (
         <Card variant="outlined">
           <CardContent>
+            <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap">
+              {(["csv", "xlsx", "pdf"] as const).map((format) => (
+                <Button
+                  key={format}
+                  size="small"
+                  variant="outlined"
+                  onClick={async () => {
+                    setExportError(false);
+                    try {
+                      await downloadApiFile(
+                        `/audit-logs/export.${format}`,
+                        `journal-audit.${format}`,
+                      );
+                    } catch {
+                      setExportError(true);
+                    }
+                  }}
+                >
+                  {`Preuve d’audit ${format.toUpperCase()}`}
+                </Button>
+              ))}
+            </Stack>
+            {exportError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                L’export du journal a échoué.
+              </Alert>
+            )}
             <Table>
               <TableHead>
                 <TableRow>

@@ -13,7 +13,8 @@
     "attributes": {
       "saml.assertion.signature": "true", "saml.server.signature": "true", "saml.client.signature": "false",
       "saml.force.post.binding": "true", "saml_name_id_format": "username", "saml.signature.algorithm": "RSA_SHA256",
-      "saml_assertion_consumer_url_post": "https://rp.recette.test/api/auth/sso/saml/1/acs", "saml.authnstatement": "true"
+      "saml_assertion_consumer_url_post": "https://rp.recette.test/api/auth/sso/saml/1/acs", "saml.authnstatement": "true",
+      "saml_single_logout_service_url_redirect": "https://rp.recette.test/api/auth/sso/saml/1/sls", "frontchannel.logout": "true"
     },
     "protocolMappers": [{"name": "groups", "protocol": "saml", "protocolMapper": "saml-group-membership-mapper",
       "config": {"attribute.name": "Role", "single": "false", "full.path": "false", "friendly.name": "Role", "attribute.nameformat": "Basic"}}]

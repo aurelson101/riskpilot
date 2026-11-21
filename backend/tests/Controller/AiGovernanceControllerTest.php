@@ -105,6 +105,7 @@ final class AiGovernanceControllerTest extends WebTestCase
         $as($admin);
         $client->request('GET', '/api/ai-governance/mandatory-documents');
         self::assertResponseIsSuccessful();
+        /** @var array{items: list<mixed>, missing: int} $documents */
         $documents = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(10, count($documents['items']));
         self::assertSame(10, $documents['missing']);

@@ -48,7 +48,7 @@ Correction : le SSO OIDC (Keycloak, Authentik, Entra ID, Google) est bien raccor
 de bout en bout (voir [sso.md](sso.md)). Depuis le même jour : rôles issus des
 groupes du fournisseur, déconnexion côté fournisseur, groupes SCIM à portée
 séparée, rappels d'échéances DORA/CRA/AI Act et banc d'évaluation du copilote IA
-(`app:ai:evaluate`, 12 questions FR/EN). 
+(`app:ai:evaluate`, 18 questions FR/EN). 
 
 Mise à jour : SAML 2.0 (vérification de signature en mode strict, recette réelle avec Keycloak 26 le même jour), rattachement des comptes SCIM par `externalId`, journalisation SCIM dans l'audit scellé, fournisseur IA auto-hébergé (Ollama, vLLM, LiteLLM…) et contexte réglementaire du copilote.
 
@@ -59,9 +59,9 @@ Mise à jour : SAML 2.0 (vérification de signature en mode strict, recette rée
 - **CRA** : pas de rapprochement entre les vulnérabilités du registre et les
   signalements de vulnérabilités activement exploitées, ni de génération de SBOM.
 - **Bibliothèques** : import Excel/YAML et mises à jour versionnées toujours absents.
-- **Identité** : SAML sans déconnexion unique (SLO) ni assertions chiffrées ;
+- **Identité** : SAML (SLO et assertions chiffrées livrés, SLO initié par RiskPilot non signé) ;
   recette réelle avec Keycloak ou Authentik à faire.
-- **IA** : le banc d'évaluation donne un indicateur de non-régression sur 12 questions,
+- **IA** : le banc d'évaluation donne un indicateur de non-régression sur 18 questions,
   pas une garantie d'exactitude réglementaire ; il consomme des appels du fournisseur.
 
 ## Parcours de référence

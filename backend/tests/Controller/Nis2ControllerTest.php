@@ -95,7 +95,9 @@ final class Nis2ControllerTest extends WebTestCase
         $client->jsonRequest('PUT', '/api/resilience/incidents/'.$incident['id'], ['title' => 'Rançongiciel', 'description' => 'Chiffrement de serveurs.', 'severity' => 'CRITICAL', 'status' => 'CONTAINED', 'ownerId' => $riskManager->getId(), 'significant' => true, 'earlyWarningAt' => $early, 'regulatoryNotificationRequired' => true, 'notifiedAt' => (new \DateTimeImmutable('-10 hours'))->format(DATE_ATOM)]);
         self::assertResponseIsSuccessful();
         $client->request('GET', '/api/nis2/overview');
-        $steps = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['incidents'][0]['steps'];
+        /** @var array{incidents: list<array{steps: list<array<string, mixed>>}>} $overview */
+        $overview = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $steps = $overview['incidents'][0]['steps'];
         self::assertSame(['DONE', 'DONE', 'PENDING'], array_column($steps, 'status'));
         self::assertFalse($steps[1]['late']);
 
