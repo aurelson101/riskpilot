@@ -99,6 +99,21 @@ final readonly class OidcDiscoveryValidator
         return $metadata;
     }
 
+    /**
+     * Point de terminaison de déconnexion du fournisseur, uniquement s'il est en HTTPS et sur l'hôte de confiance du fournisseur.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public function endSessionEndpoint(string $provider, string $issuer, array $metadata): ?string
+    {
+        $endpoint = $metadata['end_session_endpoint'] ?? null;
+        if (!is_string($endpoint) || !$this->validHttpsUrl($endpoint) || !$this->trustedEndpoint(strtoupper(trim($provider)), rtrim(trim($issuer), '/'), $endpoint)) {
+            return null;
+        }
+
+        return $endpoint;
+    }
+
     private function trustedEndpoint(string $provider, string $issuer, string $endpoint): bool
     {
         $host = parse_url($endpoint, PHP_URL_HOST);

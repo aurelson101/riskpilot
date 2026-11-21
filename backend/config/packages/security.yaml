@@ -23,6 +23,11 @@ security:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
+        # SCIM : le jeton Bearer est une clé de service vérifiée par le contrôleur, pas un JWT utilisateur.
+        scim:
+            pattern: ^/api/scim/v2/
+            stateless: true
+            security: false
         api:
             pattern: ^/api
             stateless: true

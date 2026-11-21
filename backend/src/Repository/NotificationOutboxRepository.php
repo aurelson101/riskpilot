@@ -12,7 +12,11 @@ use Doctrine\Persistence\ManagerRegistry;
 /** @extends ServiceEntityRepository<NotificationOutbox> */
 final class NotificationOutboxRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry) { parent::__construct($registry, NotificationOutbox::class); }
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, NotificationOutbox::class);
+    }
+
     public function existsForKey(Organization $organization, string $idempotencyKey): bool
     {
         return null !== $this->findOneBy([
@@ -20,6 +24,7 @@ final class NotificationOutboxRepository extends ServiceEntityRepository
             'idempotencyKey' => hash('sha256', $idempotencyKey),
         ]);
     }
+
     /** @return list<int> */
     public function claimDispatchableIds(int $limit = 100): array
     {
@@ -54,7 +59,9 @@ final class NotificationOutboxRepository extends ServiceEntityRepository
     /** @param list<int> $ids */
     public function releaseUnpublishedIds(array $ids): void
     {
-        if ([] === $ids) return;
+        if ([] === $ids) {
+            return;
+        }
         $this->getEntityManager()->getConnection()->executeStatement(
             'UPDATE notification_outbox SET status = :failed, attempts = GREATEST(0, attempts - 1), available_at = :available, last_error = :error WHERE status = :dispatched AND id IN (:ids)',
             ['failed' => 'FAILED', 'dispatched' => 'DISPATCHED', 'available' => (new \DateTimeImmutable('+2 minutes'))->format('Y-m-d H:i:s'), 'error' => 'OUTBOX_PUBLISH_FAILED', 'ids' => $ids],

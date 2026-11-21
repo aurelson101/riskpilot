@@ -14,7 +14,7 @@ use App\Entity\Requirement;
 final class StarterFrameworkCatalog
 {
     /** L'ordre est stable : les jeux de démonstration et les index de packs en dépendent. */
-    private const KEYS = ['rgpd', 'nis2', 'iso27001', 'ebios-rm', 'iso42001', 'tisax'];
+    private const KEYS = ['rgpd', 'nis2', 'iso27001', 'ebios-rm', 'iso42001', 'tisax', 'ai-act', 'dora', 'cra'];
 
     /** @var array<string, array{name: string, version: string, publisher: string, description: string, requirements: list<array{0: string, 1: string, 2: string, 3?: string}>}> */
     private array $definitions = [];

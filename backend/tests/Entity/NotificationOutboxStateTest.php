@@ -74,6 +74,7 @@ final class NotificationOutboxStateTest extends TestCase
     private function item(): NotificationOutbox
     {
         $recipient = new User('recipient@example.test', 'Test', 'Recipient', new Organization('Original tenant'));
+
         return new NotificationOutbox(new Notification($recipient, 'REMINDER', 'Title', 'Body'), $recipient, 'unique-key', ['subject' => 'Title', 'message' => 'Body']);
     }
 }

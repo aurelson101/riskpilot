@@ -235,6 +235,11 @@ const EbiosPage = lazy(() =>
 const Nis2Page = lazy(() =>
   import("./pages/Nis2Page").then((module) => ({ default: module.Nis2Page })),
 );
+const RegulatoryNotificationsPage = lazy(() =>
+  import("./pages/RegulatoryNotificationsPage").then((module) => ({
+    default: module.RegulatoryNotificationsPage,
+  })),
+);
 const AiGovernancePage = lazy(() =>
   import("./pages/AiGovernancePage").then((module) => ({
     default: module.AiGovernancePage,
@@ -465,6 +470,7 @@ function Layout() {
     "/compliance",
     "/nis2",
     "/ai-governance",
+    "/regulatory-notifications",
     "/regulatory",
     "/third-parties",
     "/resilience",
@@ -541,6 +547,7 @@ function Layout() {
     "/compliance": "Conformité",
     "/nis2": "Conformité NIS2",
     "/ai-governance": "Gouvernance de l’IA",
+    "/regulatory-notifications": "Notifications réglementaires",
     "/security-controls": "Mesures de sécurité",
     "/third-parties": "Tiers et fournisseurs",
     "/resilience": "Incidents et continuité",
@@ -775,6 +782,12 @@ function Layout() {
               path="/ai-governance"
               label="Gouvernance de l’IA"
               icon={<SmartToyOutlined fontSize="small" />}
+            />
+            <NavItem
+              nested
+              path="/regulatory-notifications"
+              label="Notifications réglementaires"
+              icon={<ShieldOutlined fontSize="small" />}
             />
             <NavItem
               nested
@@ -1108,6 +1121,10 @@ export default function App() {
                 <Route path="compliance" element={<CompliancePage />} />
                 <Route path="nis2" element={<Nis2Page />} />
                 <Route path="ai-governance" element={<AiGovernancePage />} />
+                <Route
+                  path="regulatory-notifications"
+                  element={<RegulatoryNotificationsPage />}
+                />
                 <Route path="third-parties" element={<ThirdPartiesPage />} />
                 <Route path="resilience" element={<ResiliencePage />} />
                 <Route path="regulatory" element={<RegulatoryPage />} />

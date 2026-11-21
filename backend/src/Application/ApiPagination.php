@@ -16,7 +16,9 @@ final class ApiPagination
 
     /**
      * @template T
+     *
      * @param list<T> $items
+     *
      * @return array{items: list<T>, page: int, limit: int, total: int, pages: int}
      */
     public static function response(array $items, int $page, int $limit, int $total): array

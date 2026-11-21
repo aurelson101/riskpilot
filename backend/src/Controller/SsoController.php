@@ -10,6 +10,7 @@ use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
 use App\Repository\UserRepository;
+use App\Security\OidcRoleMapper;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,7 +21,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class SsoController
 {
-    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
+    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private OidcRoleMapper $roleMapper, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
     {
     }
 
@@ -78,7 +79,8 @@ final readonly class SsoController
             if (!hash_equals($flow['fingerprint'], $this->fingerprint($integration))) {
                 throw new \RuntimeException('Configuration SSO modifiée.');
             }
-            $identity = $this->oidc->identity($integration, $this->callbackUrl(), $code, $flow);
+            $authentication = $this->oidc->authenticate($integration, $this->callbackUrl(), $code, $flow);
+            $identity = $authentication['subject'];
             $userId = null;
             foreach ($integration->getConfiguration()['accountMappings'] as $mapping) {
                 if (hash_equals($mapping['subject'], $identity)) {
@@ -88,7 +90,12 @@ final readonly class SsoController
             $user = null === $userId ? null : $this->users->find($userId);
             $this->assertAccount($user, $integration);
             $ticket = bin2hex(random_bytes(32));
-            $this->flows->put($ticket, ['userId' => $userId, 'integrationId' => $integration->getId(), 'fingerprint' => $flow['fingerprint'], 'expiresAt' => time() + 300]);
+            $this->flows->put($ticket, [
+                'userId' => $userId, 'integrationId' => $integration->getId(), 'fingerprint' => $flow['fingerprint'], 'expiresAt' => time() + 300,
+                // Appliqués seulement une fois le MFA validé, dans complete().
+                'mappedRoles' => $this->roleMapper->mappedRoles($authentication['claims'], $integration->getConfiguration()),
+                'idToken' => $authentication['idToken'], 'endSessionEndpoint' => $authentication['endSessionEndpoint'],
+            ]);
             $response = $this->redirect('complete');
             $response->headers->setCookie($this->cookie('riskpilot_sso_ticket', $ticket, Cookie::SAMESITE_STRICT));
 
@@ -145,15 +152,44 @@ final readonly class SsoController
                     return $response;
                 }
             }
+            if (is_array($flow['mappedRoles'] ?? null)) {
+                $user->setRoles($this->roleMapper->merge($user->getRoles(), array_values(array_filter($flow['mappedRoles'], 'is_string'))));
+            }
             $user->markLogin();
             $integration->markUsed();
             $this->entityManager->flush();
             $response = $this->auth->createSessionResponse($user, $request);
+            $logoutUrl = $this->logoutUrl($flow, $integration);
+            if (null !== $logoutUrl) {
+                $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
+                $response->setData($payload + ['sso' => ['logoutUrl' => $logoutUrl]]);
+            }
         } catch (\Throwable) {
             $response = new JsonResponse(['code' => 'SSO_SESSION_INVALID', 'message' => 'Session SSO expirée ou indisponible. Recommencez la connexion SSO.'], 401);
         }
 
         return $this->clearTicket($response);
+    }
+
+    /**
+     * Adresse de déconnexion chez le fournisseur (OIDC RP-Initiated Logout) : l'indice id_token_hint permet
+     * au fournisseur d'identifier la session à fermer sans demander de confirmation.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function logoutUrl(array $flow, PlatformIntegration $integration): ?string
+    {
+        $endpoint = $flow['endSessionEndpoint'] ?? null;
+        $idToken = $flow['idToken'] ?? null;
+        if (!is_string($endpoint) || !is_string($idToken) || '' === $idToken) {
+            return null;
+        }
+
+        return $endpoint.(str_contains($endpoint, '?') ? '&' : '?').http_build_query([
+            'id_token_hint' => $idToken,
+            'client_id' => $integration->getConfiguration()['clientId'] ?? '',
+            'post_logout_redirect_uri' => rtrim($this->appUrl, '/').'/login',
+        ], '', '&', PHP_QUERY_RFC3986);
     }
 
     private function clearTicket(JsonResponse $response): JsonResponse

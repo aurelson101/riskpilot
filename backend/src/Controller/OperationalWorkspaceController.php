@@ -346,10 +346,16 @@ final readonly class OperationalWorkspaceController
     private function validateReferencePack(array $details): void
     {
         foreach (['code', 'version', 'source', 'license', 'contentHash'] as $field) {
-            if ('' === trim((string) ($details[$field] ?? ''))) throw new \InvalidArgumentException('Governed pack metadata is incomplete.');
+            if ('' === trim((string) ($details[$field] ?? ''))) {
+                throw new \InvalidArgumentException('Governed pack metadata is incomplete.');
+            }
         }
-        if (1 !== preg_match('/^[a-f0-9]{64}$/', strtolower((string) $details['contentHash']))) throw new \InvalidArgumentException('Pack content hash must be SHA-256.');
-        if (true === ($details['approved'] ?? false) && ('' === trim((string) ($details['approvedBy'] ?? '')) || empty($details['approvedAt']))) throw new \InvalidArgumentException('Approved pack requires approver and timestamp.');
+        if (1 !== preg_match('/^[a-f0-9]{64}$/', strtolower((string) $details['contentHash']))) {
+            throw new \InvalidArgumentException('Pack content hash must be SHA-256.');
+        }
+        if (true === ($details['approved'] ?? false) && ('' === trim((string) ($details['approvedBy'] ?? '')) || empty($details['approvedAt']))) {
+            throw new \InvalidArgumentException('Approved pack requires approver and timestamp.');
+        }
     }
 
     /**

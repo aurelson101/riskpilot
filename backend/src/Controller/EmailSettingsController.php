@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\EmailTemplateRenderer;
 use App\Application\OauthMailProvider;
 use App\Application\OrganizationMailer;
-use App\Application\EmailTemplateRenderer;
 use App\Entity\EmailSettings;
 use App\Entity\User;
 use App\Repository\EmailSettingsRepository;
@@ -213,6 +213,7 @@ final readonly class EmailSettingsController
             $this->mailer->sendWithSettings($settings, $recipient, $email['subject'], $email['message']);
         } catch (\Throwable) {
             $oauth = in_array($settings->getProvider(), ['GOOGLE_WORKSPACE', 'MICROSOFT_365'], true);
+
             return new JsonResponse([
                 'code' => $oauth ? 'OAUTH_MAIL_SEND_FAILED' : 'SMTP_CONNECTION_FAILED',
                 'message' => 'en' === $user->getLocale()

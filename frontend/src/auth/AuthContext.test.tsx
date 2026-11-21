@@ -25,6 +25,8 @@ function Session() {
       <button onClick={() => void auth.login("new@example.test", "test")}>
         Change account
       </button>
+      <button onClick={() => void auth.loginSso?.()}>SSO login</button>
+      <button onClick={() => auth.logout()}>Log out</button>
     </>
   );
 }
@@ -72,4 +74,57 @@ it("removes cached business data when changing accounts", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Change account" }));
   await screen.findByText("new.token.value");
   expect(client.getQueryData(["risks"])).toBeUndefined();
+});
+it("also ends the identity provider session on a voluntary logout after an SSO login", async () => {
+  vi.spyOn(api, "get").mockResolvedValue({ data: { id: 1 } });
+  const post = vi.spyOn(api, "post").mockImplementation(async (url: string) =>
+    url === "/auth/sso/complete"
+      ? {
+          status: 200,
+          data: {
+            token: "sso.token.value",
+            sso: {
+              logoutUrl: "https://sso.example.test/logout?id_token_hint=x",
+            },
+          },
+        }
+      : { status: 204, data: null },
+  );
+  const assign = vi.fn();
+  vi.stubGlobal("location", { ...window.location, assign });
+  show(new QueryClient());
+  fireEvent.click(screen.getByRole("button", { name: "SSO login" }));
+  await screen.findByText("sso.token.value");
+  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+  await waitFor(() =>
+    expect(assign).toHaveBeenCalledWith(
+      "https://sso.example.test/logout?id_token_hint=x",
+    ),
+  );
+  expect(post).toHaveBeenCalledWith("/auth/logout");
+  expect(sessionStorage.getItem("riskpilot.sso.logoutUrl")).toBeNull();
+  vi.unstubAllGlobals();
+});
+it("never redirects to a non-HTTPS provider logout address", async () => {
+  vi.spyOn(api, "get").mockResolvedValue({ data: { id: 1 } });
+  vi.spyOn(api, "post").mockImplementation(async (url: string) =>
+    url === "/auth/sso/complete"
+      ? {
+          status: 200,
+          data: {
+            token: "sso.token.value",
+            sso: { logoutUrl: "javascript:alert(1)" },
+          },
+        }
+      : { status: 204, data: null },
+  );
+  const assign = vi.fn();
+  vi.stubGlobal("location", { ...window.location, assign });
+  show(new QueryClient());
+  fireEvent.click(screen.getByRole("button", { name: "SSO login" }));
+  await screen.findByText("sso.token.value");
+  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+  await screen.findByText("logged-out");
+  expect(assign).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
 });

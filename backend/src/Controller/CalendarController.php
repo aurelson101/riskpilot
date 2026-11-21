@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
-use App\Entity\ActionPlan;
 use App\Entity\User;
 use App\Repository\ActionPlanRepository;
 use App\Repository\UserRepository;
@@ -118,6 +117,7 @@ final readonly class CalendarController
     private function escape(string $value): string
     {
         $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value) ?? '';
+
         return str_replace(['\\', ';', ',', "\r\n", "\r", "\n"], ['\\\\', '\\;', '\\,', '\\n', '\\n', '\\n'], $value);
     }
 

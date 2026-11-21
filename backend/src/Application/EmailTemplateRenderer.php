@@ -50,7 +50,7 @@ final readonly class EmailTemplateRenderer
     }
 
     /** @param list<string|int|float|\DateTimeInterface> $parameters
-     *  @return array{subject: string, message: string}
+     * @return array{subject: string, message: string}
      */
     public function businessNotification(string $type, string $locale, array $parameters): array
     {

@@ -8,10 +8,10 @@ use App\Api\ApiResponseFactory;
 use App\Api\Dto\FrameworkInput;
 use App\Api\Dto\RequirementInput;
 use App\Api\JsonInputMapper;
+use App\Domain\Compliance\FrameworkCsvParser;
 use App\Entity\Framework;
 use App\Entity\Requirement;
 use App\Entity\User;
-use App\Domain\Compliance\FrameworkCsvParser;
 use App\Repository\FrameworkRepository;
 use App\Repository\RequirementRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,11 +67,15 @@ final readonly class FrameworkController
     public function export(int $id): Response
     {
         $framework = $this->frameworks->find($id);
-        if (null === $framework) return $this->notFound();
-        try { $content = $this->csv->export($this->requirements->findForFramework($framework)); }
-        catch (\InvalidArgumentException $error) {
+        if (null === $framework) {
+            return $this->notFound();
+        }
+        try {
+            $content = $this->csv->export($this->requirements->findForFramework($framework));
+        } catch (\InvalidArgumentException $error) {
             return new JsonResponse(['code' => 'FRAMEWORK_NOT_EXPORTABLE', 'message' => $error->getMessage()], 422);
         }
+
         return new Response($content, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="riskpilot-framework-'.$id.'.csv"',

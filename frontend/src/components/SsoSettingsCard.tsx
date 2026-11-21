@@ -23,6 +23,8 @@ type Configuration = {
   clientId: string;
   accountMappings: Mapping[];
   hostedDomain?: string;
+  roleClaim?: string;
+  roleMappings?: Array<{ group: string; role: string }>;
 };
 type Integration = {
   id: number;
@@ -57,7 +59,25 @@ const initial = {
   hostedDomain: "",
   enabled: false,
   accountMappings: [] as Mapping[],
+  roleClaim: "",
+  roleMappingsText: "",
 };
+
+const roleMappingsToText = (
+  mappings: Array<{ group: string; role: string }> | undefined,
+) => (mappings ?? []).map((item) => `${item.group}=${item.role}`).join("\n");
+const textToRoleMappings = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const cut = line.lastIndexOf("=");
+      return {
+        group: line.slice(0, cut).trim(),
+        role: line.slice(cut + 1).trim(),
+      };
+    });
 
 export function SsoSettingsCard() {
   const { user: actor } = useAuth();
@@ -135,6 +155,12 @@ export function SsoSettingsCard() {
           issuer: form.issuer.trim(),
           clientId: form.clientId.trim(),
           accountMappings: form.accountMappings,
+          ...(form.roleMappingsText.trim()
+            ? {
+                roleClaim: form.roleClaim.trim(),
+                roleMappings: textToRoleMappings(form.roleMappingsText),
+              }
+            : {}),
           ...(form.provider === "GOOGLE_WORKSPACE" && form.hostedDomain.trim()
             ? { hostedDomain: form.hostedDomain.trim().toLowerCase() }
             : {}),
@@ -223,6 +249,10 @@ export function SsoSettingsCard() {
                       credential: "",
                       hostedDomain: item.configuration.hostedDomain ?? "",
                       accountMappings: item.configuration.accountMappings ?? [],
+                      roleClaim: item.configuration.roleClaim ?? "",
+                      roleMappingsText: roleMappingsToText(
+                        item.configuration.roleMappings,
+                      ),
                     });
                   }}
                 >
@@ -330,6 +360,33 @@ export function SsoSettingsCard() {
                   helperText="Contrôlé sur la propriété hd du jeton Google."
                 />
               )}
+              <Typography fontWeight={700}>
+                Rôles issus des groupes (facultatif)
+              </Typography>
+              <Typography variant="body2">
+                Les rôles de risque, action, audit et lecture peuvent suivre les
+                groupes du fournisseur à chaque connexion. Les rôles
+                d’administration restent gérés dans RiskPilot et ne sont jamais
+                attribués ni retirés par le fournisseur.
+              </Typography>
+              <TextField
+                label="Revendication des groupes"
+                value={form.roleClaim}
+                onChange={(e) =>
+                  setForm({ ...form, roleClaim: e.target.value })
+                }
+                helperText="Exemples : groups (Authentik), realm_access.roles (Keycloak), roles (Entra)."
+              />
+              <TextField
+                label="Correspondances groupe = rôle"
+                multiline
+                minRows={3}
+                value={form.roleMappingsText}
+                onChange={(e) =>
+                  setForm({ ...form, roleMappingsText: e.target.value })
+                }
+                helperText="Une ligne par correspondance, par exemple : riskpilot-managers=ROLE_RISK_MANAGER. Rôles autorisés : ROLE_RISK_MANAGER, ROLE_ACTION_OWNER, ROLE_AUDITOR, ROLE_VIEWER."
+              />
               <Typography fontWeight={700}>Comptes autorisés</Typography>
               <Typography variant="body2">
                 Associez un utilisateur à son identifiant{" "}

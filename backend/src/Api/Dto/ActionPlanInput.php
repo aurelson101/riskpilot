@@ -35,7 +35,6 @@ final class ActionPlanInput
     /** @var list<int> */ #[Assert\Count(max: 500), Assert\All([new Assert\Type('integer'), new Assert\Positive()])] public array $requirementIds = [];
     /** @var array<string, scalar|null> */ public array $customFields = [];
     /** @var list<array{type: string, id: int}> */ #[Assert\Count(max: 100)] public array $nonConformities = [];
-
     #[Assert\Callback]
     public function validateCollections(ExecutionContextInterface $context): void
     {
@@ -47,7 +46,7 @@ final class ActionPlanInput
         }
         $nonConformities = self::untrusted($this->nonConformities);
         foreach (is_array($nonConformities) ? $nonConformities : [] as $link) {
-            if (!is_array($link) || count($link) !== 2 || !in_array($link['type'] ?? null, ['AUDIT_FINDING', 'COMPLIANCE_RESULT'], true) || !is_int($link['id'] ?? null) || $link['id'] < 1) {
+            if (!is_array($link) || 2 !== count($link) || !in_array($link['type'] ?? null, ['AUDIT_FINDING', 'COMPLIANCE_RESULT'], true) || !is_int($link['id'] ?? null) || $link['id'] < 1) {
                 $context->buildViolation('La non-conformité doit préciser un type et un identifiant positif.')->atPath('nonConformities')->addViolation();
                 break;
             }

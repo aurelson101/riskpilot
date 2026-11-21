@@ -72,6 +72,22 @@ La lecture est ouverte aux utilisateurs authentifiés. Les mutations exigent le 
 - `GET /api/ai-governance/overview` et `GET …/mandatory-documents` ;
 - les éléments de pilotage `/api/executive-governance/records` acceptent les types `CONTEXT_ISSUE`, `INTERESTED_PARTY`, `COMPETENCE_RECORD` et `AWARENESS_CAMPAIGN`, et une `MANAGEMENT_REVIEW` n'est approuvée qu'avec les entrées 9.3.2 (`previousActions`, `contextChanges`, `auditResults`, `nonconformities`, `monitoringResults`, `interestedPartyFeedback`, `riskResults`, `improvementOpportunities`).
 
+## DORA, CRA, AI Act et provisioning SCIM
+
+Notifications réglementaires (lecture pour tout utilisateur, écriture pour les gestionnaires de risques et plus) :
+
+- `GET /api/regulatory-incidents?regime=` : dossiers avec leurs échéances. Régimes : `DORA_MAJOR_INCIDENT` (art. 19 : `INITIAL`, `INTERMEDIATE`, `FINAL`), `CRA_VULNERABILITY` et `CRA_INCIDENT` (art. 14 : `EARLY_WARNING`, `NOTIFICATION`, `FINAL`), `AI_ACT_SERIOUS_INCIDENT` (art. 73 : `REPORT`, 15 jours, 10 jours en cas de décès, 2 jours si infraction généralisée ou infrastructure critique) ;
+- `POST /api/regulatory-incidents`, `PUT /api/regulatory-incidents/{id}` : `title`, `description`, `awareAt` (ISO 8601 explicite, jamais dans le futur), faits propres au régime (`classifiedAt` DORA, `correctiveAvailableAt` CRA vulnérabilité, `widespread`, `criticalInfrastructure`, `death` AI Act), `completed` (objet étape → date, `null` pour retirer), `status` (`CLOSED` exige toutes les étapes applicables déposées), liens `aiSystemId` ou `productId` de la même organisation ;
+- `GET /api/regulatory-incidents/{id}/report` : trame Markdown à adapter au formulaire de l'autorité.
+
+Autres registres :
+
+- `GET|POST /api/cra/products`, `PUT /api/cra/products/{id}` : produits comportant des éléments numériques (catégorie, rôle, statut, mise sur le marché, fin de support, SBOM, contact de divulgation, voie de conformité) et `gaps` de préparation (`SBOM_MISSING`, `SUPPORT_PERIOD_UNDER_FIVE_YEARS`, `THIRD_PARTY_ASSESSMENT_REQUIRED`…) ;
+- `GET|POST /api/dora/arrangements`, `PUT /api/dora/arrangements/{id}` : accords de services TIC par prestataire (LEI validé, fonction critique, localisation, sous-traitants, substituabilité, test du plan de sortie) avec `gaps` ; `GET /api/dora/register.csv` exporte le registre en neutralisant les formules ;
+- `POST|PUT /api/ai-governance/systems` acceptent `aiActRole`, `annexIiiCategory` (réservé au haut risque), `generalPurpose`, `systemicRisk` (exige un modèle à usage général) et `euRegistrationReference` ; la réponse inclut `aiAct.obligations`, références du pack `ai-act` déduites de la qualification.
+
+SCIM 2.0 (`/api/scim/v2`, clé de service avec la portée `scim:write`, en `Authorization: Bearer` ou `X-RiskPilot-Key`) : `GET /ServiceProviderConfig`, `GET /Users` (filtre `userName eq "…"` uniquement, 100 résultats maximum), `GET|PUT|PATCH|DELETE /Users/{id}`, `POST /Users`. Les comptes créés reçoivent le seul rôle lecteur ; l'adresse email n'est jamais modifiée par SCIM et les rôles ne le sont que par `/Groups` avec la portée `scim:groups` (trois groupes fixes, administration exclue) ; `DELETE` et `active=false` désactivent le compte et révoquent ses sessions ; le dernier administrateur actif ne peut pas être désactivé ; un compte verrouillé par RiskPilot n'est pas réactivé. L'association SSO du compte reste une action d'administration. `app:regulatory:remind-deadlines` (planifiée avec les autres rappels) notifie chaque jour les responsables des dossiers dont une échéance approche ou est dépassée. `php bin/console app:ai:evaluate <organisation> --yes` note le copilote IA sur 12 questions françaises et anglaises (langue, notions attendues, garde-fous) et échoue sous `--min-score`.
+
 ## Copilote IA et brouillon de risque
 
 `PUT /api/settings/ai` n'accepte que les fournisseurs `MISTRAL`, `OPENAI` et

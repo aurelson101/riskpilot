@@ -9,8 +9,8 @@ use App\Entity\EmailSettings;
 use App\Entity\Organization;
 use App\Security\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -212,6 +212,7 @@ final class OauthMailProviderTest extends TestCase
             $captured = [];
             $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
                 $captured = $options;
+
                 return new MockResponse('{}', ['http_code' => 200]);
             });
             $cipher = new SecretCipher('test-secret-at-least-32-characters-long');

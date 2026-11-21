@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Api;
 
 use App\Api\Dto\AssetInput;
-use App\Api\Dto\VulnerabilityInput;
-use App\Api\Dto\RiskScenarioInput;
-use App\Api\Dto\EvidenceInput;
 use App\Api\Dto\ComplianceResultInput;
+use App\Api\Dto\EvidenceInput;
+use App\Api\Dto\RiskScenarioInput;
+use App\Api\Dto\VulnerabilityInput;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Validator\Validation;

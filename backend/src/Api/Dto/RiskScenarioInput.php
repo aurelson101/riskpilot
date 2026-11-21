@@ -30,7 +30,6 @@ final class RiskScenarioInput
     #[Assert\Choice(choices: RiskScenario::TREATMENTS)] public string $treatmentDecision = 'REDUCE';
     #[Assert\Choice(choices: RiskScenario::STATUSES)] public string $status = 'DRAFT';
     #[Assert\Date] public ?string $reviewDate = null;
-
     #[Assert\Callback]
     public function validateCollections(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {

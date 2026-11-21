@@ -9,7 +9,11 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20260823150000 extends AbstractMigration
 {
-    public function getDescription(): string { return 'Ajoute le registre de preuves versionné, haché et tenant-scoped'; }
+    public function getDescription(): string
+    {
+        return 'Ajoute le registre de preuves versionné, haché et tenant-scoped';
+    }
+
     public function up(Schema $schema): void
     {
         $this->addSql('ALTER TABLE platform_integrations ADD encrypted_credential TEXT DEFAULT NULL');
@@ -20,10 +24,18 @@ final class Version20260823150000 extends AbstractMigration
         $this->addSql('CREATE INDEX IDX_74446ED77A7685A8 ON evidence_records (supersedes_id)');
         foreach (['requirements' => 'requirements', 'controls' => 'security_controls', 'results' => 'compliance_results', 'actions' => 'action_plans'] as $suffix => $target) {
             $column = rtrim($suffix, 's').'_id';
-            if ('requirements' === $suffix) $column = 'requirement_id';
-            if ('controls' === $suffix) $column = 'security_control_id';
-            if ('results' === $suffix) $column = 'compliance_result_id';
-            if ('actions' === $suffix) $column = 'action_plan_id';
+            if ('requirements' === $suffix) {
+                $column = 'requirement_id';
+            }
+            if ('controls' === $suffix) {
+                $column = 'security_control_id';
+            }
+            if ('results' === $suffix) {
+                $column = 'compliance_result_id';
+            }
+            if ('actions' === $suffix) {
+                $column = 'action_plan_id';
+            }
             $this->addSql(sprintf('CREATE TABLE evidence_%s (evidence_id INT NOT NULL, %s INT NOT NULL, PRIMARY KEY(evidence_id, %s))', $suffix, $column, $column));
             $index = ['requirements' => 'IDX_5D677F2C7B576F77', 'controls' => 'IDX_7D0DF6DBF26C157B', 'results' => 'IDX_777AD2854FA9ACB8', 'actions' => 'IDX_ED91C77E323B8A7A'][$suffix];
             $this->addSql(sprintf('CREATE INDEX %s ON evidence_%s (%s)', $index, $suffix, $column));
@@ -43,11 +55,14 @@ final class Version20260823150000 extends AbstractMigration
         $this->addSql('ALTER TABLE notification_outbox ADD CONSTRAINT FK_OUTBOX_RECIPIENT FOREIGN KEY (recipient_id) REFERENCES users (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE notification_outbox ADD CONSTRAINT FK_OUTBOX_NOTIFICATION FOREIGN KEY (notification_id) REFERENCES notifications (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
     }
+
     public function down(Schema $schema): void
     {
         $this->addSql('ALTER TABLE platform_integrations DROP encrypted_credential');
         $this->addSql('DROP TABLE notification_outbox');
-        foreach (['requirements', 'controls', 'results', 'actions'] as $suffix) $this->addSql('DROP TABLE evidence_'.$suffix);
+        foreach (['requirements', 'controls', 'results', 'actions'] as $suffix) {
+            $this->addSql('DROP TABLE evidence_'.$suffix);
+        }
         $this->addSql('DROP TABLE evidence_records');
     }
 }

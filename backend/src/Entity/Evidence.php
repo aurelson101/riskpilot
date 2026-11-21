@@ -39,7 +39,6 @@ class Evidence
     /** @var Collection<int, SecurityControl> */ #[ORM\ManyToMany(targetEntity: SecurityControl::class)] #[ORM\JoinTable(name: 'evidence_controls')] private Collection $controls;
     /** @var Collection<int, ComplianceResult> */ #[ORM\ManyToMany(targetEntity: ComplianceResult::class)] #[ORM\JoinTable(name: 'evidence_results')] private Collection $results;
     /** @var Collection<int, ActionPlan> */ #[ORM\ManyToMany(targetEntity: ActionPlan::class)] #[ORM\JoinTable(name: 'evidence_actions')] private Collection $actions;
-
     public function __construct(Organization $organization, User $owner, string $title, string $kind, string $classification, string $sourceReference, string $sha256, ?\DateTimeImmutable $validFrom, ?\DateTimeImmutable $expiresAt, ?self $supersedes = null)
     {
         $this->organization = $organization;
@@ -54,55 +53,175 @@ class Evidence
         $this->update($title, $kind, $classification, $sourceReference, $sha256, $validFrom, $expiresAt);
     }
 
-    public function getId(): ?int { return $this->id; }
-    public function getOrganization(): Organization { return $this->organization; }
-    public function getOwner(): User { return $this->owner; }
-    public function getApprovedBy(): ?User { return $this->approvedBy; }
-    public function getSupersedes(): ?self { return $this->supersedes; }
-    public function getTitle(): string { return $this->title; }
-    public function getKind(): string { return $this->kind; }
-    public function getClassification(): string { return $this->classification; }
-    public function getSourceReference(): string { return $this->sourceReference; }
-    public function getSha256(): string { return $this->sha256; }
-    public function getVersion(): int { return $this->version; }
-    public function getStatus(): string { return $this->status; }
-    public function getValidFrom(): ?\DateTimeImmutable { return $this->validFrom; }
-    public function getExpiresAt(): ?\DateTimeImmutable { return $this->expiresAt; }
-    public function getApprovedAt(): ?\DateTimeImmutable { return $this->approvedAt; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
-    /** @return Collection<int, Requirement> */ public function getRequirements(): Collection { return $this->requirements; }
-    /** @return Collection<int, SecurityControl> */ public function getControls(): Collection { return $this->controls; }
-    /** @return Collection<int, ComplianceResult> */ public function getResults(): Collection { return $this->results; }
-    /** @return Collection<int, ActionPlan> */ public function getActions(): Collection { return $this->actions; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getOrganization(): Organization
+    {
+        return $this->organization;
+    }
+
+    public function getOwner(): User
+    {
+        return $this->owner;
+    }
+
+    public function getApprovedBy(): ?User
+    {
+        return $this->approvedBy;
+    }
+
+    public function getSupersedes(): ?self
+    {
+        return $this->supersedes;
+    }
+
+    public function getTitle(): string
+    {
+        return $this->title;
+    }
+
+    public function getKind(): string
+    {
+        return $this->kind;
+    }
+
+    public function getClassification(): string
+    {
+        return $this->classification;
+    }
+
+    public function getSourceReference(): string
+    {
+        return $this->sourceReference;
+    }
+
+    public function getSha256(): string
+    {
+        return $this->sha256;
+    }
+
+    public function getVersion(): int
+    {
+        return $this->version;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function getValidFrom(): ?\DateTimeImmutable
+    {
+        return $this->validFrom;
+    }
+
+    public function getExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->expiresAt;
+    }
+
+    public function getApprovedAt(): ?\DateTimeImmutable
+    {
+        return $this->approvedAt;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    /** @return Collection<int, Requirement> */
+    public function getRequirements(): Collection
+    {
+        return $this->requirements;
+    }
+
+    /** @return Collection<int, SecurityControl> */
+    public function getControls(): Collection
+    {
+        return $this->controls;
+    }
+
+    /** @return Collection<int, ComplianceResult> */
+    public function getResults(): Collection
+    {
+        return $this->results;
+    }
+
+    /** @return Collection<int, ActionPlan> */
+    public function getActions(): Collection
+    {
+        return $this->actions;
+    }
 
     public function update(string $title, string $kind, string $classification, string $sourceReference, string $sha256, ?\DateTimeImmutable $validFrom, ?\DateTimeImmutable $expiresAt): void
     {
-        $kind = strtoupper($kind); $classification = strtoupper($classification); $sha256 = strtolower(trim($sha256));
+        $kind = strtoupper($kind);
+        $classification = strtoupper($classification);
+        $sha256 = strtolower(trim($sha256));
         if ('' === trim($title) || !in_array($kind, self::KINDS, true) || !in_array($classification, self::CLASSIFICATIONS, true) || '' === trim($sourceReference) || 1 !== preg_match('/^[a-f0-9]{64}$/', $sha256) || (null !== $validFrom && null !== $expiresAt && $expiresAt < $validFrom)) {
             throw new \InvalidArgumentException('Preuve invalide : titre, type, classification, source, SHA-256 et validité sont requis.');
         }
         if ('APPROVED' === $this->status || 'SUPERSEDED' === $this->status) {
             throw new \LogicException('Une preuve approuvée est immuable ; créez une nouvelle version.');
         }
-        $this->title = trim($title); $this->kind = $kind; $this->classification = $classification; $this->sourceReference = trim($sourceReference); $this->sha256 = $sha256; $this->validFrom = $validFrom; $this->expiresAt = $expiresAt; $this->updatedAt = new \DateTimeImmutable();
+        $this->title = trim($title);
+        $this->kind = $kind;
+        $this->classification = $classification;
+        $this->sourceReference = trim($sourceReference);
+        $this->sha256 = $sha256;
+        $this->validFrom = $validFrom;
+        $this->expiresAt = $expiresAt;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
-     * @param list<Requirement> $requirements
-     * @param list<SecurityControl> $controls
+     * @param list<Requirement>      $requirements
+     * @param list<SecurityControl>  $controls
      * @param list<ComplianceResult> $results
-     * @param list<ActionPlan> $actions
+     * @param list<ActionPlan>       $actions
      */
     public function link(array $requirements, array $controls, array $results, array $actions): void
     {
         foreach ([[$this->requirements, $requirements], [$this->controls, $controls], [$this->results, $results], [$this->actions, $actions]] as [$collection, $items]) {
-            $collection->clear(); foreach ($items as $item) { $collection->add($item); }
+            $collection->clear();
+            foreach ($items as $item) {
+                $collection->add($item);
+            }
         }
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function submit(): void { if ('DRAFT' !== $this->status) throw new \LogicException('Seule une preuve brouillon peut être soumise.'); $this->status = 'IN_REVIEW'; $this->updatedAt = new \DateTimeImmutable(); }
-    public function approve(User $approver): void { if ('IN_REVIEW' !== $this->status || $approver === $this->owner || $approver->getOrganization() !== $this->organization) throw new \LogicException('Approbation de preuve interdite.'); $this->status = 'APPROVED'; $this->approvedBy = $approver; $this->approvedAt = $this->updatedAt = new \DateTimeImmutable(); }
-    public function supersede(): void { if ('APPROVED' !== $this->status) throw new \LogicException('Seule une preuve approuvée peut être remplacée.'); $this->status = 'SUPERSEDED'; $this->updatedAt = new \DateTimeImmutable(); }
+    public function submit(): void
+    {
+        if ('DRAFT' !== $this->status) {
+            throw new \LogicException('Seule une preuve brouillon peut être soumise.');
+        } $this->status = 'IN_REVIEW';
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function approve(User $approver): void
+    {
+        if ('IN_REVIEW' !== $this->status || $approver === $this->owner || $approver->getOrganization() !== $this->organization) {
+            throw new \LogicException('Approbation de preuve interdite.');
+        } $this->status = 'APPROVED';
+        $this->approvedBy = $approver;
+        $this->approvedAt = $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function supersede(): void
+    {
+        if ('APPROVED' !== $this->status) {
+            throw new \LogicException('Seule une preuve approuvée peut être remplacée.');
+        } $this->status = 'SUPERSEDED';
+        $this->updatedAt = new \DateTimeImmutable();
+    }
 }

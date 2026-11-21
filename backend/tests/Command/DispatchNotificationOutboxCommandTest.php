@@ -6,9 +6,9 @@ namespace App\Tests\Command;
 
 use App\Application\NotificationService;
 use App\Command\DispatchNotificationOutboxCommand;
+use App\Entity\NotificationOutbox;
 use App\Entity\Organization;
 use App\Entity\User;
-use App\Entity\NotificationOutbox;
 use App\Repository\NotificationOutboxRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -44,6 +44,7 @@ final class DispatchNotificationOutboxCommandTest extends KernelTestCase
             if (1 === $calls++) {
                 throw new \RuntimeException('Internal transport secret must not be exposed');
             }
+
             return new Envelope($message);
         });
         $repository = self::getContainer()->get(NotificationOutboxRepository::class);

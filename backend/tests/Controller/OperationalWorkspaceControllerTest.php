@@ -70,7 +70,7 @@ final class OperationalWorkspaceControllerTest extends WebTestCase
 
         $client->jsonRequest('POST', '/api/operations/tasks/'.$task['id'].'/delegate', [
             'email' => 'manager@example.test',
-            'until' => '2026-10-30T10:00:00+00:00',
+            'until' => (new \DateTimeImmutable('+7 days'))->format(DATE_ATOM),
         ]);
         self::assertResponseIsSuccessful();
         $delegated = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);

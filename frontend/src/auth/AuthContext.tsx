@@ -11,17 +11,29 @@ import axios from "axios";
 import type { User } from "../api/types";
 import { AuthContext } from "./auth-context";
 
+const SSO_LOGOUT_KEY = "riskpilot.sso.logoutUrl";
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [token, setToken] = useState(() =>
     sessionStorage.getItem(TOKEN_STORAGE_KEY),
   );
-  const logout = useCallback(() => {
-    void api.post("/auth/logout").catch(() => undefined);
+  const endLocally = useCallback(() => {
+    const done = api.post("/auth/logout").catch(() => undefined);
+    sessionStorage.removeItem(SSO_LOGOUT_KEY);
     endSession();
     setToken(null);
     queryClient.clear();
+    return done;
   }, [queryClient]);
+  // Déconnexion volontaire : ferme aussi la session chez le fournisseur SSO lorsqu'il l'a permis.
+  const logout = useCallback(() => {
+    const providerUrl = sessionStorage.getItem(SSO_LOGOUT_KEY);
+    void endLocally().then(() => {
+      if (providerUrl?.startsWith("https://"))
+        window.location.assign(providerUrl);
+    });
+  }, [endLocally]);
   const profile = useQuery({
     queryKey: ["me"],
     queryFn: async ({ signal }) => {
@@ -33,7 +45,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           axios.isAxiosError(error) &&
           error.response?.status === 401
         )
-          logout();
+          void endLocally();
         throw error;
       }
     },
@@ -45,10 +57,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void refetch();
   }, [refetch]);
   useEffect(() => {
-    window.addEventListener("riskpilot:session-expired", logout);
+    const expire = () => void endLocally();
+    window.addEventListener("riskpilot:session-expired", expire);
     return () =>
-      window.removeEventListener("riskpilot:session-expired", logout);
-  }, [logout]);
+      window.removeEventListener("riskpilot:session-expired", expire);
+  }, [endLocally]);
   const login = useCallback(
     async (email: string, password: string, mfaCode?: string) => {
       const { data, status } = await api.post<{
@@ -79,12 +92,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const { data, status } = await api.post<{
           token?: string;
           mfaRequired?: boolean;
+          sso?: { logoutUrl?: string };
         }>("/auth/sso/complete", { mfaCode });
         if (status === 202 || data.mfaRequired) return true;
         if (!data.token) throw new Error("Jeton de connexion manquant");
         endSession();
         queryClient.clear();
         sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+        if (data.sso?.logoutUrl)
+          sessionStorage.setItem(SSO_LOGOUT_KEY, data.sso.logoutUrl);
         setToken(data.token);
         await queryClient.invalidateQueries({ queryKey: ["me"] });
         return false;

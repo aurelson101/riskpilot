@@ -29,7 +29,9 @@ final class TprmGovernanceControllerTest extends WebTestCase
         $foreignUser = new User('foreign-tprm@example.test', 'Foreign', 'Manager', $foreignOrganization, [User::ROLE_RISK_MANAGER]);
         $party = new ThirdParty($organization, $managerUser, 'Critical Cloud', 'CRITICAL');
         $foreignParty = new ThirdParty($foreignOrganization, $foreignUser, 'Foreign Cloud', 'HIGH');
-        foreach ([$organization, $foreignOrganization, $managerUser, $foreignUser, $party, $foreignParty] as $entity) $manager->persist($entity);
+        foreach ([$organization, $foreignOrganization, $managerUser, $foreignUser, $party, $foreignParty] as $entity) {
+            $manager->persist($entity);
+        }
         $manager->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer '.$tokens->create($managerUser));

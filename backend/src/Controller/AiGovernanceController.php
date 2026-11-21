@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\CurrentUser;
+use App\Domain\Regulatory\AiActObligations;
 use App\Entity\AiImpactAssessment;
 use App\Entity\AiSystem;
 use App\Entity\User;
@@ -43,6 +44,7 @@ final readonly class AiGovernanceController
         private UserRepository $users,
         private IsmsDocumentRepository $documents,
         private EntityManagerInterface $entityManager,
+        private AiActObligations $obligations,
     ) {
     }
 
@@ -64,6 +66,7 @@ final readonly class AiGovernanceController
         }
         try {
             $system = new AiSystem($actor->getOrganization(), $owner, (string) ($data['name'] ?? ''), (string) ($data['purpose'] ?? ''), (string) ($data['provider'] ?? ''), $this->nullableString($data['model'] ?? null), (array) ($data['dataCategories'] ?? []), (string) ($data['riskLevel'] ?? ''), (string) ($data['status'] ?? 'PLANNED'), $this->nullableString($data['humanOversight'] ?? null), $this->date($data['reviewAt'] ?? null));
+            $this->applyAiAct($system, $data);
         } catch (\InvalidArgumentException|\DateMalformedStringException $exception) {
             return $this->invalid($exception->getMessage());
         }
@@ -93,6 +96,7 @@ final readonly class AiGovernanceController
         }
         try {
             $system->update($owner, (string) ($data['name'] ?? $system->getName()), (string) ($data['purpose'] ?? $system->getPurpose()), (string) ($data['provider'] ?? $system->getProvider()), array_key_exists('model', $data) ? $this->nullableString($data['model']) : $system->getModel(), (array) ($data['dataCategories'] ?? $system->getDataCategories()), (string) ($data['riskLevel'] ?? $system->getRiskLevel()), (string) ($data['status'] ?? $system->getStatus()), array_key_exists('humanOversight', $data) ? $this->nullableString($data['humanOversight']) : $system->getHumanOversight(), array_key_exists('reviewAt', $data) ? $this->date($data['reviewAt']) : $system->getReviewAt());
+            $this->applyAiAct($system, $data);
         } catch (\InvalidArgumentException|\DateMalformedStringException $exception) {
             return $this->invalid($exception->getMessage());
         }
@@ -227,9 +231,31 @@ final readonly class AiGovernanceController
     }
 
     /** @param array<string, mixed> $data */
+    private function applyAiAct(AiSystem $system, array $data): void
+    {
+        foreach (['generalPurpose', 'systemicRisk'] as $flag) {
+            if (array_key_exists($flag, $data) && !is_bool($data[$flag])) {
+                throw new \InvalidArgumentException(sprintf('Le champ %s doit être un booléen.', $flag));
+            }
+        }
+        $system->configureAiAct(
+            array_key_exists('aiActRole', $data) ? $this->emptyToNull($data['aiActRole']) : $system->getAiActRole(),
+            array_key_exists('annexIiiCategory', $data) ? $this->emptyToNull($data['annexIiiCategory']) : $system->getAnnexIiiCategory(),
+            array_key_exists('generalPurpose', $data) ? $data['generalPurpose'] : $system->isGeneralPurpose(),
+            array_key_exists('systemicRisk', $data) ? $data['systemicRisk'] : $system->hasSystemicRisk(),
+            array_key_exists('euRegistrationReference', $data) ? $this->nullableString($data['euRegistrationReference']) : $system->getEuRegistrationReference(),
+        );
+    }
+
+    /** @param array<string, mixed> $data */
     private function owner(array $data, User $actor, User $default): ?User
     {
         return array_key_exists('ownerId', $data) ? $this->users->findOneVisibleTo((int) $data['ownerId'], $actor) : $default;
+    }
+
+    private function emptyToNull(mixed $value): ?string
+    {
+        return null === $value || '' === trim((string) $value) ? null : trim((string) $value);
     }
 
     private function nullableString(mixed $value): ?string
@@ -251,6 +277,7 @@ final readonly class AiGovernanceController
             'id' => $system->getId(), 'name' => $system->getName(), 'purpose' => $system->getPurpose(), 'provider' => $system->getProvider(), 'model' => $system->getModel(),
             'dataCategories' => $system->getDataCategories(), 'riskLevel' => $system->getRiskLevel(), 'status' => $system->getStatus(), 'humanOversight' => $system->getHumanOversight(),
             'reviewAt' => $system->getReviewAt()?->format('Y-m-d'), 'builtIn' => $system->isBuiltIn(),
+            'aiAct' => ['role' => $system->getAiActRole(), 'annexIiiCategory' => $system->getAnnexIiiCategory(), 'generalPurpose' => $system->isGeneralPurpose(), 'systemicRisk' => $system->hasSystemicRisk(), 'euRegistrationReference' => $system->getEuRegistrationReference(), 'obligations' => $this->obligations->for($system)],
             'owner' => ['id' => $owner->getId(), 'name' => trim($owner->getFirstName().' '.$owner->getLastName())],
             'approvedAssessment' => $this->assessments->hasApprovedFor($system), 'updatedAt' => $system->getUpdatedAt()->format(DATE_ATOM),
         ];

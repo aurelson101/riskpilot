@@ -37,6 +37,18 @@ final readonly class OidcClient
     /** @param array<string, mixed> $flow */
     public function identity(PlatformIntegration $integration, string $redirectUri, string $code, array $flow): string
     {
+        return $this->authenticate($integration, $redirectUri, $code, $flow)['subject'];
+    }
+
+    /**
+     * Échange le code et retourne l'identité vérifiée, ses revendications et les éléments de déconnexion fournisseur.
+     *
+     * @param array<string, mixed> $flow
+     *
+     * @return array{subject: string, claims: array<string, mixed>, idToken: string, endSessionEndpoint: ?string}
+     */
+    public function authenticate(PlatformIntegration $integration, string $redirectUri, string $code, array $flow): array
+    {
         $configuration = $integration->getConfiguration();
         $metadata = $this->discovery->discover($integration->getProvider(), $configuration['issuer']);
         $authMethods = $metadata['token_endpoint_auth_methods_supported'] ?? ['client_secret_basic'];
@@ -64,11 +76,12 @@ final readonly class OidcClient
             if (($claims['tid'] ?? null) !== $tenant || !is_string($claims['oid'] ?? null) || !preg_match('/^[a-f0-9-]{36}$/Di', $claims['oid'])) {
                 throw new \RuntimeException('Identité Microsoft Entra invalide.');
             }
-
-            return $claims['oid'];
+            $subject = $claims['oid'];
+        } else {
+            $subject = $claims['sub'];
         }
 
-        return $claims['sub'];
+        return ['subject' => $subject, 'claims' => $claims, 'idToken' => $tokens['id_token'], 'endSessionEndpoint' => $this->discovery->endSessionEndpoint($integration->getProvider(), $configuration['issuer'], $metadata)];
     }
 
     /**

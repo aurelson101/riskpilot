@@ -20,7 +20,7 @@ final class BusinessNotificationTemplateTest extends TestCase
         self::assertNotSame($fr['message'], $en['message']);
         self::assertStringContainsString('Business item', $en['message']);
         self::assertSame($fr, $templates->businessNotification($type, 'unsupported', $parameters));
-        self::assertStringNotContainsString('<script>', $templates->html($en['subject'], $en['message']."<script>untrusted</script>"));
+        self::assertStringNotContainsString('<script>', $templates->html($en['subject'], $en['message'].'<script>untrusted</script>'));
     }
 
     public static function templates(): iterable

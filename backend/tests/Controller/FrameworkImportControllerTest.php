@@ -17,14 +17,19 @@ final class FrameworkImportControllerTest extends WebTestCase
 {
     public function testPreviewConfirmationHierarchyAndAccess(): void
     {
-        $client = self::createClient(); $client->disableReboot();
+        $client = self::createClient();
+        $client->disableReboot();
         $em = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = $em->getMetadataFactory()->getAllMetadata();
-        $schema = new SchemaTool($em); $schema->dropSchema($metadata); $schema->createSchema($metadata);
+        $schema = new SchemaTool($em);
+        $schema->dropSchema($metadata);
+        $schema->createSchema($metadata);
         $org = new Organization('CSV import test');
         $admin = new User('import-admin@example.test', 'Import', 'Admin', $org, [User::ROLE_ADMIN]);
         $reader = new User('import-reader@example.test', 'Import', 'Reader', $org, ['ROLE_VIEWER']);
-        foreach ([$org, $admin, $reader] as $entity) $em->persist($entity);
+        foreach ([$org, $admin, $reader] as $entity) {
+            $em->persist($entity);
+        }
         $em->flush();
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);
         $body = ['name' => 'Original local test catalogue', 'version' => '1', 'csv' => "reference;title;category;description;parentReference;status\r\nA;Root;Security;;;ACTIVE\r\nB;Child;Security;;A;ARCHIVED\r\n"];

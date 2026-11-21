@@ -30,6 +30,14 @@ const systems = [
     builtIn: true,
     owner: { id: 1, name: "Alice Admin" },
     approvedAssessment: false,
+    aiAct: {
+      role: null,
+      annexIiiCategory: null,
+      generalPurpose: false,
+      systemicRisk: false,
+      euRegistrationReference: null,
+      obligations: [],
+    },
   },
   {
     id: 2,
@@ -45,6 +53,16 @@ const systems = [
     builtIn: false,
     owner: { id: 1, name: "Alice Admin" },
     approvedAssessment: true,
+    aiAct: {
+      role: "DEPLOYER",
+      annexIiiCategory: "EMPLOYMENT",
+      generalPurpose: false,
+      systemicRisk: false,
+      euRegistrationReference: null,
+      obligations: [
+        { reference: "ART-26", reason: "Obligations des déployeurs" },
+      ],
+    },
   },
 ];
 const assessment = {

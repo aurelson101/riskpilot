@@ -31,46 +31,111 @@ class NotificationOutbox
     /** @param array<string, string> $payload */
     public function __construct(Notification $notification, User $recipient, string $idempotencyKey, array $payload, ?\DateTimeImmutable $availableAt = null)
     {
-        if ('' === trim($idempotencyKey)) throw new \InvalidArgumentException('Outbox idempotency key is required.');
-        $this->notification = $notification; $this->recipient = $recipient; $this->organization = $recipient->getOrganization(); $this->idempotencyKey = hash('sha256', $idempotencyKey); $this->payload = $payload; $this->availableAt = $availableAt ?? new \DateTimeImmutable(); $this->createdAt = new \DateTimeImmutable();
+        if ('' === trim($idempotencyKey)) {
+            throw new \InvalidArgumentException('Outbox idempotency key is required.');
+        }
+        $this->notification = $notification;
+        $this->recipient = $recipient;
+        $this->organization = $recipient->getOrganization();
+        $this->idempotencyKey = hash('sha256', $idempotencyKey);
+        $this->payload = $payload;
+        $this->availableAt = $availableAt ?? new \DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
     }
-    public function getId(): ?int { return $this->id; }
-    public function getOrganization(): Organization { return $this->organization; }
-    public function getRecipient(): User { return $this->recipient; }
-    public function getNotification(): Notification { return $this->notification; }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getOrganization(): Organization
+    {
+        return $this->organization;
+    }
+
+    public function getRecipient(): User
+    {
+        return $this->recipient;
+    }
+
+    public function getNotification(): Notification
+    {
+        return $this->notification;
+    }
+
     /** @return array<string, string> */
-    public function getPayload(): array { return $this->payload; }
-    public function getStatus(): string { return $this->status; }
-    public function getAttempts(): int { return $this->attempts; }
-    public function getLastError(): ?string { return $this->lastError; }
-    public function getAvailableAt(): \DateTimeImmutable { return $this->availableAt; }
+    public function getPayload(): array
+    {
+        return $this->payload;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function getAttempts(): int
+    {
+        return $this->attempts;
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    public function getAvailableAt(): \DateTimeImmutable
+    {
+        return $this->availableAt;
+    }
+
     public function isRecipientEligible(): bool
     {
         return User::STATUS_ACTIVE === $this->recipient->getStatus()
             && ($this->recipient->getOrganization() === $this->organization
                 || (null !== $this->organization->getId() && $this->recipient->getOrganization()->getId() === $this->organization->getId()));
     }
+
     public function markDispatched(): void
     {
-        if (!in_array($this->status, ['PENDING', 'FAILED'], true)) return;
-        if ($this->attempts >= self::MAX_ATTEMPTS) { $this->status = 'DEAD_LETTER'; return; }
-        $this->status = 'DISPATCHED'; ++$this->attempts;
+        if (!in_array($this->status, ['PENDING', 'FAILED'], true)) {
+            return;
+        }
+        if ($this->attempts >= self::MAX_ATTEMPTS) {
+            $this->status = 'DEAD_LETTER';
+
+            return;
+        }
+        $this->status = 'DISPATCHED';
+        ++$this->attempts;
     }
+
     public function markSent(): void
     {
-        if ('DISPATCHED' !== $this->status) return;
-        $this->status = 'SENT'; $this->lastError = null; $this->sentAt = new \DateTimeImmutable();
+        if ('DISPATCHED' !== $this->status) {
+            return;
+        }
+        $this->status = 'SENT';
+        $this->lastError = null;
+        $this->sentAt = new \DateTimeImmutable();
     }
+
     public function markFailed(): void
     {
-        if ('DISPATCHED' !== $this->status) return;
+        if ('DISPATCHED' !== $this->status) {
+            return;
+        }
         $this->status = $this->attempts >= self::MAX_ATTEMPTS ? 'DEAD_LETTER' : 'FAILED';
         $this->lastError = 'MAIL_SEND_FAILED';
         $this->availableAt = new \DateTimeImmutable('+'.(2 ** min(5, $this->attempts)).' minutes');
     }
+
     public function markCancelled(): void
     {
-        if (!in_array($this->status, ['PENDING', 'FAILED', 'DISPATCHED'], true)) return;
-        $this->status = 'CANCELLED'; $this->lastError = 'RECIPIENT_NO_LONGER_ELIGIBLE';
+        if (!in_array($this->status, ['PENDING', 'FAILED', 'DISPATCHED'], true)) {
+            return;
+        }
+        $this->status = 'CANCELLED';
+        $this->lastError = 'RECIPIENT_NO_LONGER_ELIGIBLE';
     }
 }

@@ -328,7 +328,7 @@ final readonly class ComplianceGovernanceController
         $actor = $this->currentUser->get();
         $organization = $actor->getOrganization();
         $byPack = [];
-        foreach (['iso27001', 'iso42001', 'nis2', 'tisax'] as $key) {
+        foreach (['iso27001', 'iso42001', 'nis2', 'tisax', 'ai-act', 'dora', 'cra'] as $key) {
             $definition = $this->starterPacks->definition($key);
             $framework = $this->frameworks->findOneBy(['name' => $definition['name'], 'version' => $definition['version'], 'status' => 'ACTIVE']);
             if ($framework instanceof Framework) {

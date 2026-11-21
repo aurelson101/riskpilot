@@ -26,6 +26,42 @@ prototypes ; la validation des modèles de notification par autorité nationale 
 à faire ; ces fonctions n'ont pas fait l'objet d'une certification ou d'un audit
 externe.
 
+Complément du 21 novembre 2026 : trois packs réglementaires européens sont
+ajoutés (`ai-act`, `dora`, `cra`) avec identifiants officiels et intitulés
+reformulés, soit le règlement sur l'IA 2024/1689 (53 exigences), DORA 2022/2554
+(31) et le Cyber Resilience Act 2024/2847 (40), ainsi que 105 correspondances
+suggérées (ISO 42001 vers AI Act, ISO 27001 vers DORA et CRA). S'y ajoutent :
+la qualification AI Act des systèmes d'IA (rôle, annexe III, modèle à usage
+général, obligations déduites), un registre des notifications d'incidents DORA
+(art. 19), CRA (art. 14) et AI Act (art. 73) avec calcul des échéances, un
+inventaire de produits CRA avec écarts de préparation, un registre des accords
+de services TIC DORA exportable en CSV, et le provisioning SCIM 2.0. Les tests
+backend (471) et frontend (244) ont été exécutés sur un serveur de préproduction
+isolé. Limites : numérotation des articles et dates d'application à confirmer sur
+les textes officiels (reports et actes délégués possibles) ; les délais sont des
+repères de pilotage et non un avis juridique ; le registre DORA ne couvre que les
+champs saisis, pas le format complet des normes techniques ; aucune qualification
+juridique d'un système d'IA ou d'un produit n'est réalisée ; aucune recette réelle
+avec Keycloak, Authentik ou un client SCIM n'a été faite.
+
+Correction : le SSO OIDC (Keycloak, Authentik, Entra ID, Google) est bien raccordé
+de bout en bout (voir [sso.md](sso.md)). Depuis le même jour : rôles issus des
+groupes du fournisseur, déconnexion côté fournisseur, groupes SCIM à portée
+séparée, rappels d'échéances DORA/CRA/AI Act et banc d'évaluation du copilote IA
+(`app:ai:evaluate`, 12 questions FR/EN). SAML n'est volontairement pas implémenté.
+
+### Écarts fonctionnels restants pour un GRC multi-réglementaire
+
+- **Notifications** : rappels quotidiens en place ; pas de dépôt direct auprès des autorités.
+- **DORA** : registre d'informations incomplet par rapport au format réglementaire.
+- **CRA** : pas de rapprochement entre les vulnérabilités du registre et les
+  signalements de vulnérabilités activement exploitées, ni de génération de SBOM.
+- **Bibliothèques** : import Excel/YAML et mises à jour versionnées toujours absents.
+- **Identité** : SAML non implémenté (passer par un fournisseur OIDC qui le fédère) ;
+  recette réelle avec Keycloak ou Authentik à faire.
+- **IA** : le banc d'évaluation donne un indicateur de non-régression sur 12 questions,
+  pas une garantie d'exactitude réglementaire ; il consomme des appels du fournisseur.
+
 ## Parcours de référence
 
 EGERIE présente des bibliothèques, des questionnaires collaboratifs, des vues
@@ -51,7 +87,7 @@ restent stables lors des mises à jour. Sources :
 | Collecte et tiers | Questionnaires, campagnes, TPRM et relances dans le module opérationnel | Vérifier l'expérience répondant, expiration des accès, réception des relances et validation des preuves. |
 | Traitement et décision | Actions, Kanban/calendrier, portefeuille et rapports décisionnels | Unifier le parcours guidé et tester les vues 360° plutôt que multiplier les menus. |
 | Quantification | `DecisionWorkspaceController::quantify`, pertes annuelles et percentiles | Méthode locale à expliquer/valider ; ne pas annoncer une équivalence avec un moteur éditeur ou une estimation financière garantie. |
-| Identité | JWT/MFA/session, clés de service, bind/recherche LDAPS et découverte OIDC | SSO OIDC/SAML et SCIM non raccordés ; Keycloak/Authentik non validés par le diagnostic actuel Google/Entra. |
+| Identité | JWT/MFA/session, clés de service, LDAPS, SSO OIDC (Keycloak, Authentik, Entra, Google), rôles par groupes, déconnexion fournisseur, SCIM 2.0 (utilisateurs et groupes) | SAML ; recette réelle avec un fournisseur à réaliser. |
 | Messagerie | SMTP, Gmail et Graph délégués, OAuth/PKCE, reset/test FR/EN, HTML, liens internes, tentatives bornées et contrôle du destinataire | Traduction des notifications et rendu dans les clients mail à valider ; réservations bloquées et supervision à traiter. |
 | Agenda | Abonnement privé `.ics`, rotation/révocation, actions affectées | Pas de CalDAV ni d'API calendrier Graph/Google ; tests Thunderbird/Outlook à réaliser. |
 | IA | Copilote FR/EN, contexte consenti, brouillons gouvernés et RBAC | Évaluer couverture, qualité et réponses hors contexte ; aucun accès fournisseur direct et illimité aux API. |

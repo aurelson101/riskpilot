@@ -28,7 +28,9 @@ final class EvidenceControllerTest extends WebTestCase
         $owner = new User('evidence-owner@example.test', 'Evidence', 'Owner', $organization, [User::ROLE_RISK_MANAGER]);
         $approver = new User('evidence-approver@example.test', 'Evidence', 'Approver', $organization, [User::ROLE_ADMIN]);
         $foreign = new User('evidence-foreign@example.test', 'Foreign', 'User', $foreignOrganization, [User::ROLE_RISK_MANAGER]);
-        foreach ([$organization, $foreignOrganization, $owner, $approver, $foreign] as $entity) $manager->persist($entity);
+        foreach ([$organization, $foreignOrganization, $owner, $approver, $foreign] as $entity) {
+            $manager->persist($entity);
+        }
         $manager->flush();
 
         $tokens = self::getContainer()->get(JWTTokenManagerInterface::class);

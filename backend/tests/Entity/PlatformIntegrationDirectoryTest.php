@@ -17,6 +17,7 @@ final class PlatformIntegrationDirectoryTest extends TestCase
         self::assertSame('GENERIC', $item->getProvider());
         self::assertFalse($item->isEnabled());
     }
+
     public function testLastUseTrackingAvoidsWritingOnEveryApiRead(): void
     {
         $integration = new PlatformIntegration(new Organization('Tenant'), 'API_KEY', 'GENERIC', 'Reader', ['scopes' => ['risks:read']], true);

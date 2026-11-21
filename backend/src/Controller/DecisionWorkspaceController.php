@@ -30,9 +30,9 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 #[Route('/api/decision')]
 final readonly class DecisionWorkspaceController
@@ -340,6 +340,7 @@ final readonly class DecisionWorkspaceController
 
     /**
      * @param array<string, mixed> $period
+     *
      * @return array<string, mixed>
      */
     private function tenantSnapshot(array $period = []): array
@@ -379,6 +380,7 @@ final readonly class DecisionWorkspaceController
     {
         $mode = strtoupper((string) ($period['mode'] ?? 'ALL_TIME'));
         $today = new \DateTimeImmutable('today');
+
         return match ($mode) {
             'CALENDAR_YEAR' => ['mode' => $mode, 'from' => $today->format('Y').'-01-01', 'until' => $today->format('Y').'-12-31'],
             'ROLLING_MONTHS' => ['mode' => $mode, 'from' => $today->modify('-'.max(1, min(120, (int) ($period['months'] ?? 12))).' months')->format('Y-m-d'), 'until' => $today->format('Y-m-d')],
@@ -402,6 +404,7 @@ final readonly class DecisionWorkspaceController
             foreach (['risks', 'controls', 'assessments', 'actions', 'thirdParties'] as $metric) {
                 $deltas[$metric] = (int) ($snapshot[$metric] ?? 0) - (int) ($prior[$metric] ?? 0);
             }
+
             return ['available' => true, 'previousRunId' => $previous->getId(), 'previousGeneratedAt' => $details['generatedAt'] ?? null, 'deltas' => $deltas];
         }
 

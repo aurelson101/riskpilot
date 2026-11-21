@@ -13,7 +13,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'app:compliance:install-starter-packs', description: 'Installe ou complète les packs RGPD, NIS2, ISO 27001, EBIOS RM, ISO 42001 et TISAX sans reproduire de contenu protégé.')]
+#[AsCommand(name: 'app:compliance:install-starter-packs', description: 'Installe ou complète les packs RGPD, NIS2, ISO 27001, EBIOS RM, ISO 42001, TISAX, AI Act, DORA et CRA sans reproduire de contenu protégé.')]
 final class InstallComplianceStarterPacksCommand extends Command
 {
     public function __construct(private readonly StarterFrameworkCatalog $catalog, private readonly EntityManagerInterface $entityManager)

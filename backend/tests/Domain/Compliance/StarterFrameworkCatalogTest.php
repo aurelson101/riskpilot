@@ -12,7 +12,7 @@ final class StarterFrameworkCatalogTest extends TestCase
     public function testGovernedPacksHaveUniqueRequirementsAndNoProtectedText(): void
     {
         $catalog = new StarterFrameworkCatalog();
-        self::assertSame(['rgpd', 'nis2', 'iso27001', 'ebios-rm', 'iso42001', 'tisax'], $catalog->keys());
+        self::assertSame(['rgpd', 'nis2', 'iso27001', 'ebios-rm', 'iso42001', 'tisax', 'ai-act', 'dora', 'cra'], $catalog->keys());
         foreach ($catalog->keys() as $key) {
             $definition = $catalog->definition($key);
             self::assertNotEmpty($definition['publisher']);
@@ -124,5 +124,25 @@ final class StarterFrameworkCatalogTest extends TestCase
         $byReference = array_combine($references, $missing);
         self::assertSame($legacy['ART-21.2-H-J'], $byReference['ART-21.2-H']->getParentRequirement(), 'A new child attaches to the requirement that already exists.');
         self::assertSame($legacy['ART-23'], $byReference['ART-23.4-A']->getParentRequirement());
+    }
+
+    public function testEuRegulationPacksCoverTheirKeyObligationsAndTimelines(): void
+    {
+        $catalog = new StarterFrameworkCatalog();
+        $aiAct = array_column($catalog->definition('ai-act')['requirements'], 0);
+        foreach (['ART-4', 'ART-5', 'ART-6', 'ART-9', 'ART-14', 'ART-15', 'ART-26', 'ART-27', 'ART-50', 'ART-53', 'ART-72', 'ART-73.2', 'ART-73.3', 'ART-73.4'] as $reference) {
+            self::assertContains($reference, $aiAct);
+        }
+        $dora = array_column($catalog->definition('dora')['requirements'], 0);
+        foreach (['ART-5', 'ART-19.4-A', 'ART-19.4-C', 'ART-26', 'ART-28.3', 'ART-30'] as $reference) {
+            self::assertContains($reference, $dora);
+        }
+        $cra = array_column($catalog->definition('cra')['requirements'], 0);
+        foreach (['ANNEX-I-P1.1', 'ANNEX-I-P2.1', 'ART-14.2-A', 'ART-14.2-B', 'ART-14.2-C', 'ART-14.4-C'] as $reference) {
+            self::assertContains($reference, $cra);
+        }
+        foreach (['ai-act', 'dora', 'cra'] as $key) {
+            self::assertStringContainsString('avis juridique', $catalog->definition($key)['description']);
+        }
     }
 }

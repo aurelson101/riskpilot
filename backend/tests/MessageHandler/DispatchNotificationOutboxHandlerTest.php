@@ -51,6 +51,7 @@ final class DispatchNotificationOutboxHandlerTest extends TestCase
         // Deliberately uninitialized: any send raises an Error, without a transport or network.
         // Cancellation must happen before that call; normal failures must store only a safe code.
         $mailer = (new \ReflectionClass(OrganizationMailer::class))->newInstanceWithoutConstructor();
+
         return new DispatchNotificationOutboxHandler($manager, $mailer, new EmailTemplateRenderer('https://riskpilot.example'));
     }
 
@@ -61,6 +62,7 @@ final class DispatchNotificationOutboxHandlerTest extends TestCase
         $recipient = new User('recipient@example.test', 'Test', 'Recipient', $organization);
         $item = new NotificationOutbox(new Notification($recipient, 'REMINDER', 'Title', 'Body'), $recipient, 'test-key', ['subject' => 'Title', 'message' => 'Body']);
         $item->markDispatched();
+
         return $item;
     }
 }

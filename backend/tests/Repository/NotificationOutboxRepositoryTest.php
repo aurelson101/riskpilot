@@ -26,6 +26,7 @@ final class NotificationOutboxRepositoryTest extends TestCase
                 self::assertStringContainsString('FOR UPDATE SKIP LOCKED', $sql);
                 self::assertStringContainsString('created_at ASC, id ASC', $sql);
                 self::assertSame(5, $parameters['maximum']);
+
                 return ['42'];
             },
         );
@@ -44,6 +45,7 @@ final class NotificationOutboxRepositoryTest extends TestCase
                     self::assertSame('DISPATCHED', $parameters['status']);
                     self::assertSame([42], $parameters['ids']);
                 }
+
                 return 1;
             },
         );
@@ -68,6 +70,7 @@ final class NotificationOutboxRepositoryTest extends TestCase
         $manager->method('getClassMetadata')->willReturn(new ClassMetadata(NotificationOutbox::class));
         $registry = $this->createMock(ManagerRegistry::class);
         $registry->method('getManagerForClass')->willReturn($manager);
+
         return new NotificationOutboxRepository($registry);
     }
 }

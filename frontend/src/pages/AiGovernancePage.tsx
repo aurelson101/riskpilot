@@ -4,11 +4,13 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Stack,
   Tab,
@@ -41,6 +43,14 @@ type AiSystem = {
   builtIn: boolean;
   owner: { id: number; name: string };
   approvedAssessment: boolean;
+  aiAct: {
+    role: string | null;
+    annexIiiCategory: string | null;
+    generalPurpose: boolean;
+    systemicRisk: boolean;
+    euRegistrationReference: string | null;
+    obligations: Array<{ reference: string; reason: string }>;
+  };
 };
 type Assessment = {
   id: number;
@@ -99,6 +109,25 @@ const residualLabels: Record<Assessment["residualRisk"], string> = {
   CRITICAL: "Critique",
 };
 
+const aiActRoleLabels: Record<string, string> = {
+  PROVIDER: "Fournisseur",
+  DEPLOYER: "Déployeur",
+  IMPORTER: "Importateur",
+  DISTRIBUTOR: "Distributeur",
+  AUTHORISED_REPRESENTATIVE: "Mandataire",
+  NOT_APPLICABLE: "Hors champ de l’AI Act",
+};
+const annexIiiLabels: Record<string, string> = {
+  BIOMETRICS: "Biométrie",
+  CRITICAL_INFRASTRUCTURE: "Infrastructures critiques",
+  EDUCATION: "Éducation et formation",
+  EMPLOYMENT: "Emploi et gestion des travailleurs",
+  ESSENTIAL_SERVICES: "Services essentiels (crédit, assurance, aides)",
+  LAW_ENFORCEMENT: "Répression",
+  MIGRATION_BORDER: "Migration et contrôle aux frontières",
+  JUSTICE_DEMOCRACY: "Justice et processus démocratiques",
+};
+
 const errorText = (error: unknown) =>
   axios.isAxiosError<{ message?: string }>(error)
     ? (error.response?.data?.message ?? "L’opération a échoué.")
@@ -115,6 +144,11 @@ const emptySystem = {
   humanOversight: "",
   reviewAt: "",
   ownerId: "",
+  aiActRole: "",
+  annexIiiCategory: "",
+  generalPurpose: false,
+  systemicRisk: false,
+  euRegistrationReference: "",
 };
 const emptyAssessment = {
   affectedGroups: "",
@@ -186,6 +220,11 @@ export function AiGovernancePage() {
           .filter(Boolean),
         humanOversight: systemForm.humanOversight || null,
         reviewAt: systemForm.reviewAt || null,
+        annexIiiCategory:
+          systemForm.riskLevel === "HIGH"
+            ? systemForm.annexIiiCategory || null
+            : null,
+        systemicRisk: systemForm.generalPurpose && systemForm.systemicRisk,
         ownerId: Number(systemForm.ownerId || user?.id),
       };
       return systemDialog === "new" || systemDialog === null
@@ -240,6 +279,11 @@ export function AiGovernancePage() {
             humanOversight: item.humanOversight ?? "",
             reviewAt: item.reviewAt ?? "",
             ownerId: String(item.owner.id),
+            aiActRole: item.aiAct.role ?? "",
+            annexIiiCategory: item.aiAct.annexIiiCategory ?? "",
+            generalPurpose: item.aiAct.generalPurpose,
+            systemicRisk: item.aiAct.systemicRisk,
+            euRegistrationReference: item.aiAct.euRegistrationReference ?? "",
           },
     );
   };
@@ -334,6 +378,23 @@ export function AiGovernancePage() {
                           <Typography variant="caption" color="text.secondary">
                             {item.purpose}
                           </Typography>
+                          {item.aiAct.obligations.length > 0 && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                              title={item.aiAct.obligations
+                                .map(
+                                  (obligation) =>
+                                    `${obligation.reference} : ${obligation.reason}`,
+                                )
+                                .join("\n")}
+                            >
+                              {`AI Act : ${item.aiAct.obligations
+                                .map((obligation) => obligation.reference)
+                                .join(", ")}`}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           {item.provider}
@@ -697,6 +758,97 @@ export function AiGovernancePage() {
               }
               helperText="Obligatoire pour un système à haut risque actif."
             />
+            <Typography variant="subtitle2" fontWeight={700}>
+              Qualification AI Act (règlement 2024/1689)
+            </Typography>
+            <Stack direction="row" spacing={2}>
+              <TextField
+                select
+                fullWidth
+                label="Rôle de l’organisation"
+                value={systemForm.aiActRole}
+                onChange={(e) =>
+                  setSystemForm({ ...systemForm, aiActRole: e.target.value })
+                }
+                helperText="Détermine les obligations affichées ; à confirmer juridiquement."
+              >
+                <MenuItem value="">Non renseigné</MenuItem>
+                {Object.entries(aiActRoleLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                fullWidth
+                label="Domaine de l’annexe III"
+                value={systemForm.annexIiiCategory}
+                disabled={systemForm.riskLevel !== "HIGH"}
+                onChange={(e) =>
+                  setSystemForm({
+                    ...systemForm,
+                    annexIiiCategory: e.target.value,
+                  })
+                }
+                helperText="Réservé aux systèmes à haut risque."
+              >
+                <MenuItem value="">Aucun</MenuItem>
+                {Object.entries(annexIiiLabels).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={systemForm.generalPurpose}
+                    onChange={(e) =>
+                      setSystemForm({
+                        ...systemForm,
+                        generalPurpose: e.target.checked,
+                        systemicRisk: e.target.checked
+                          ? systemForm.systemicRisk
+                          : false,
+                      })
+                    }
+                  />
+                }
+                label="Modèle à usage général"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={
+                      systemForm.generalPurpose && systemForm.systemicRisk
+                    }
+                    disabled={!systemForm.generalPurpose}
+                    onChange={(e) =>
+                      setSystemForm({
+                        ...systemForm,
+                        systemicRisk: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="Risque systémique"
+              />
+              <TextField
+                fullWidth
+                label="Référence d’enregistrement UE"
+                value={systemForm.euRegistrationReference}
+                onChange={(e) =>
+                  setSystemForm({
+                    ...systemForm,
+                    euRegistrationReference: e.target.value,
+                  })
+                }
+                slotProps={{ htmlInput: { maxLength: 120 } }}
+              />
+            </Stack>
             <Stack direction="row" spacing={2}>
               <TextField
                 select

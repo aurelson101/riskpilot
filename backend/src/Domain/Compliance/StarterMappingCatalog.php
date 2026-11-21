@@ -16,6 +16,9 @@ final class StarterMappingCatalog
     private const ISO_42001 = 'iso42001';
     private const NIS2 = 'nis2';
     private const TISAX = 'tisax';
+    private const AI_ACT = 'ai-act';
+    private const DORA = 'dora';
+    private const CRA = 'cra';
 
     /** Clauses de même numéro dans les deux normes (structure harmonisée ISO). */
     private const SHARED_CLAUSES = ['4.1', '4.2', '4.3', '4.4', '5.1', '5.2', '5.3', '6.1.1', '6.1.2', '6.1.3', '6.2', '6.3', '7.1', '7.2', '7.3', '7.4', '7.5', '8.1', '8.2', '8.3', '9.1', '9.2', '9.3', '10.1', '10.2'];
@@ -56,6 +59,56 @@ final class StarterMappingCatalog
         '9.2' => ['A.5.34'],
     ];
 
+    /** Exigence cible AI Act => références ISO 42001 qui y contribuent (système de management de l'IA). */
+    private const AI_ACT_FROM_42001 = [
+        'ART-4' => ['A.4.6', 'CLAUSE-7.2', 'CLAUSE-7.3'],
+        'ART-6' => ['A.5.2', 'A.9.4'],
+        'ART-9' => ['CLAUSE-6.1.2', 'CLAUSE-6.1.3', 'A.6.1.2', 'A.6.1.3'],
+        'ART-10' => ['A.7.2', 'A.7.3', 'A.7.4', 'A.7.5', 'A.7.6', 'A.4.3'],
+        'ART-11' => ['A.6.2.3', 'A.6.2.7', 'A.4.2'],
+        'ART-12' => ['A.6.2.8'],
+        'ART-13' => ['A.8.2', 'A.8.5'],
+        'ART-14' => ['A.9.2', 'A.9.3', 'A.6.2.6'],
+        'ART-15' => ['A.6.2.4', 'A.6.2.5'],
+        'ART-17' => ['CLAUSE-4.4', 'CLAUSE-5.2', 'CLAUSE-9.2', 'CLAUSE-10.2'],
+        'ART-25' => ['A.10.2', 'A.10.3', 'A.10.4'],
+        'ART-26' => ['A.9.2', 'A.9.4', 'A.6.2.6'],
+        'ART-27' => ['CLAUSE-6.1.4', 'A.5.2', 'A.5.3', 'A.5.4', 'A.5.5'],
+        'ART-50' => ['A.8.2', 'A.8.5'],
+        'ART-72' => ['A.6.2.6', 'CLAUSE-9.1'],
+        'ART-73' => ['A.8.3', 'A.8.4'],
+    ];
+
+    /** Exigence cible DORA => références ISO 27001 qui y contribuent. */
+    private const DORA_FROM_27001 = [
+        'ART-5' => ['CLAUSE-5.1', 'CLAUSE-5.2', 'CLAUSE-5.3', 'A.5.1'],
+        'ART-6' => ['CLAUSE-6.1.2', 'CLAUSE-6.1.3', 'A.5.1'],
+        'ART-8' => ['A.5.9', 'A.5.10'],
+        'ART-9' => ['A.8.5', 'A.8.20', 'A.8.24', 'A.8.8', 'A.8.9'],
+        'ART-10' => ['A.8.15', 'A.8.16'],
+        'ART-11' => ['A.5.29', 'A.5.30'],
+        'ART-12' => ['A.8.13', 'A.8.14'],
+        'ART-13' => ['A.5.27', 'A.6.3'],
+        'ART-17' => ['A.5.24', 'A.5.25', 'A.5.26', 'A.5.27', 'A.5.28', 'A.6.8'],
+        'ART-19' => ['A.5.24', 'A.5.26'],
+        'ART-25' => ['A.8.29', 'A.8.8'],
+        'ART-28' => ['A.5.19', 'A.5.21', 'A.5.22', 'A.5.23'],
+        'ART-30' => ['A.5.20'],
+    ];
+
+    /** Exigence cible CRA => références ISO 27001 qui y contribuent. */
+    private const CRA_FROM_27001 = [
+        'ANNEX-I-P1.4' => ['A.8.5', 'A.5.15', 'A.5.16', 'A.5.17', 'A.5.18'],
+        'ANNEX-I-P1.5' => ['A.8.24'],
+        'ANNEX-I-P1.12' => ['A.8.15', 'A.8.16'],
+        'ANNEX-I-P2.1' => ['A.8.8', 'A.8.9'],
+        'ANNEX-I-P2.2' => ['A.8.8', 'A.8.32'],
+        'ANNEX-I-P2.3' => ['A.8.29'],
+        'ART-13.2' => ['CLAUSE-6.1.2', 'A.8.25'],
+        'ART-13.5' => ['A.5.19', 'A.5.21', 'A.8.30'],
+        'ART-13.6' => ['A.8.8', 'A.5.24', 'A.5.26'],
+    ];
+
     /**
      * @return list<array{source: array{0: string, 1: string}, target: array{0: string, 1: string}, coverage: int, rationale: string}> pack source/cible et référence
      */
@@ -73,6 +126,22 @@ final class StarterMappingCatalog
         foreach (self::TISAX_FROM_27001 as $target => $sources) {
             foreach ($sources as $source) {
                 $mappings[] = $this->entry(self::ISO_27001, $source, self::TISAX, $target, 50, 'Mesure ISO 27001 contribuant à la section VDA ISA ; la maturité reste évaluée séparément.');
+            }
+        }
+
+        foreach (self::AI_ACT_FROM_42001 as $target => $sources) {
+            foreach ($sources as $source) {
+                $mappings[] = $this->entry(self::ISO_42001, $source, self::AI_ACT, $target, 40, 'Mesure ISO 42001 contribuant à l’exigence du règlement sur l’IA ; la qualification du système et les obligations légales restent à confirmer.');
+            }
+        }
+        foreach (self::DORA_FROM_27001 as $target => $sources) {
+            foreach ($sources as $source) {
+                $mappings[] = $this->entry(self::ISO_27001, $source, self::DORA, $target, 40, 'Mesure ISO 27001 contribuant à l’exigence DORA ; proportionnalité et normes techniques à confirmer.');
+            }
+        }
+        foreach (self::CRA_FROM_27001 as $target => $sources) {
+            foreach ($sources as $source) {
+                $mappings[] = $this->entry(self::ISO_27001, $source, self::CRA, $target, 30, 'Mesure ISO 27001 de l’organisation contribuant à l’exigence produit du CRA ; ne vaut pas évaluation de conformité du produit.');
             }
         }
 

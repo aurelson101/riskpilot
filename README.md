@@ -48,6 +48,16 @@ docker compose exec backend php bin/console app:user:create-admin \
 
 La [roadmap](docs/roadmap.md) maintient les écarts restants et leur ordre de priorité avant une exploitation critique.
 
+### Multi-réglementaire — 21 novembre 2026
+
+RiskPilot couvre en plus l'AI Act, DORA et le Cyber Resilience Act : packs de
+référentiels, qualification AI Act des systèmes d'IA, notifications d'incidents avec
+échéances, produits CRA, registre des accords TIC DORA et provisioning SCIM 2.0.
+Voir la [comparaison](docs/grc-product-comparison.md) pour les limites, les
+[points d'API](docs/api.md) et le [guide SSO/SCIM](docs/sso.md). Après mise à jour,
+appliquer `make migrate` puis installer les packs :
+`docker compose exec backend php bin/console app:compliance:install-starter-packs`.
+
 ### État et références produit — 2 octobre 2026
 
 La [comparaison EGERIE / CISO Assistant](docs/grc-product-comparison.md)

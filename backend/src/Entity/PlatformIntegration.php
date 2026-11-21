@@ -14,7 +14,7 @@ class PlatformIntegration
 {
     public const TYPES = ['OIDC', 'SAML', 'SCIM', 'DIRECTORY', 'API_KEY', 'WEBHOOK', 'CONNECTOR'];
     public const PROVIDERS = ['GOOGLE_WORKSPACE', 'MICROSOFT_ENTRA', 'KEYCLOAK', 'AUTHENTIK', 'ACTIVE_DIRECTORY', 'JIRA', 'SERVICENOW', 'GENERIC'];
-    public const SCOPES = ['risks:read', 'controls:read', 'actions:read', 'events:write', 'scim:write'];
+    public const SCOPES = ['risks:read', 'controls:read', 'actions:read', 'events:write', 'scim:write', 'scim:groups'];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column] private ?int $id = null;
     #[ORM\ManyToOne, ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')] private Organization $organization;
@@ -227,6 +227,28 @@ class PlatformIntegration
     }
 
     /** @param array<string, mixed> $configuration */
+    private function validateRoleMappings(array $configuration): void
+    {
+        $mappings = $configuration['roleMappings'] ?? [];
+        $path = $configuration['roleClaim'] ?? null;
+        if (!is_array($mappings) || !array_is_list($mappings) || count($mappings) > 50) {
+            throw new \InvalidArgumentException('Les correspondances de rôles doivent être une liste de 50 éléments au plus.');
+        }
+        if ([] === $mappings) {
+            return;
+        }
+        if (!is_string($path) || 1 !== preg_match('/^[A-Za-z0-9_:-]{1,80}(\.[A-Za-z0-9_:-]{1,80}){0,3}$/D', $path)) {
+            throw new \InvalidArgumentException('La revendication des groupes est invalide (exemple : groups ou realm_access.roles).');
+        }
+        foreach ($mappings as $mapping) {
+            if (!is_array($mapping) || !is_string($mapping['group'] ?? null) || '' === trim($mapping['group']) || strlen($mapping['group']) > 200
+                || !in_array($mapping['role'] ?? null, \App\Security\OidcRoleMapper::ASSIGNABLE_ROLES, true)) {
+                throw new \InvalidArgumentException('Chaque correspondance associe un groupe à un rôle autorisé : les rôles d’administration ne peuvent pas être attribués par le fournisseur.');
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $configuration */
     private function validateConfiguration(string $type, array $configuration): void
     {
         $json = json_encode($configuration);
@@ -264,6 +286,7 @@ class PlatformIntegration
                 $subjects[] = $mapping['subject'];
                 $users[] = $mapping['userId'];
             }
+            $this->validateRoleMappings($configuration);
             if (isset($configuration['hostedDomain']) && (!is_string($configuration['hostedDomain']) || false === filter_var($configuration['hostedDomain'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME))) {
                 throw new \InvalidArgumentException('Le domaine Google Workspace est invalide.');
             }

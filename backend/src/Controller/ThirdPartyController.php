@@ -286,10 +286,13 @@ final readonly class ThirdPartyController
 
     private function text(mixed $value, string $label, int $limit): ?string
     {
-        if (null === $value) return null;
+        if (null === $value) {
+            return null;
+        }
         if (!is_string($value) || mb_strlen($value) > $limit) {
             throw new \InvalidArgumentException($label.' doit être un texte de '.$limit.' caractères maximum.');
         }
+
         return '' === trim($value) ? null : trim($value);
     }
 
@@ -301,10 +304,15 @@ final readonly class ThirdPartyController
         }
         $result = [];
         foreach ($values as $value) {
-            if (!is_string($value)) throw new \InvalidArgumentException($label.' doivent contenir uniquement du texte.');
+            if (!is_string($value)) {
+                throw new \InvalidArgumentException($label.' doivent contenir uniquement du texte.');
+            }
             $text = $this->text($value, $label, 200);
-            if (null !== $text && !in_array($text, $result, true)) $result[] = $text;
+            if (null !== $text && !in_array($text, $result, true)) {
+                $result[] = $text;
+            }
         }
+
         return $result;
     }
 
@@ -312,6 +320,7 @@ final readonly class ThirdPartyController
     {
         $response->headers->set('Cache-Control', 'no-store');
         $response->headers->set('Referrer-Policy', 'no-referrer');
+
         return $response;
     }
 

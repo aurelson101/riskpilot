@@ -66,8 +66,11 @@ final class FrameworkCsvParserTest extends TestCase
 
     public function testExportRefusesPartialFileOnRowLimit(): void
     {
-        $framework = new Framework('Local', '1'); $items = [];
-        for ($i = 0; $i < 501; ++$i) $items[] = new Requirement($framework, (string) $i, 'Title', 'Security');
+        $framework = new Framework('Local', '1');
+        $items = [];
+        for ($i = 0; $i < 501; ++$i) {
+            $items[] = new Requirement($framework, (string) $i, 'Title', 'Security');
+        }
         $this->expectException(\InvalidArgumentException::class);
         (new FrameworkCsvParser())->export($items);
     }
@@ -109,7 +112,9 @@ final class FrameworkCsvParserTest extends TestCase
     public function testRowLimit(): void
     {
         $csv = self::HEADER;
-        for ($i = 0; $i < 501; ++$i) $csv .= "$i,Title,Security,,\n";
+        for ($i = 0; $i < 501; ++$i) {
+            $csv .= "$i,Title,Security,,\n";
+        }
         $this->expectException(\InvalidArgumentException::class);
         (new FrameworkCsvParser())->parse($csv);
     }
