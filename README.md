@@ -2,7 +2,13 @@
 
 RiskPilot est une plateforme GRC open source pour gérer les risques cyber, la conformité, les plans d’action, les audits, les tiers, la résilience et la documentation ISMS. Elle comprend l’isolation multi-tenant, le RBAC, le MFA TOTP, les notifications, la messagerie SMTP/OAuth 2.0, les tableaux de bord, les exports, les rapports annuels versionnés et un radar de maturité cyber de 0 à 5.
 
-![Aperçu du tableau de bord RiskPilot](riskpilot.png)
+**Démo en ligne : [demo.riskpilot.site](https://demo.riskpilot.site)** · Site : [riskpilot.site](https://riskpilot.site)
+
+![Aperçu du tableau de bord RiskPilot](docs/screenshots/dashboard.png)
+
+| Conformité multi-référentiels | Notifications réglementaires (DORA, CRA, AI Act) |
+| --- | --- |
+| ![Conformité](docs/screenshots/compliance.png) | ![Notifications réglementaires](docs/screenshots/regulatory-notifications.png) |
 
 ## Prérequis
 
