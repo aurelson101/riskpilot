@@ -390,8 +390,9 @@ export function IntegrationSettingsPage() {
       <Alert severity="info">
         La découverte OIDC Google/Entra peut être vérifiée ici, ainsi que
         Keycloak/Authentik si l’émetteur est autorisé côté serveur. L’activation
-        du SSO OIDC est disponible dans « Connexion SSO ». SAML et le
-        provisioning SCIM restent indisponibles.
+        du SSO OIDC ou SAML est disponible dans « Connexion SSO ». Le
+        provisioning SCIM utilise une clé de service avec la portée scim:write
+        (voir la documentation SSO).
       </Alert>
 
       <Card>

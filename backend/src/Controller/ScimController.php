@@ -119,7 +119,15 @@ final readonly class ScimController
         if (null === $active) {
             return $this->error(400, 'Le champ active doit être un booléen.', 'invalidValue');
         }
+        $externalId = $this->externalId($data['externalId'] ?? null);
+        if (false === $externalId) {
+            return $this->error(400, 'externalId invalide (255 caractères maximum, sans caractère de contrôle).', 'invalidValue');
+        }
+        if (null !== $externalId && $this->externalIdTaken($externalId, $access, null)) {
+            return $this->error(409, 'Cet externalId est déjà rattaché à un autre utilisateur.', 'uniqueness');
+        }
         $user = new User($email, $given, $family, $access->getOrganization(), [User::ROLE_VIEWER]);
+        $user->setScimExternalId($externalId);
         // Le mot de passe est inutilisable : la connexion se fait par SSO ou après une réinitialisation par l'administrateur.
         $user->setPassword($this->passwordHasher->hashPassword($user, bin2hex(random_bytes(32))));
         $user->setStatus($active ? User::STATUS_ACTIVE : User::STATUS_INACTIVE);
@@ -148,7 +156,12 @@ final readonly class ScimController
             return $this->error(400, 'L’adresse email ne peut pas être modifiée par SCIM.', 'mutability');
         }
 
-        return $this->apply($user, $access, ['active' => $data['active'] ?? true, 'givenName' => $data['name']['givenName'] ?? $user->getFirstName(), 'familyName' => $data['name']['familyName'] ?? $user->getLastName()]);
+        $changes = ['active' => $data['active'] ?? true, 'givenName' => $data['name']['givenName'] ?? $user->getFirstName(), 'familyName' => $data['name']['familyName'] ?? $user->getLastName()];
+        if (array_key_exists('externalId', $data)) {
+            $changes['externalId'] = $data['externalId'];
+        }
+
+        return $this->apply($user, $access, $changes);
     }
 
     #[Route('/Users/{id<\d+>}', methods: ['PATCH'])]
@@ -181,6 +194,7 @@ final readonly class ScimController
                     'active' => 'active',
                     'name.givenName' => 'givenName',
                     'name.familyName' => 'familyName',
+                    'externalId' => 'externalId',
                     default => null,
                 };
                 if ('name' === $key && is_array($value)) {
@@ -403,9 +417,16 @@ final readonly class ScimController
         return $member ? [...$roles, $role] : $roles;
     }
 
-    /** @param array{active: mixed, givenName: mixed, familyName: mixed} $changes */
+    /** @param array{active: mixed, givenName: mixed, familyName: mixed, externalId?: mixed} $changes */
     private function apply(User $user, PlatformIntegration $access, array $changes): JsonResponse
     {
+        $externalId = array_key_exists('externalId', $changes) ? $this->externalId($changes['externalId']) : $user->getScimExternalId();
+        if (false === $externalId) {
+            return $this->error(400, 'externalId invalide (255 caractères maximum, sans caractère de contrôle).', 'invalidValue');
+        }
+        if (null !== $externalId && $externalId !== $user->getScimExternalId() && $this->externalIdTaken($externalId, $access, $user)) {
+            return $this->error(409, 'Cet externalId est déjà rattaché à un autre utilisateur.', 'uniqueness');
+        }
         $given = $this->name($changes['givenName']);
         $family = $this->name($changes['familyName']);
         $active = $this->active($changes['active']);
@@ -415,7 +436,7 @@ final readonly class ScimController
         if (!$active && User::STATUS_INACTIVE !== $user->getStatus() && $this->isLastActiveAdmin($user)) {
             return $this->error(403, 'Le dernier administrateur actif ne peut pas être désactivé.', 'mutability');
         }
-        $user->setFirstName($given)->setLastName($family);
+        $user->setFirstName($given)->setLastName($family)->setScimExternalId($externalId);
         if (!$active && User::STATUS_INACTIVE !== $user->getStatus()) {
             $user->setStatus(User::STATUS_INACTIVE);
             $this->sessions->revokeAll($user);
@@ -475,10 +496,30 @@ final readonly class ScimController
         return null;
     }
 
+    /** @return string|false|null null : absent ; false : invalide */
+    private function externalId(mixed $value): string|false|null
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        if (!is_string($value) || strlen($value) > 255 || preg_match('/[\x00-\x20\x7f]/', $value)) {
+            return false;
+        }
+
+        return $value;
+    }
+
+    private function externalIdTaken(string $externalId, PlatformIntegration $access, ?User $except): bool
+    {
+        $other = $this->users->findOneBy(['organization' => $access->getOrganization(), 'scimExternalId' => $externalId]);
+
+        return null !== $other && $other !== $except;
+    }
+
     /** @return array<string, mixed> */
     private function resource(User $user): array
     {
-        return [
+        return (null === $user->getScimExternalId() ? [] : ['externalId' => $user->getScimExternalId()]) + [
             'schemas' => [self::USER_SCHEMA], 'id' => (string) $user->getId(), 'userName' => $user->getEmail(),
             'name' => ['givenName' => $user->getFirstName(), 'familyName' => $user->getLastName(), 'formatted' => trim($user->getFirstName().' '.$user->getLastName())],
             'emails' => [['value' => $user->getEmail(), 'primary' => true]], 'active' => User::STATUS_ACTIVE === $user->getStatus(),
@@ -512,6 +553,7 @@ final readonly class ScimController
         if ($item->markUsed()) {
             $this->entityManager->flush();
         }
+        $request->attributes->set('_scim_integration', $item->getId());
 
         return $item;
     }

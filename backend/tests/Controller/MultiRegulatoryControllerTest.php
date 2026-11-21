@@ -286,4 +286,23 @@ final class MultiRegulatoryControllerTest extends WebTestCase
         }
         self::assertSame('DORA : notification initiale en retard', $notifications[0]->getTitle());
     }
+
+    public function testCopilotContextSummarisesRegulatoryExposureWithoutFreeTextAndPerTenant(): void
+    {
+        $this->as($this->manager);
+        $this->client->jsonRequest('POST', '/api/regulatory-incidents', ['regime' => 'DORA_MAJOR_INCIDENT', 'title' => 'Panne de paiement', 'description' => 'Détail confidentiel de la panne', 'awareAt' => $this->ago('30 hours')]);
+        self::assertResponseStatusCodeSame(201);
+        $context = self::getContainer()->get(\App\Application\RegulatoryAiContext::class);
+
+        $minimal = $context->summary($this->manager, 'MINIMAL');
+        self::assertSame(['open' => 1, 'overdue' => 1, 'dueSoon' => 0], $minimal['regulatoryIncidents']);
+        self::assertArrayNotHasKey('urgentRegulatoryDeadlines', $minimal, 'Counters only under the minimal data policy.');
+
+        $contextual = $context->summary($this->manager, 'CONTEXTUAL');
+        self::assertSame('DORA_MAJOR_INCIDENT', $contextual['urgentRegulatoryDeadlines'][0]['regime']);
+        self::assertSame('Panne de paiement', $contextual['urgentRegulatoryDeadlines'][0]['title']);
+        self::assertStringNotContainsString('Détail confidentiel', json_encode($contextual, JSON_THROW_ON_ERROR), 'Free-text descriptions are never sent to the model.');
+
+        self::assertSame(0, $context->summary($this->foreign, 'CONTEXTUAL')['regulatoryIncidents']['open'], 'Another organisation sees nothing.');
+    }
 }

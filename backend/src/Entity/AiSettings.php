@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'ai_settings')]
 class AiSettings
 {
-    public const PROVIDERS = ['MISTRAL', 'OPENAI', 'GEMINI'];
+    public const PROVIDERS = ['MISTRAL', 'OPENAI', 'GEMINI', 'SELF_HOSTED'];
     public const DATA_POLICIES = ['MINIMAL', 'CONTEXTUAL'];
     /** Version de l'avis d'usage (DPA, transferts, sous-traitant) acquitté par l'administrateur. */
     public const TERMS_VERSION = '2026-11';
@@ -139,6 +139,12 @@ class AiSettings
         $this->termsVersion = self::TERMS_VERSION;
         $this->termsAcknowledgedAt = new \DateTimeImmutable();
         $this->termsAcknowledgedBy = $administrator;
+    }
+
+    public function clearApiKey(): void
+    {
+        $this->encryptedApiKey = null;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function setEncryptedApiKey(string $encryptedApiKey): void

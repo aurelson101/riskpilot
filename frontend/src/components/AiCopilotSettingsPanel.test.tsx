@@ -186,3 +186,48 @@ it("blocks activation until the usage terms are acknowledged", async () => {
   fireEvent.click(screen.getByRole("switch", { name: /DPA/ }));
   expect(activation).toBeEnabled();
 });
+
+it("configures a self-hosted model from the endpoints allowed by the server, without an API key", async () => {
+  mockGet({
+    ...settings,
+    selfHostedEndpoints: ["http://ollama:11434/v1"],
+  } as typeof settings);
+  const put = vi.spyOn(api, "put").mockResolvedValue({ data: settings });
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      <AiCopilotSettingsPanel />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole("button", { name: "Tester la génération IA" });
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Fournisseur IA" }));
+  fireEvent.click(
+    await screen.findByRole("option", { name: /Modèle auto-hébergé/ }),
+  );
+  expect(
+    screen.getByRole("combobox", { name: /Point d’accès auto-hébergé/ }),
+  ).toHaveTextContent("http://ollama:11434/v1");
+  expect(
+    screen.getByLabelText("Jeton d’accès (facultatif)", { exact: false }),
+  ).not.toBeRequired();
+  fireEvent.change(screen.getByRole("textbox", { name: /^Modèle/ }), {
+    target: { value: "llama3.1:8b" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Enregistrer la configuration IA" }),
+  );
+  await waitFor(() =>
+    expect(put).toHaveBeenCalledWith(
+      "/settings/ai",
+      expect.objectContaining({
+        provider: "SELF_HOSTED",
+        baseUrl: "http://ollama:11434/v1",
+        model: "llama3.1:8b",
+        apiKey: "",
+      }),
+    ),
+  );
+});

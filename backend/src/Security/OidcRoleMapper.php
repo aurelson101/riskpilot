@@ -66,7 +66,9 @@ final class OidcRoleMapper
     private function groups(array $claims, string $path): ?array
     {
         $value = $claims;
-        foreach (explode('.', $path) as $segment) {
+        // Les attributs SAML portent souvent des noms qui contiennent des points ou des barres (urn:oid:2.5.4.3, URL de schéma).
+        $segments = array_key_exists($path, $claims) ? [$path] : explode('.', $path);
+        foreach ($segments as $segment) {
             if (!is_array($value) || !array_key_exists($segment, $value)) {
                 return null;
             }

@@ -18,9 +18,14 @@ import type { User } from "../api/types";
 import { useAuth } from "../auth/useAuth";
 
 type Mapping = { userId: number; subject: string };
+type Protocol = "OIDC" | "SAML";
 type Configuration = {
   issuer: string;
   clientId: string;
+  ssoUrl?: string;
+  idpCertificate?: string;
+  spEntityId?: string;
+  linkScimExternalId?: boolean;
   accountMappings: Mapping[];
   hostedDomain?: string;
   roleClaim?: string;
@@ -51,6 +56,11 @@ const names: Record<string, string> = {
   GENERIC: "Autre fournisseur OIDC",
 };
 const initial = {
+  protocol: "OIDC" as Protocol,
+  ssoUrl: "",
+  idpCertificate: "",
+  spEntityId: "",
+  linkScimExternalId: false,
   name: "",
   provider: "MICROSOFT_ENTRA",
   issuer: presets.MICROSOFT_ENTRA,
@@ -118,13 +128,15 @@ export function SsoSettingsCard() {
       (user) => user.organization?.id === actor?.organization.id,
     ) ?? [];
   const editing = integrations.data?.find((item) => item.id === editingId);
+  const saml = form.protocol === "SAML";
   const needsNewSecret =
-    editingId === null ||
-    Boolean(
+    !saml &&
+    (editingId === null ||
+      Boolean(
       editing &&
       (editing.configuration.issuer !== form.issuer.trim() ||
         editing.configuration.clientId !== form.clientId.trim()),
-    );
+    ));
   const duplicateSubject = (subject: string, index: number) =>
     Boolean(subject.trim()) &&
     form.accountMappings.some(
@@ -146,14 +158,23 @@ export function SsoSettingsCard() {
   const save = useMutation({
     mutationFn: async () => {
       const body = {
-        type: "OIDC",
+        type: form.protocol,
         provider: form.provider,
         name: form.name,
         enabled: form.enabled,
-        ...(form.credential ? { credential: form.credential } : {}),
+        ...(!saml && form.credential ? { credential: form.credential } : {}),
         configuration: {
           issuer: form.issuer.trim(),
-          clientId: form.clientId.trim(),
+          ...(saml
+            ? {
+                ssoUrl: form.ssoUrl.trim(),
+                idpCertificate: form.idpCertificate.trim(),
+                ...(form.spEntityId.trim()
+                  ? { spEntityId: form.spEntityId.trim() }
+                  : {}),
+              }
+            : { clientId: form.clientId.trim() }),
+          ...(form.linkScimExternalId ? { linkScimExternalId: true } : {}),
           accountMappings: form.accountMappings,
           ...(form.roleMappingsText.trim()
             ? {
@@ -210,9 +231,10 @@ export function SsoSettingsCard() {
         <Stack spacing={2}>
           <Typography variant="h6">Connexion SSO</Typography>
           <Typography color="text.secondary">
-            Connectez Microsoft, Google ou un fournisseur OIDC. Les comptes et
-            les droits restent gérés dans RiskPilot ; le MFA RiskPilot reste
-            obligatoire lorsqu’il est activé.
+            Connectez Microsoft, Google, Keycloak, Authentik ou tout fournisseur
+            OIDC ou SAML 2.0. Les comptes et les droits restent gérés dans
+            RiskPilot ; le MFA RiskPilot reste obligatoire lorsqu’il est
+            activé.
           </Typography>
           {error && <Alert severity="error">{error}</Alert>}
           {saved && (
@@ -224,7 +246,7 @@ export function SsoSettingsCard() {
             </Alert>
           )}
           {integrations.data
-            ?.filter((item) => item.type === "OIDC")
+            ?.filter((item) => item.type === "OIDC" || item.type === "SAML")
             .map((item) => (
               <Stack
                 key={item.id}
@@ -232,7 +254,8 @@ export function SsoSettingsCard() {
                 gap={1}
               >
                 <Typography sx={{ flex: 1 }}>
-                  {item.name} · {item.enabled ? "Actif" : "Inactif"}
+                  {item.name} · {item.type} ·{" "}
+                  {item.enabled ? "Actif" : "Inactif"}
                 </Typography>
                 <Button
                   disabled={save.isPending || remove.isPending}
@@ -243,6 +266,12 @@ export function SsoSettingsCard() {
                     setForm({
                       ...initial,
                       ...item.configuration,
+                      protocol: item.type as Protocol,
+                      ssoUrl: item.configuration.ssoUrl ?? "",
+                      idpCertificate: item.configuration.idpCertificate ?? "",
+                      spEntityId: item.configuration.spEntityId ?? "",
+                      linkScimExternalId:
+                        item.configuration.linkScimExternalId ?? false,
                       name: item.name,
                       provider: item.provider,
                       enabled: item.enabled,
@@ -285,6 +314,29 @@ export function SsoSettingsCard() {
               />
               <TextField
                 select
+                label="Protocole"
+                value={form.protocol}
+                disabled={editingId !== null}
+                helperText="OIDC (recommandé) ou SAML 2.0 pour les fournisseurs qui n’exposent pas OIDC."
+                onChange={(e) =>
+                  setForm({
+                    ...initial,
+                    protocol: e.target.value as Protocol,
+                    name: form.name,
+                    provider:
+                      e.target.value === "SAML" ? "KEYCLOAK" : initial.provider,
+                    issuer:
+                      e.target.value === "SAML"
+                        ? ""
+                        : presets[initial.provider],
+                  })
+                }
+              >
+                <MenuItem value="OIDC">OpenID Connect</MenuItem>
+                <MenuItem value="SAML">SAML 2.0</MenuItem>
+              </TextField>
+              <TextField
+                select
                 label="Fournisseur SSO"
                 value={form.provider}
                 disabled={editingId !== null}
@@ -293,7 +345,7 @@ export function SsoSettingsCard() {
                   setForm({
                     ...form,
                     provider: e.target.value,
-                    issuer: presets[e.target.value],
+                    issuer: saml ? "" : presets[e.target.value],
                     clientId: "",
                     credential: "",
                     hostedDomain: "",
@@ -302,25 +354,90 @@ export function SsoSettingsCard() {
                   })
                 }
               >
-                {Object.entries(names).map(([value, label]) => (
-                  <MenuItem key={value} value={value}>
-                    {label}
-                  </MenuItem>
-                ))}
+                {Object.entries(names)
+                  .filter(
+                    ([value]) =>
+                      !saml ||
+                      ["KEYCLOAK", "AUTHENTIK", "MICROSOFT_ENTRA", "GENERIC"].includes(
+                        value,
+                      ),
+                  )
+                  .map(([value, label]) => (
+                    <MenuItem key={value} value={value}>
+                      {saml && value === "GENERIC"
+                        ? "Autre fournisseur SAML"
+                        : label}
+                    </MenuItem>
+                  ))}
               </TextField>
               <TextField
                 required
-                label="URL de l’émetteur SSO"
+                label={
+                  saml
+                    ? "Identifiant du fournisseur (entityID)"
+                    : "URL de l’émetteur SSO"
+                }
                 value={form.issuer}
                 onChange={(e) => setForm({ ...form, issuer: e.target.value })}
                 helperText={
-                  form.provider === "MICROSOFT_ENTRA"
+                  saml
+                    ? "Valeur entityID des métadonnées du fournisseur, par exemple https://sso.example.com/realms/riskpilot."
+                    : form.provider === "MICROSOFT_ENTRA"
                     ? "Remplacez les zéros par l’identifiant du tenant Entra ID. Application de type Web, mono-tenant."
                     : form.provider === "GOOGLE_WORKSPACE"
                       ? "Créez un client OAuth de type application Web dans Google Cloud."
                       : "Autorisez cet émetteur dans OIDC_DIAGNOSTIC_ISSUERS côté serveur. Signature RS256 requise."
                 }
               />
+              {saml ? (
+              <>
+              <TextField
+                required
+                label="Adresse de connexion SAML (SingleSignOnService)"
+                value={form.ssoUrl}
+                onChange={(e) => setForm({ ...form, ssoUrl: e.target.value })}
+                helperText="URL HTTPS de la liaison HTTP-Redirect du fournisseur."
+              />
+              <TextField
+                required
+                multiline
+                minRows={4}
+                label="Certificat de signature du fournisseur (PEM)"
+                value={form.idpCertificate}
+                onChange={(e) =>
+                  setForm({ ...form, idpCertificate: e.target.value })
+                }
+                helperText="Certificat X.509 public (-----BEGIN CERTIFICATE-----). Les réponses ou assertions non signées par ce certificat sont refusées ; SHA-1 est refusé."
+              />
+              <TextField
+                label="Identifiant RiskPilot (entityID du service, facultatif)"
+                value={form.spEntityId}
+                onChange={(e) =>
+                  setForm({ ...form, spEntityId: e.target.value })
+                }
+                helperText="Par défaut, l’adresse des métadonnées RiskPilot."
+              />
+              <TextField
+                label="Adresse de retour à enregistrer chez le fournisseur (ACS)"
+                value={
+                  editingId === null
+                    ? "Disponible après l’enregistrement"
+                    : `${window.location.origin}/api/auth/sso/saml/${editingId}/acs`
+                }
+                slotProps={{ input: { readOnly: true } }}
+              />
+              <TextField
+                label="Métadonnées RiskPilot à importer chez le fournisseur"
+                value={
+                  editingId === null
+                    ? "Disponible après l’enregistrement"
+                    : `${window.location.origin}/api/auth/sso/saml/${editingId}/metadata`
+                }
+                slotProps={{ input: { readOnly: true } }}
+              />
+              </>
+              ) : (
+              <>
               <TextField
                 required
                 label="Identifiant client"
@@ -350,6 +467,8 @@ export function SsoSettingsCard() {
                 value={`${window.location.origin}/api/auth/sso/callback`}
                 slotProps={{ input: { readOnly: true } }}
               />
+              </>
+              )}
               {form.provider === "GOOGLE_WORKSPACE" && (
                 <TextField
                   label="Domaine Google Workspace autorisé (facultatif)"
@@ -370,12 +489,16 @@ export function SsoSettingsCard() {
                 attribués ni retirés par le fournisseur.
               </Typography>
               <TextField
-                label="Revendication des groupes"
+                label={saml ? "Attribut des groupes" : "Revendication des groupes"}
                 value={form.roleClaim}
                 onChange={(e) =>
                   setForm({ ...form, roleClaim: e.target.value })
                 }
-                helperText="Exemples : groups (Authentik), realm_access.roles (Keycloak), roles (Entra)."
+                helperText={
+                  saml
+                    ? "Nom de l’attribut SAML qui porte les groupes, par exemple Role ou http://schemas.xmlsoap.org/claims/Group."
+                    : "Exemples : groups (Authentik), realm_access.roles (Keycloak), roles (Entra)."
+                }
               />
               <TextField
                 label="Correspondances groupe = rôle"
@@ -394,6 +517,23 @@ export function SsoSettingsCard() {
                   ? "d’objet Microsoft (oid)"
                   : "de sujet OIDC (sub)"}
                 . Aucun compte n’est créé automatiquement.
+              </Typography>
+              <FormControlLabel
+                label="Rattacher aussi les comptes créés par SCIM (identifiant externe)"
+                control={
+                  <Switch
+                    checked={form.linkScimExternalId}
+                    onChange={(e) =>
+                      setForm({ ...form, linkScimExternalId: e.target.checked })
+                    }
+                  />
+                }
+              />
+              <Typography variant="body2" color="text.secondary">
+                Un compte provisionné par SCIM dont l’externalId est égal à{" "}
+                {saml ? "l’identifiant NameID" : "l’identifiant sub"} peut se
+                connecter sans association manuelle. Il reste Lecteur tant que
+                les groupes ne lui donnent pas d’autre rôle.
               </Typography>
               {form.accountMappings.map((mapping, index) => (
                 <Stack
@@ -527,7 +667,9 @@ export function SsoSettingsCard() {
                 disabled={
                   save.isPending ||
                   !users.isSuccess ||
-                  (form.enabled && !form.accountMappings.length)
+                  (form.enabled &&
+                    !form.accountMappings.length &&
+                    !form.linkScimExternalId)
                 }
               >
                 {save.isPending ? "Vérification…" : "Enregistrer le SSO"}

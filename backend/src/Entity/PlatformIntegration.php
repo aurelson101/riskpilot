@@ -39,9 +39,6 @@ class PlatformIntegration
             throw new \InvalidArgumentException('Type, fournisseur ou nom d’intégration invalide.');
         }
         $this->validateName($name);
-        if ($enabled && 'SAML' === $type) {
-            throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
-        }
         $this->validateConfiguration($type, $configuration);
         $this->organization = $organization;
         $this->type = $type;
@@ -124,7 +121,18 @@ class PlatformIntegration
 
     public function isCredentialConfigured(): bool
     {
+        if ('SAML' === $this->type) {
+            return $this->hasCredentialIn($this->configuration);
+        }
+
         return in_array($this->type, ['DIRECTORY', 'OIDC'], true) ? null !== $this->encryptedCredential : null !== $this->secretHash;
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private function hasCredentialIn(array $configuration): bool
+    {
+        // SAML : aucun secret partagé, le certificat public du fournisseur sert à vérifier les signatures.
+        return 'SAML' === $this->type ? is_string($configuration['idpCertificate'] ?? null) && '' !== trim($configuration['idpCertificate']) : null !== $this->encryptedCredential;
     }
 
     public function getCredentialExpiresAt(): ?\DateTimeImmutable
@@ -210,15 +218,13 @@ class PlatformIntegration
             throw new \InvalidArgumentException('Utilisez la rotation pour modifier la validité de la clé API.');
         }
         $this->validateName($name);
-        if ($enabled && 'SAML' === $this->type) {
-            throw new \InvalidArgumentException('La connexion SSO n’est pas encore raccordée : conservez cette configuration inactive.');
-        }
         if ($enabled && 'API_KEY' === $this->type && (!$this->isCredentialConfigured() || $this->isCredentialExpired())) {
             throw new \InvalidArgumentException('La clé API est révoquée ou expirée : effectuez une rotation avant de l’activer.');
         }
         $this->validateConfiguration($this->type, $configuration);
-        if ($enabled && 'OIDC' === $this->type && (!$this->isCredentialConfigured() || [] === ($configuration['accountMappings'] ?? []))) {
-            throw new \InvalidArgumentException('Le SSO exige un secret et au moins un compte associé.');
+        $linkable = true === ($configuration['linkScimExternalId'] ?? false);
+        if ($enabled && in_array($this->type, ['OIDC', 'SAML'], true) && (!$this->hasCredentialIn($configuration) || ([] === ($configuration['accountMappings'] ?? []) && !$linkable))) {
+            throw new \InvalidArgumentException('Le SSO exige un secret (OIDC) ou un certificat (SAML) et au moins un compte associé, ou le rattachement par SCIM externalId.');
         }
         $this->name = trim($name);
         $this->configuration = $configuration;
@@ -226,8 +232,51 @@ class PlatformIntegration
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @param array<array-key, mixed> $mappings */
+    private function validateAccountMappings(array $mappings): void
+    {
+        $subjects = [];
+        $users = [];
+        foreach ($mappings as $mapping) {
+            if (!is_array($mapping) || !is_int($mapping['userId'] ?? null) || $mapping['userId'] < 1
+                || !is_string($mapping['subject'] ?? null) || '' === trim($mapping['subject']) || strlen($mapping['subject']) > 255
+                || preg_match('/[\x00-\x20\x7f]/', $mapping['subject'])
+                || in_array($mapping['subject'], $subjects, true) || in_array($mapping['userId'], $users, true)) {
+                throw new \InvalidArgumentException('Chaque compte doit avoir un identifiant fournisseur unique et un utilisateur unique.');
+            }
+            $subjects[] = $mapping['subject'];
+            $users[] = $mapping['userId'];
+        }
+    }
+
     /** @param array<string, mixed> $configuration */
-    private function validateRoleMappings(array $configuration): void
+    private function validateSaml(array $configuration): void
+    {
+        $mappings = $configuration['accountMappings'] ?? [];
+        if (!is_array($mappings) || !array_is_list($mappings) || count($mappings) > 200) {
+            throw new \InvalidArgumentException('Les associations de comptes SAML doivent être une liste de 200 éléments au plus.');
+        }
+        $this->validateAccountMappings($mappings);
+        $entity = $configuration['spEntityId'] ?? null;
+        if (null !== $entity && (!is_string($entity) || '' === trim($entity) || strlen($entity) > 512 || preg_match('/[\x00-\x20\x7f]/', $entity))) {
+            throw new \InvalidArgumentException('L’identifiant de service SAML est invalide.');
+        }
+        $issuer = (string) $configuration['issuer'];
+        if (strlen($issuer) > 512 || preg_match('/[\x00-\x20\x7f]/', $issuer)) {
+            throw new \InvalidArgumentException('L’identifiant (entityID) du fournisseur SAML est invalide.');
+        }
+        if (!is_string($configuration['ssoUrl'] ?? null) || !$this->validHttpsUrl($configuration['ssoUrl'])) {
+            throw new \InvalidArgumentException('L’adresse de connexion SAML doit être une URL HTTPS valide.');
+        }
+        $certificate = $configuration['idpCertificate'] ?? '';
+        if (!is_string($certificate) || strlen($certificate) > 8192 || str_contains($certificate, 'PRIVATE KEY') || false === @openssl_x509_read($certificate)) {
+            throw new \InvalidArgumentException('Le certificat du fournisseur SAML doit être un certificat X.509 public au format PEM.');
+        }
+        $this->validateRoleMappings($configuration, true);
+    }
+
+    /** @param array<string, mixed> $configuration */
+    private function validateRoleMappings(array $configuration, bool $attribute = false): void
     {
         $mappings = $configuration['roleMappings'] ?? [];
         $path = $configuration['roleClaim'] ?? null;
@@ -237,7 +286,7 @@ class PlatformIntegration
         if ([] === $mappings) {
             return;
         }
-        if (!is_string($path) || 1 !== preg_match('/^[A-Za-z0-9_:-]{1,80}(\.[A-Za-z0-9_:-]{1,80}){0,3}$/D', $path)) {
+        if (!is_string($path) || ($attribute ? strlen($path) > 200 || 1 === preg_match('/[\x00-\x1f\x7f]/', $path) : 1 !== preg_match('/^[A-Za-z0-9_:-]{1,80}(\.[A-Za-z0-9_:-]{1,80}){0,3}$/D', $path))) {
             throw new \InvalidArgumentException('La revendication des groupes est invalide (exemple : groups ou realm_access.roles).');
         }
         foreach ($mappings as $mapping) {
@@ -256,7 +305,7 @@ class PlatformIntegration
             throw new \InvalidArgumentException('La configuration doit rester inférieure à 64 Kio et être sérialisable.');
         }
         $this->rejectPlainSecrets($configuration);
-        foreach (['issuer', 'url', 'baseUrl', 'direction', 'conflictStrategy', 'host', 'baseDn', 'bindDn', 'userFilter', 'testUsername', 'caCertificate'] as $key) {
+        foreach (['issuer', 'url', 'baseUrl', 'direction', 'conflictStrategy', 'host', 'baseDn', 'bindDn', 'userFilter', 'testUsername', 'caCertificate', 'idpCertificate', 'ssoUrl', 'spEntityId'] as $key) {
             if (array_key_exists($key, $configuration) && !is_string($configuration[$key])) {
                 throw new \InvalidArgumentException('Un champ de configuration textuel est invalide.');
             }
@@ -274,22 +323,17 @@ class PlatformIntegration
                 || !is_array($mappings) || !array_is_list($mappings) || count($mappings) > 200) {
                 throw new \InvalidArgumentException('Identifiant client et associations de comptes OIDC requis.');
             }
-            $subjects = [];
-            $users = [];
-            foreach ($mappings as $mapping) {
-                if (!is_array($mapping) || !is_int($mapping['userId'] ?? null) || $mapping['userId'] < 1
-                    || !is_string($mapping['subject'] ?? null) || '' === trim($mapping['subject']) || strlen($mapping['subject']) > 255
-                    || preg_match('/[\x00-\x20\x7f]/', $mapping['subject'])
-                    || in_array($mapping['subject'], $subjects, true) || in_array($mapping['userId'], $users, true)) {
-                    throw new \InvalidArgumentException('Chaque compte doit avoir un identifiant fournisseur unique et un utilisateur unique.');
-                }
-                $subjects[] = $mapping['subject'];
-                $users[] = $mapping['userId'];
-            }
+            $this->validateAccountMappings($mappings);
             $this->validateRoleMappings($configuration);
             if (isset($configuration['hostedDomain']) && (!is_string($configuration['hostedDomain']) || false === filter_var($configuration['hostedDomain'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME))) {
                 throw new \InvalidArgumentException('Le domaine Google Workspace est invalide.');
             }
+        }
+        if ('SAML' === $type) {
+            $this->validateSaml($configuration);
+        }
+        if (array_key_exists('linkScimExternalId', $configuration) && !is_bool($configuration['linkScimExternalId'])) {
+            throw new \InvalidArgumentException('linkScimExternalId doit être un booléen.');
         }
         if ('API_KEY' === $type) {
             $scopes = $configuration['scopes'] ?? [];

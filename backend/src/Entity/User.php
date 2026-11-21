@@ -14,6 +14,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\Table(name: 'users')]
 #[ORM\UniqueConstraint(name: 'uniq_user_email', columns: ['email'])]
 #[ORM\UniqueConstraint(name: 'uniq_user_calendar_token', columns: ['calendar_token_hash'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_scim_external_id', columns: ['organization_id', 'scim_external_id'])]
 #[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['email'], message: 'Cette adresse email est déjà utilisée.')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
@@ -101,6 +102,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lockedUntil = null;
+
+    /** Identifiant du compte chez le fournisseur d'identité (SCIM externalId) : permet de rattacher la connexion SSO sans saisie manuelle. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $scimExternalId = null;
 
     /** @param list<string> $roles */
     public function __construct(string $email, string $firstName, string $lastName, Organization $organization, array $roles = [])
@@ -195,6 +200,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getStatus(): string
     {
         return $this->status;
+    }
+
+    public function getScimExternalId(): ?string
+    {
+        return $this->scimExternalId;
+    }
+
+    public function setScimExternalId(?string $scimExternalId): self
+    {
+        $this->scimExternalId = $scimExternalId;
+
+        return $this;
     }
 
     public function setStatus(string $status): self

@@ -48,7 +48,9 @@ Correction : le SSO OIDC (Keycloak, Authentik, Entra ID, Google) est bien raccor
 de bout en bout (voir [sso.md](sso.md)). Depuis le même jour : rôles issus des
 groupes du fournisseur, déconnexion côté fournisseur, groupes SCIM à portée
 séparée, rappels d'échéances DORA/CRA/AI Act et banc d'évaluation du copilote IA
-(`app:ai:evaluate`, 12 questions FR/EN). SAML n'est volontairement pas implémenté.
+(`app:ai:evaluate`, 12 questions FR/EN). 
+
+Mise à jour : SAML 2.0 (vérification de signature en mode strict, recette réelle avec Keycloak 26 le même jour), rattachement des comptes SCIM par `externalId`, journalisation SCIM dans l'audit scellé, fournisseur IA auto-hébergé (Ollama, vLLM, LiteLLM…) et contexte réglementaire du copilote.
 
 ### Écarts fonctionnels restants pour un GRC multi-réglementaire
 
@@ -57,7 +59,7 @@ séparée, rappels d'échéances DORA/CRA/AI Act et banc d'évaluation du copilo
 - **CRA** : pas de rapprochement entre les vulnérabilités du registre et les
   signalements de vulnérabilités activement exploitées, ni de génération de SBOM.
 - **Bibliothèques** : import Excel/YAML et mises à jour versionnées toujours absents.
-- **Identité** : SAML non implémenté (passer par un fournisseur OIDC qui le fédère) ;
+- **Identité** : SAML sans déconnexion unique (SLO) ni assertions chiffrées ;
   recette réelle avec Keycloak ou Authentik à faire.
 - **IA** : le banc d'évaluation donne un indicateur de non-régression sur 12 questions,
   pas une garantie d'exactitude réglementaire ; il consomme des appels du fournisseur.
@@ -87,7 +89,7 @@ restent stables lors des mises à jour. Sources :
 | Collecte et tiers | Questionnaires, campagnes, TPRM et relances dans le module opérationnel | Vérifier l'expérience répondant, expiration des accès, réception des relances et validation des preuves. |
 | Traitement et décision | Actions, Kanban/calendrier, portefeuille et rapports décisionnels | Unifier le parcours guidé et tester les vues 360° plutôt que multiplier les menus. |
 | Quantification | `DecisionWorkspaceController::quantify`, pertes annuelles et percentiles | Méthode locale à expliquer/valider ; ne pas annoncer une équivalence avec un moteur éditeur ou une estimation financière garantie. |
-| Identité | JWT/MFA/session, clés de service, LDAPS, SSO OIDC (Keycloak, Authentik, Entra, Google), rôles par groupes, déconnexion fournisseur, SCIM 2.0 (utilisateurs et groupes) | SAML ; recette réelle avec un fournisseur à réaliser. |
+| Identité | JWT/MFA/session, clés de service, LDAPS, SSO OIDC (Keycloak, Authentik, Entra, Google) et SAML 2.0, rôles par groupes, déconnexion fournisseur OIDC, SCIM 2.0 (utilisateurs, groupes, rattachement par externalId, audit) | Recette réelle faite pour SAML et SCIM avec Keycloak ; recette OIDC avec un émetteur HTTPS public et recette Authentik à faire ; SLO SAML. |
 | Messagerie | SMTP, Gmail et Graph délégués, OAuth/PKCE, reset/test FR/EN, HTML, liens internes, tentatives bornées et contrôle du destinataire | Traduction des notifications et rendu dans les clients mail à valider ; réservations bloquées et supervision à traiter. |
 | Agenda | Abonnement privé `.ics`, rotation/révocation, actions affectées | Pas de CalDAV ni d'API calendrier Graph/Google ; tests Thunderbird/Outlook à réaliser. |
 | IA | Copilote FR/EN, contexte consenti, brouillons gouvernés et RBAC | Évaluer couverture, qualité et réponses hors contexte ; aucun accès fournisseur direct et illimité aux API. |

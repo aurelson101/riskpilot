@@ -15,7 +15,7 @@ import {
 import axios from "axios";
 import { api } from "../api/client";
 
-type Provider = "MISTRAL" | "OPENAI" | "GEMINI";
+type Provider = "MISTRAL" | "OPENAI" | "GEMINI" | "SELF_HOSTED";
 type AiSettings = {
   provider: Provider;
   baseUrl: string;
@@ -30,6 +30,7 @@ type AiSettings = {
   termsVersion: string;
   termsAcknowledgedAt: string | null;
   models: string[];
+  selfHostedEndpoints?: string[];
   updatedAt: string | null;
 };
 type Usage = {
@@ -58,6 +59,7 @@ const presets: Record<Provider, Pick<Form, "baseUrl" | "model">> = {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     model: "gemini-3.5-flash-lite",
   },
+  SELF_HOSTED: { baseUrl: "", model: "" },
 };
 
 /** Doit rester identique à AiSettingsController::MODELS : le serveur refuse tout autre modèle. */
@@ -79,6 +81,7 @@ const providerModels: Record<Provider, readonly string[]> = {
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
   ],
+  SELF_HOSTED: [],
 };
 
 export function AiCopilotSettingsPanel() {
@@ -201,46 +204,93 @@ export function AiCopilotSettingsPanel() {
                     settings.data.apiKeyConfigured,
                   enabled: false,
                   ...presets[provider],
+                  ...(provider === "SELF_HOSTED"
+                    ? { baseUrl: form.selfHostedEndpoints?.[0] ?? "" }
+                    : {}),
                 });
               }}
             >
               <MenuItem value="MISTRAL">Mistral AI</MenuItem>
               <MenuItem value="OPENAI">OpenAI</MenuItem>
               <MenuItem value="GEMINI">Google Gemini</MenuItem>
+              <MenuItem value="SELF_HOSTED">
+                Modèle auto-hébergé (Ollama, vLLM, LiteLLM…)
+              </MenuItem>
             </TextField>
+            {form.provider === "SELF_HOSTED" ? (
+              <TextField
+                fullWidth
+                required
+                label="Modèle"
+                helperText="Nom du modèle tel que servi par votre point d’accès, par exemple llama3.1:8b ou mistral-small."
+                value={form.model}
+                onChange={(event) =>
+                  setForm({ ...form, model: event.target.value.trim() })
+                }
+              />
+            ) : (
+              <TextField
+                select
+                fullWidth
+                required
+                label="Modèle"
+                helperText="Disponibilité selon votre compte et vos quotas fournisseur."
+                value={form.model}
+                onChange={(event) =>
+                  setForm({ ...form, model: event.target.value })
+                }
+              >
+                {models.map((model) => (
+                  <MenuItem key={model} value={model}>
+                    {model}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+          </Stack>
+          {form.provider === "SELF_HOSTED" ? (
             <TextField
               select
-              fullWidth
               required
-              label="Modèle"
-              helperText="Disponibilité selon votre compte et vos quotas fournisseur."
-              value={form.model}
+              label="Point d’accès auto-hébergé"
+              value={form.baseUrl}
               onChange={(event) =>
-                setForm({ ...form, model: event.target.value })
+                setForm({ ...form, baseUrl: event.target.value })
+              }
+              error={!form.selfHostedEndpoints?.length}
+              helperText={
+                form.selfHostedEndpoints?.length
+                  ? "Adresses déclarées par l’administrateur du serveur (AI_SELF_HOSTED_ENDPOINTS). Les données restent dans votre infrastructure."
+                  : "Aucun point d’accès autorisé : l’administrateur du serveur doit renseigner AI_SELF_HOSTED_ENDPOINTS."
               }
             >
-              {models.map((model) => (
-                <MenuItem key={model} value={model}>
-                  {model}
+              {(form.selfHostedEndpoints ?? []).map((endpoint) => (
+                <MenuItem key={endpoint} value={endpoint}>
+                  {endpoint}
                 </MenuItem>
               ))}
             </TextField>
-          </Stack>
-          <TextField
-            required
-            label="URL de l’API"
-            value={form.baseUrl}
-            disabled
-            helperText="URL officielle du fournisseur, imposée par le serveur (protection contre les accès réseau internes)."
-          />
+          ) : (
+            <TextField
+              required
+              label="URL de l’API"
+              value={form.baseUrl}
+              disabled
+              helperText="URL officielle du fournisseur, imposée par le serveur (protection contre les accès réseau internes)."
+            />
+          )}
           <TextField
             type="password"
             label={
-              form.apiKeyConfigured
-                ? "Nouvelle clé API (vide pour conserver)"
-                : "Clé API"
+              form.provider === "SELF_HOSTED"
+                ? form.apiKeyConfigured
+                  ? "Nouveau jeton d’accès (vide pour conserver)"
+                  : "Jeton d’accès (facultatif)"
+                : form.apiKeyConfigured
+                  ? "Nouvelle clé API (vide pour conserver)"
+                  : "Clé API"
             }
-            required={!form.apiKeyConfigured}
+            required={!form.apiKeyConfigured && form.provider !== "SELF_HOSTED"}
             value={form.apiKey}
             onChange={(event) =>
               setForm({ ...form, apiKey: event.target.value })
@@ -350,7 +400,7 @@ export function AiCopilotSettingsPanel() {
             <Button
               variant="outlined"
               disabled={
-                !form.apiKeyConfigured ||
+                (!form.apiKeyConfigured && form.provider !== "SELF_HOSTED") ||
                 !configurationSaved ||
                 save.isPending ||
                 test.isPending
@@ -359,7 +409,8 @@ export function AiCopilotSettingsPanel() {
             >
               Tester la génération IA
             </Button>
-            {(!form.apiKeyConfigured || !configurationSaved) && (
+            {((!form.apiKeyConfigured && form.provider !== "SELF_HOSTED") ||
+              !configurationSaved) && (
               <Typography variant="caption" color="text.secondary">
                 Enregistrez la configuration avant de lancer le test de
                 génération.

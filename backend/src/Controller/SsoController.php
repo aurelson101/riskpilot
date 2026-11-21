@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Application\OidcClient;
 use App\Application\OidcFlowStore;
+use App\Application\SamlClient;
 use App\Entity\PlatformIntegration;
 use App\Entity\User;
 use App\Repository\PlatformIntegrationRepository;
@@ -16,20 +17,21 @@ use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 final readonly class SsoController
 {
-    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private OidcRoleMapper $roleMapper, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
+    public function __construct(private PlatformIntegrationRepository $integrations, private UserRepository $users, private OidcClient $oidc, private OidcFlowStore $flows, private OidcRoleMapper $roleMapper, private SamlClient $saml, private AuthController $auth, private EntityManagerInterface $entityManager, private RateLimiterFactoryInterface $loginLimiter, private string $appUrl)
     {
     }
 
     #[Route('/api/auth/sso/providers', methods: ['GET'])]
     public function providers(): JsonResponse
     {
-        $items = array_filter($this->integrations->findBy(['type' => 'OIDC', 'enabled' => true]), static fn (PlatformIntegration $item): bool => $item->isCredentialConfigured() && [] !== ($item->getConfiguration()['accountMappings'] ?? []));
-        $response = new JsonResponse(['items' => array_values(array_map(static fn (PlatformIntegration $item): array => ['id' => $item->getId(), 'name' => $item->getName(), 'provider' => $item->getProvider()], $items))]);
+        $items = array_filter($this->integrations->findBy(['enabled' => true]), static fn (PlatformIntegration $item): bool => in_array($item->getType(), ['OIDC', 'SAML'], true) && $item->isCredentialConfigured() && ([] !== ($item->getConfiguration()['accountMappings'] ?? []) || true === ($item->getConfiguration()['linkScimExternalId'] ?? false)));
+        $response = new JsonResponse(['items' => array_values(array_map(static fn (PlatformIntegration $item): array => ['id' => $item->getId(), 'name' => $item->getName(), 'provider' => $item->getProvider(), 'protocol' => $item->getType()], $items))]);
         $response->headers->set('Cache-Control', 'no-store, private');
 
         return $response;
@@ -44,6 +46,9 @@ final readonly class SsoController
             }
             $integration = $this->integration($id);
             $state = bin2hex(random_bytes(32));
+            if ('SAML' === $integration->getType()) {
+                return $this->startSaml($integration, $state);
+            }
             $flow = ['integrationId' => $id, 'fingerprint' => $this->fingerprint($integration), 'nonce' => bin2hex(random_bytes(32)), 'verifier' => bin2hex(random_bytes(32)), 'expiresAt' => time() + 300];
             $url = $this->oidc->authorizationUrl($integration, $this->callbackUrl(), $state, $flow);
             $this->flows->put($state, $flow);
@@ -80,29 +85,105 @@ final readonly class SsoController
                 throw new \RuntimeException('Configuration SSO modifiée.');
             }
             $authentication = $this->oidc->authenticate($integration, $this->callbackUrl(), $code, $flow);
-            $identity = $authentication['subject'];
-            $userId = null;
-            foreach ($integration->getConfiguration()['accountMappings'] as $mapping) {
-                if (hash_equals($mapping['subject'], $identity)) {
-                    $userId = $mapping['userId'];
-                }
-            }
-            $user = null === $userId ? null : $this->users->find($userId);
-            $this->assertAccount($user, $integration);
-            $ticket = bin2hex(random_bytes(32));
-            $this->flows->put($ticket, [
-                'userId' => $userId, 'integrationId' => $integration->getId(), 'fingerprint' => $flow['fingerprint'], 'expiresAt' => time() + 300,
-                // Appliqués seulement une fois le MFA validé, dans complete().
-                'mappedRoles' => $this->roleMapper->mappedRoles($authentication['claims'], $integration->getConfiguration()),
-                'idToken' => $authentication['idToken'], 'endSessionEndpoint' => $authentication['endSessionEndpoint'],
-            ]);
-            $response = $this->redirect('complete');
-            $response->headers->setCookie($this->cookie('riskpilot_sso_ticket', $ticket, Cookie::SAMESITE_STRICT));
 
-            return $response;
+            return $this->issueTicket($integration, $flow['fingerprint'], $authentication['subject'], $authentication['claims'], ['idToken' => $authentication['idToken'], 'endSessionEndpoint' => $authentication['endSessionEndpoint']]);
         } catch (\Throwable) {
             return $this->redirect('error');
         }
+    }
+
+    #[Route('/api/auth/sso/saml/{id}/acs', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function samlAssertion(int $id, Request $request): RedirectResponse
+    {
+        try {
+            $state = $request->request->get('RelayState', '');
+            $cookie = $request->cookies->get('riskpilot_sso_state', '');
+            if (!is_string($state) || '' === $state || !is_string($cookie) || !hash_equals($cookie, $state)) {
+                throw new \RuntimeException('État SSO invalide.');
+            }
+            // La demande est consommée une seule fois : une même réponse ne peut pas être rejouée.
+            $flow = $this->flows->take($state);
+            $response = $request->request->get('SAMLResponse', '');
+            if (null === $flow || ($flow['integrationId'] ?? null) !== $id || !is_string($flow['requestId'] ?? null) || !is_string($response) || '' === $response || strlen($response) > 1_000_000) {
+                throw new \RuntimeException('Parcours SSO expiré.');
+            }
+            $integration = $this->integration($id);
+            if (!hash_equals($flow['fingerprint'], $this->fingerprint($integration))) {
+                throw new \RuntimeException('Configuration SSO modifiée.');
+            }
+            $authentication = $this->saml->authenticate($integration, $this->appUrl, $response, $flow['requestId']);
+
+            return $this->issueTicket($integration, $flow['fingerprint'], $authentication['subject'], $authentication['claims'], []);
+        } catch (\Throwable) {
+            return $this->redirect('error');
+        }
+    }
+
+    #[Route('/api/auth/sso/saml/{id}/metadata', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function samlMetadata(int $id): Response
+    {
+        try {
+            $integration = $this->integration($id);
+            if ('SAML' !== $integration->getType()) {
+                throw new \RuntimeException('Fournisseur non SAML.');
+            }
+
+            return new Response($this->saml->metadata($integration, $this->appUrl), 200, ['Content-Type' => 'application/samlmetadata+xml', 'Cache-Control' => 'no-store']);
+        } catch (\Throwable) {
+            return new Response('', 404);
+        }
+    }
+
+    private function startSaml(PlatformIntegration $integration, string $state): RedirectResponse
+    {
+        $request = $this->saml->authorizationUrl($integration, $this->appUrl, $state);
+        $this->flows->put($state, ['integrationId' => $integration->getId(), 'fingerprint' => $this->fingerprint($integration), 'requestId' => $request['requestId'], 'expiresAt' => time() + 300]);
+        $response = new RedirectResponse($request['url']);
+        // Le fournisseur renvoie l'utilisateur par un POST inter-sites : le cookie de liaison doit alors être SameSite=None (HTTPS).
+        $response->headers->setCookie($this->cookie('riskpilot_sso_state', $state, str_starts_with($this->appUrl, 'https://') ? Cookie::SAMESITE_NONE : Cookie::SAMESITE_LAX));
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
+    }
+
+    /**
+     * Rattache l'identité vérifiée à un compte RiskPilot puis dépose un ticket à usage unique ; le MFA et les rôles
+     * sont traités dans complete().
+     *
+     * @param array<string, mixed> $claims
+     * @param array<string, mixed> $extra
+     */
+    private function issueTicket(PlatformIntegration $integration, string $fingerprint, string $subject, array $claims, array $extra): RedirectResponse
+    {
+        $user = $this->resolveAccount($integration, $subject);
+        $this->assertAccount($user, $integration);
+        $ticket = bin2hex(random_bytes(32));
+        $this->flows->put($ticket, [
+            'userId' => $user->getId(), 'integrationId' => $integration->getId(), 'fingerprint' => $fingerprint, 'expiresAt' => time() + 300,
+            // Appliqués seulement une fois le MFA validé, dans complete().
+            'mappedRoles' => $this->roleMapper->mappedRoles($claims, $integration->getConfiguration()),
+        ] + $extra);
+        $response = $this->redirect('complete');
+        $response->headers->setCookie($this->cookie('riskpilot_sso_ticket', $ticket, Cookie::SAMESITE_STRICT));
+
+        return $response;
+    }
+
+    /** Association explicite d'abord ; à défaut, rattachement par SCIM externalId lorsque l'administrateur l'a autorisé. */
+    private function resolveAccount(PlatformIntegration $integration, string $subject): ?User
+    {
+        $configuration = $integration->getConfiguration();
+        foreach ($configuration['accountMappings'] ?? [] as $mapping) {
+            if (hash_equals($mapping['subject'], $subject)) {
+                return $this->users->find($mapping['userId']);
+            }
+        }
+        if (true === ($configuration['linkScimExternalId'] ?? false)) {
+            return $this->users->findOneBy(['organization' => $integration->getOrganization(), 'scimExternalId' => $subject]);
+        }
+
+        return null;
     }
 
     #[Route('/api/auth/sso/complete', methods: ['POST'])]
@@ -203,7 +284,7 @@ final readonly class SsoController
     private function integration(int $id): PlatformIntegration
     {
         $item = $this->integrations->find($id);
-        if (!$item instanceof PlatformIntegration || 'OIDC' !== $item->getType() || !$item->isEnabled() || !$item->isCredentialConfigured()) {
+        if (!$item instanceof PlatformIntegration || !in_array($item->getType(), ['OIDC', 'SAML'], true) || !$item->isEnabled() || !$item->isCredentialConfigured()) {
             throw new \RuntimeException('SSO indisponible.');
         }
 

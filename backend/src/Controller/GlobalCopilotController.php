@@ -38,6 +38,7 @@ final readonly class GlobalCopilotController
         private RiskScenarioRepository $risks,
         private ActionPlanRepository $actions,
         private EmailSettingsRepository $emailSettings,
+        private \App\Application\RegulatoryAiContext $regulatory,
     ) {
     }
 
@@ -281,6 +282,8 @@ final readonly class GlobalCopilotController
             '/security-controls' => ['Mesures de sécurité', 'Security controls'],
             '/resilience' => ['Incidents et continuité', 'Resilience and continuity'],
             '/regulatory' => ['Vie privée et obligations', 'Privacy and regulatory records'],
+            '/regulatory-notifications' => ['Notifications réglementaires (DORA, CRA, AI Act)', 'Regulatory notifications (DORA, CRA, AI Act)'],
+            '/ai-governance' => ['Gouvernance IA et AI Act', 'AI governance and AI Act'],
             '/isms-documents' => ['Documents ISMS', 'ISMS documents'], '/notifications' => ['Notifications', 'Notifications'],
             '/profile' => ['Profil utilisateur', 'User profile'],
         ];
@@ -360,6 +363,7 @@ final readonly class GlobalCopilotController
                 'provider' => $email->getProvider(),
             ];
         }
+        $context += $this->regulatory->summary($actor, $dataPolicy);
         if ('CONTEXTUAL' !== $dataPolicy) {
             return $context;
         }

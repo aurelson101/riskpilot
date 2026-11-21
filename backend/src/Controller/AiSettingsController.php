@@ -26,6 +26,8 @@ final readonly class AiSettingsController
         'MISTRAL' => ['baseUrl' => 'https://api.mistral.ai/v1', 'model' => 'mistral-large-latest'],
         'OPENAI' => ['baseUrl' => 'https://api.openai.com/v1', 'model' => 'gpt-5-mini'],
         'GEMINI' => ['baseUrl' => 'https://generativelanguage.googleapis.com/v1beta', 'model' => 'gemini-3.5-flash-lite'],
+        // Modèle auto-hébergé : l'adresse est choisie parmi AI_SELF_HOSTED_ENDPOINTS et le nom du modèle est libre.
+        'SELF_HOSTED' => ['baseUrl' => '', 'model' => ''],
     ];
 
     /** Modèles acceptés côté serveur : toute valeur hors liste est refusée, quel que soit le fournisseur. */
@@ -33,6 +35,7 @@ final readonly class AiSettingsController
         'MISTRAL' => ['codestral-latest', 'mistral-large-latest', 'mistral-medium-latest', 'mistral-medium-3-5', 'mistral-small-latest', 'mistral-small-2603', 'ministral-14b-2512'],
         'OPENAI' => ['gpt-5-mini', 'gpt-4.1-mini', 'gpt-4.1'],
         'GEMINI' => ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+        'SELF_HOSTED' => [],
     ];
 
     public function __construct(
@@ -44,6 +47,7 @@ final readonly class AiSettingsController
         private AiInteractionRepository $interactions,
         private RateLimiterFactoryInterface $aiSettingsTestLimiter,
         private \App\Application\AiSystemRegistry $registry,
+        private \App\Application\AiEndpointPolicy $endpoints,
     ) {
     }
 
@@ -85,26 +89,41 @@ final readonly class AiSettingsController
             return $this->error('Le fournisseur IA sélectionné est invalide.');
         }
         $preset = self::PRESETS[$provider];
-        $baseUrl = $preset['baseUrl'];
+        $selfHosted = 'SELF_HOSTED' === $provider;
+        $baseUrl = $selfHosted ? rtrim(trim($input['baseUrl'] ?? ''), '/') : $preset['baseUrl'];
         $model = trim($input['model'] ?? $preset['model']);
         $dataPolicy = strtoupper(trim($input['dataPolicy'] ?? 'MINIMAL'));
         $systemPrompt = trim($input['systemPrompt'] ?? '');
         $enabled = $input['enabled'] ?? false;
-        if (!$this->validHttpsUrl($baseUrl) || '' === $model || mb_strlen($model) > 120 || !in_array($dataPolicy, AiSettings::DATA_POLICIES, true) || mb_strlen($systemPrompt) > 4000) {
+        if ($selfHosted) {
+            if (!$this->endpoints->allows($baseUrl)) {
+                return $this->error('Cette adresse n’est pas autorisée : l’administrateur du serveur doit la déclarer dans AI_SELF_HOSTED_ENDPOINTS.');
+            }
+            if (1 !== preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/@+-]{0,119}$/D', $model)) {
+                return $this->error('Le nom du modèle auto-hébergé est invalide (lettres, chiffres et . _ : / @ + -, 120 caractères au maximum).');
+            }
+        } elseif (!$this->validHttpsUrl($baseUrl)) {
             return $this->error('Vérifiez l’URL HTTPS, le modèle et la politique de données.');
         }
-        if (!in_array($model, self::MODELS[$provider], true)) {
+        if ('' === $model || mb_strlen($model) > 120 || !in_array($dataPolicy, AiSettings::DATA_POLICIES, true) || mb_strlen($systemPrompt) > 4000) {
+            return $this->error('Vérifiez l’URL HTTPS, le modèle et la politique de données.');
+        }
+        if (!$selfHosted && !in_array($model, self::MODELS[$provider], true)) {
             return $this->error('Sélectionnez un modèle pris en charge pour ce fournisseur : '.implode(', ', self::MODELS[$provider]).'.');
         }
         $settings = $this->repository->findOneBy(['organization' => $user->getOrganization()]) ?? new AiSettings($user->getOrganization());
-        if ('' === $apiKey && null !== $settings->getEncryptedApiKey()
-            && ($provider !== $settings->getProvider() || $baseUrl !== $settings->getBaseUrl())) {
-            return $this->error('Saisissez une nouvelle clé API pour changer de fournisseur ou d’URL.');
+        $destinationChanged = $provider !== $settings->getProvider() || $baseUrl !== $settings->getBaseUrl();
+        if ('' === $apiKey && null !== $settings->getEncryptedApiKey() && $destinationChanged) {
+            if (!$selfHosted) {
+                return $this->error('Saisissez une nouvelle clé API pour changer de fournisseur ou d’URL.');
+            }
+            // La clé d'un autre fournisseur ne doit jamais être envoyée à un point d'accès auto-hébergé.
+            $settings->clearApiKey();
         }
         if ('' !== $apiKey) {
             $settings->setEncryptedApiKey($this->cipher->encrypt($apiKey));
         }
-        if ($enabled && null === $settings->getEncryptedApiKey()) {
+        if ($enabled && !$selfHosted && null === $settings->getEncryptedApiKey()) {
             return $this->error('Une clé API est obligatoire pour activer le copilote.');
         }
         if (($input['acknowledgeTerms'] ?? false) === true) {
@@ -126,8 +145,11 @@ final readonly class AiSettingsController
     public function test(): JsonResponse
     {
         $settings = $this->find();
-        if (!$settings instanceof AiSettings || null === $settings->getEncryptedApiKey()) {
+        if (!$settings instanceof AiSettings || (null === $settings->getEncryptedApiKey() && 'SELF_HOSTED' !== $settings->getProvider())) {
             return $this->error('Enregistrez une clé API avant de tester la connexion.');
+        }
+        if ('SELF_HOSTED' === $settings->getProvider() && !$this->endpoints->allows($settings->getBaseUrl())) {
+            return $this->error('Cette adresse n’est plus autorisée par l’administrateur du serveur (AI_SELF_HOSTED_ENDPOINTS).');
         }
         if (!$this->aiSettingsTestLimiter->create('org-'.$settings->getOrganization()->getId())->consume()->isAccepted()) {
             return new JsonResponse(['code' => 'AI_RATE_LIMIT', 'message' => 'Trop de tests de connexion. Réessayez dans une minute.'], JsonResponse::HTTP_TOO_MANY_REQUESTS);
@@ -192,13 +214,13 @@ final readonly class AiSettingsController
     /** @return array<string, mixed> */
     private function serialize(AiSettings $settings): array
     {
-        return ['provider' => $settings->getProvider(), 'baseUrl' => $settings->getBaseUrl(), 'model' => $settings->getModel(), 'apiKeyConfigured' => null !== $settings->getEncryptedApiKey(), 'dataPolicy' => $settings->getDataPolicy(), 'systemPrompt' => $settings->getSystemPrompt(), 'enabled' => $settings->isEnabled(), 'monthlyTokenBudget' => $settings->getMonthlyTokenBudget(), 'dailyCallLimit' => $settings->getDailyCallLimit(), 'termsAcknowledged' => $settings->termsAcknowledged(), 'termsVersion' => AiSettings::TERMS_VERSION, 'termsAcknowledgedAt' => $settings->getTermsAcknowledgedAt()?->format(DATE_ATOM), 'models' => self::MODELS[$settings->getProvider()] ?? [], 'updatedAt' => $settings->getUpdatedAt()->format(DATE_ATOM)];
+        return ['provider' => $settings->getProvider(), 'baseUrl' => $settings->getBaseUrl(), 'model' => $settings->getModel(), 'apiKeyConfigured' => null !== $settings->getEncryptedApiKey(), 'dataPolicy' => $settings->getDataPolicy(), 'systemPrompt' => $settings->getSystemPrompt(), 'enabled' => $settings->isEnabled(), 'monthlyTokenBudget' => $settings->getMonthlyTokenBudget(), 'dailyCallLimit' => $settings->getDailyCallLimit(), 'termsAcknowledged' => $settings->termsAcknowledged(), 'termsVersion' => AiSettings::TERMS_VERSION, 'termsAcknowledgedAt' => $settings->getTermsAcknowledgedAt()?->format(DATE_ATOM), 'models' => self::MODELS[$settings->getProvider()] ?? [], 'selfHostedEndpoints' => $this->endpoints->endpoints(), 'updatedAt' => $settings->getUpdatedAt()->format(DATE_ATOM)];
     }
 
     /** @return array<string, mixed> */
     private function defaults(): array
     {
-        return ['provider' => 'MISTRAL', ...self::PRESETS['MISTRAL'], 'apiKeyConfigured' => false, 'dataPolicy' => 'MINIMAL', 'systemPrompt' => '', 'enabled' => false, 'monthlyTokenBudget' => AiSettings::DEFAULT_MONTHLY_TOKEN_BUDGET, 'dailyCallLimit' => AiSettings::DEFAULT_DAILY_CALL_LIMIT, 'termsAcknowledged' => false, 'termsVersion' => AiSettings::TERMS_VERSION, 'termsAcknowledgedAt' => null, 'models' => self::MODELS['MISTRAL'], 'updatedAt' => null];
+        return ['provider' => 'MISTRAL', ...self::PRESETS['MISTRAL'], 'apiKeyConfigured' => false, 'dataPolicy' => 'MINIMAL', 'systemPrompt' => '', 'enabled' => false, 'monthlyTokenBudget' => AiSettings::DEFAULT_MONTHLY_TOKEN_BUDGET, 'dailyCallLimit' => AiSettings::DEFAULT_DAILY_CALL_LIMIT, 'termsAcknowledged' => false, 'termsVersion' => AiSettings::TERMS_VERSION, 'termsAcknowledgedAt' => null, 'models' => self::MODELS['MISTRAL'], 'selfHostedEndpoints' => $this->endpoints->endpoints(), 'updatedAt' => null];
     }
 
     private function error(string $message): JsonResponse

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\AuditLog;
 use App\Entity\Organization;
 use App\Entity\PlatformIntegration;
 use App\Entity\User;
@@ -235,5 +236,43 @@ final class ScimControllerTest extends WebTestCase
 
         $patch('ROLE_AUDITOR', [['op' => 'add', 'path' => 'members', 'value' => [['value' => (string) $this->memberId]]]], self::FOREIGN_SECRET);
         self::assertResponseStatusCodeSame(403, 'Another organization key without the groups scope is refused.');
+    }
+
+    public function testExternalIdIsStoredUniquePerOrganizationAndWritesAreAudited(): void
+    {
+        $this->scim('POST', '/Users', ['userName' => 'ext@example.test', 'externalId' => 'idp-123', 'name' => ['givenName' => 'Eve', 'familyName' => 'External']]);
+        self::assertResponseStatusCodeSame(201);
+        $created = $this->json();
+        self::assertSame('idp-123', $created['externalId']);
+
+        $this->scim('POST', '/Users', ['userName' => 'ext2@example.test', 'externalId' => 'idp-123', 'name' => ['givenName' => 'Eve', 'familyName' => 'Two']]);
+        self::assertResponseStatusCodeSame(409);
+        $this->scim('POST', '/Users', ['userName' => 'ext3@example.test', 'externalId' => "bad id\n", 'name' => ['givenName' => 'Eve', 'familyName' => 'Three']]);
+        self::assertResponseStatusCodeSame(400);
+        // Another organization may reuse the identifier.
+        $this->scim('POST', '/Users', ['userName' => 'ext4@example.test', 'externalId' => 'idp-123', 'name' => ['givenName' => 'Zed', 'familyName' => 'Other']], self::FOREIGN_SECRET);
+        self::assertResponseStatusCodeSame(201);
+
+        $this->patch((int) $created['id'], [['op' => 'replace', 'path' => 'externalId', 'value' => 'idp-456']]);
+        self::assertSame('idp-456', $this->reload((int) $created['id'])->getScimExternalId());
+        $this->patch($this->memberId, [['op' => 'replace', 'path' => 'externalId', 'value' => 'idp-456']]);
+        self::assertResponseStatusCodeSame(409);
+
+        $logs = $this->entityManager->getRepository(AuditLog::class)->findBy([], ['id' => 'ASC']);
+        self::assertGreaterThanOrEqual(3, count($logs));
+        $first = $logs[0];
+        self::assertSame('POST', $first->getAction());
+        self::assertSame('scim-users', $first->getEntityType());
+        self::assertNull($first->getActorId());
+        self::assertSame('Key', $first->getNewValues()['serviceKey']);
+        self::assertSame('ext@example.test', $first->getNewValues()['request']['userName']);
+        self::assertArrayNotHasKey('name', $first->getNewValues()['request'], 'Only account-management attributes are recorded.');
+        $previous = null;
+        foreach (array_filter($logs, static fn (AuditLog $log): bool => 'Primary' === $log->getOrganization()->getName()) as $log) {
+            self::assertTrue($log->verify($previous), 'SCIM events belong to the sealed hash chain.');
+            $previous = $log->getEventHash();
+        }
+        $this->scim('GET', '/Users');
+        self::assertCount(count($logs), $this->entityManager->getRepository(AuditLog::class)->findAll(), 'Reads are not journaled.');
     }
 }

@@ -1,0 +1,21 @@
+{
+  "realm": "riskpilot", "enabled": true, "sslRequired": "none",
+  "groups": [{"name": "riskpilot-auditors"}],
+  "users": [
+    {"username": "alice@riskpilot.test", "email": "alice@riskpilot.test", "firstName": "Alice", "lastName": "Recette", "enabled": true, "emailVerified": true,
+     "credentials": [{"type": "password", "value": "Recette-Only-1", "temporary": false}], "groups": ["/riskpilot-auditors"]},
+    {"username": "bob@riskpilot.test", "email": "bob@riskpilot.test", "firstName": "Bob", "lastName": "Inconnu", "enabled": true, "emailVerified": true,
+     "credentials": [{"type": "password", "value": "Recette-Only-2", "temporary": false}]}
+  ],
+  "clients": [{
+    "clientId": "https://rp.recette.test/api/auth/sso/saml/1/metadata", "protocol": "saml", "enabled": true,
+    "redirectUris": ["https://rp.recette.test/api/auth/sso/saml/1/acs"],
+    "attributes": {
+      "saml.assertion.signature": "true", "saml.server.signature": "true", "saml.client.signature": "false",
+      "saml.force.post.binding": "true", "saml_name_id_format": "username", "saml.signature.algorithm": "RSA_SHA256",
+      "saml_assertion_consumer_url_post": "https://rp.recette.test/api/auth/sso/saml/1/acs", "saml.authnstatement": "true"
+    },
+    "protocolMappers": [{"name": "groups", "protocol": "saml", "protocolMapper": "saml-group-membership-mapper",
+      "config": {"attribute.name": "Role", "single": "false", "full.path": "false", "friendly.name": "Role", "attribute.nameformat": "Basic"}}]
+  }]
+}

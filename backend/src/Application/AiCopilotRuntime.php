@@ -60,7 +60,7 @@ final readonly class AiCopilotRuntime
 
     public function isUsable(?AiSettings $settings): bool
     {
-        return $settings instanceof AiSettings && $settings->isEnabled() && null !== $settings->getEncryptedApiKey()
+        return $settings instanceof AiSettings && $settings->isEnabled() && (null !== $settings->getEncryptedApiKey() || 'SELF_HOSTED' === $settings->getProvider())
             && $settings->termsAcknowledged() && in_array($settings->getProvider(), AiSettings::PROVIDERS, true);
     }
 

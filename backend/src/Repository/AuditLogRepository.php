@@ -31,7 +31,12 @@ final class AuditLogRepository extends ServiceEntityRepository
 
     public function latestHashFor(User $actor): ?string
     {
-        $log = $this->findOneBy(['organization' => $actor->getOrganization(), 'hashVersion' => 2], ['createdAt' => 'DESC', 'id' => 'DESC']);
+        return $this->latestHashForOrganization($actor->getOrganization());
+    }
+
+    public function latestHashForOrganization(Organization $organization): ?string
+    {
+        $log = $this->findOneBy(['organization' => $organization, 'hashVersion' => 2], ['createdAt' => 'DESC', 'id' => 'DESC']);
 
         return $log?->getEventHash();
     }

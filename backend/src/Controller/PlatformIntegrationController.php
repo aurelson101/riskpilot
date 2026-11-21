@@ -63,7 +63,7 @@ use Symfony\Component\Routing\Attribute\Route;
             return $this->invalid('Type, fournisseur, nom, configuration ou état d’activation invalide.');
         }
         $type = strtoupper(trim($data['type']));
-        if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR', 'OIDC'], true)) {
+        if (!in_array($type, ['DIRECTORY', 'API_KEY', 'CONNECTOR', 'OIDC', 'SAML'], true)) {
             return $this->invalid('Cette intégration n’est pas encore raccordée à un parcours complet et ne peut pas être activée.');
         }
         try {
@@ -88,7 +88,7 @@ use Symfony\Component\Routing\Attribute\Route;
                 }
                 $item->setEncryptedCredential($this->cipher->encrypt($password));
             }
-            if ('OIDC' === $type) {
+            if (in_array($type, ['OIDC', 'SAML'], true)) {
                 $this->validateSso($item, $configuration, $data['enabled'] ?? false);
             }
             $item->update($item->getName(), $configuration, $data['enabled'] ?? false);
@@ -196,6 +196,9 @@ use Symfony\Component\Routing\Attribute\Route;
                     $item->setEncryptedCredential($this->cipher->encrypt($data['credential']));
                 }
             }
+            if ('SAML' === $item->getType()) {
+                $this->validateSso($item, $configuration, $enabled);
+            }
             $item->update($data['name'] ?? $item->getName(), $configuration, $enabled);
         } catch (\InvalidArgumentException $e) {
             return $this->invalid($e->getMessage());
@@ -267,7 +270,7 @@ use Symfony\Component\Routing\Attribute\Route;
     private function validateSso(PlatformIntegration $item, array $configuration, bool $enabled): void
     {
         if (!is_array($configuration['accountMappings'] ?? null)) {
-            throw new \InvalidArgumentException('Associations de comptes OIDC requises.');
+            throw new \InvalidArgumentException('Associations de comptes SSO requises (liste éventuellement vide avec le rattachement par SCIM).');
         }
         if (!in_array($item->getProvider(), ['MICROSOFT_ENTRA', 'GOOGLE_WORKSPACE', 'KEYCLOAK', 'AUTHENTIK', 'GENERIC'], true)) {
             throw new \InvalidArgumentException('Fournisseur SSO non pris en charge.');
@@ -278,7 +281,7 @@ use Symfony\Component\Routing\Attribute\Route;
                 throw new \InvalidArgumentException('Les comptes SSO doivent appartenir à votre organisation.');
             }
         }
-        if ($enabled) {
+        if ($enabled && 'OIDC' === $item->getType()) {
             try {
                 $metadata = $this->oidcDiscoveryValidator->discover($item->getProvider(), (string) ($configuration['issuer'] ?? ''));
                 if (!in_array('RS256', $metadata['id_token_signing_alg_values_supported'], true)) {

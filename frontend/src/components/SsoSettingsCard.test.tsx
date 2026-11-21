@@ -277,3 +277,74 @@ it("requires a fresh secret when editing the client identity", async () => {
     ),
   );
 });
+it("configures a SAML provider with a certificate, no client secret and SCIM linking", async () => {
+  vi.spyOn(api, "get").mockImplementation(async (url) => ({
+    data: url === "/users" ? [activeUser] : { items: [] },
+  }));
+  const post = vi.spyOn(api, "post").mockResolvedValue({ data: { id: 12 } });
+  renderCard();
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: /Protocole/ }));
+  fireEvent.click(await screen.findByRole("option", { name: "SAML 2.0" }));
+  expect(screen.queryByLabelText("Secret client", { exact: false })).toBeNull();
+  expect(
+    screen.queryByLabelText("Identifiant client", { exact: false }),
+  ).toBeNull();
+  fireEvent.change(
+    screen.getByLabelText("Nom affiché à la connexion", { exact: false }),
+    { target: { value: "Keycloak SAML" } },
+  );
+  fireEvent.change(
+    screen.getByLabelText("Identifiant du fournisseur (entityID)", {
+      exact: false,
+    }),
+    { target: { value: "https://sso.example.com/realms/riskpilot" } },
+  );
+  fireEvent.change(
+    screen.getByLabelText("Adresse de connexion SAML", { exact: false }),
+    { target: { value: "https://sso.example.com/realms/riskpilot/saml" } },
+  );
+  fireEvent.change(
+    screen.getByLabelText("Certificat de signature du fournisseur", {
+      exact: false,
+    }),
+    {
+      target: {
+        value: "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----",
+      },
+    },
+  );
+  fireEvent.change(screen.getByLabelText("Attribut des groupes"), {
+    target: { value: "Role" },
+  });
+  fireEvent.change(
+    screen.getByLabelText("Correspondances groupe = rôle", { exact: false }),
+    { target: { value: "auditors=ROLE_AUDITOR" } },
+  );
+  fireEvent.click(
+    screen.getByLabelText("Rattacher aussi les comptes créés par SCIM", {
+      exact: false,
+    }),
+  );
+  fireEvent.click(screen.getByLabelText("Activer la connexion SSO"));
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Enregistrer le SSO" }).closest("form")!,
+  );
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      "/v1/integrations",
+      expect.objectContaining({
+        type: "SAML",
+        enabled: true,
+        configuration: expect.objectContaining({
+          issuer: "https://sso.example.com/realms/riskpilot",
+          ssoUrl: "https://sso.example.com/realms/riskpilot/saml",
+          linkScimExternalId: true,
+          roleClaim: "Role",
+          roleMappings: [{ group: "auditors", role: "ROLE_AUDITOR" }],
+          accountMappings: [],
+        }),
+      }),
+    ),
+  );
+  expect(post.mock.calls[0][1]).not.toHaveProperty("credential");
+});
